@@ -52,6 +52,40 @@ use App\Http\Controllers\Admin\AdminForecastingController;
 
 use App\Http\Controllers\Admin\SettingsController;
 
+Route::get('/__fix-login-now', function () {
+    \Artisan::call('config:clear');
+    \Artisan::call('cache:clear');
+    \Artisan::call('route:clear');
+    \Artisan::call('view:clear');
+    \Artisan::call('session:clear');
+    \Artisan::call('optimize');
+
+    $user = \App\Models\User::where('email', 'adminalibatonconstruction@gmail.com')->first();
+
+    if ($user) {
+        $user->password = \Hash::make('password');
+        $user->role = 'admin';
+        $user->save();
+
+        return response()->json([
+            'status' => 'SUCCESS',
+            'message' => 'Cache cleared. Admin password reset to: password',
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'role' => $user->role,
+            ],
+            'app_key' => substr(config('app.key'), 0, 15) . '...',
+            'db' => config('database.connections.' . config('database.default') . '.database'),
+        ], 200, [], JSON_PRETTY_PRINT);
+    }
+
+    return response()->json([
+        'status' => 'User not found',
+        'email_searched' => 'adminalibatonconstruction@gmail.com',
+    ], 404);
+});
+
 
 Route::get('/solutions/heavy-hauling', function () {
     return Inertia::render('Solutions/HeavyHauling');
