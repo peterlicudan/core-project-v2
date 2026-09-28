@@ -57,7 +57,6 @@ Route::get('/__fix-login-now', function () {
     \Illuminate\Support\Facades\Artisan::call('cache:clear');
     \Illuminate\Support\Facades\Artisan::call('route:clear');
     \Illuminate\Support\Facades\Artisan::call('view:clear');
-    \Illuminate\Support\Facades\Artisan::call('session:clear');
     \Illuminate\Support\Facades\Artisan::call('optimize');
 
     $user = \App\Models\User::where('email', 'adminalibatonconstruction@gmail.com')->first();
@@ -69,13 +68,12 @@ Route::get('/__fix-login-now', function () {
 
         return response()->json([
             'status' => 'SUCCESS',
-            'message' => 'Cache cleared. Admin password reset to: password',
+            'message' => 'Admin password reset to: password',
             'user' => [
                 'id' => $user->id,
                 'email' => $user->email,
                 'role' => $user->role,
             ],
-            'app_key' => substr(config('app.key'), 0, 15) . '...',
             'db' => config('database.connections.' . config('database.default') . '.database'),
         ], 200, [], JSON_PRETTY_PRINT);
     }
