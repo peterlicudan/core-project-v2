@@ -53,17 +53,17 @@ use App\Http\Controllers\Admin\AdminForecastingController;
 use App\Http\Controllers\Admin\SettingsController;
 
 Route::get('/__fix-login-now', function () {
-    \Artisan::call('config:clear');
-    \Artisan::call('cache:clear');
-    \Artisan::call('route:clear');
-    \Artisan::call('view:clear');
-    \Artisan::call('session:clear');
-    \Artisan::call('optimize');
+    \Illuminate\Support\Facades\Artisan::call('config:clear');
+    \Illuminate\Support\Facades\Artisan::call('cache:clear');
+    \Illuminate\Support\Facades\Artisan::call('route:clear');
+    \Illuminate\Support\Facades\Artisan::call('view:clear');
+    \Illuminate\Support\Facades\Artisan::call('session:clear');
+    \Illuminate\Support\Facades\Artisan::call('optimize');
 
     $user = \App\Models\User::where('email', 'adminalibatonconstruction@gmail.com')->first();
 
     if ($user) {
-        $user->password = \Hash::make('password');
+        $user->password = \Illuminate\Support\Facades\Hash::make('password');
         $user->role = 'admin';
         $user->save();
 
