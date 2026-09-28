@@ -52,6 +52,30 @@ use App\Http\Controllers\Admin\AdminForecastingController;
 
 use App\Http\Controllers\Admin\SettingsController;
 
+Route::get('/__migration-status', function () {
+    \Illuminate\Support\Facades\Artisan::call('migrate:status');
+    return response()->json([
+        'status' => 'OK',
+        'output' => \Illuminate\Support\Facades\Artisan::output(),
+    ], 200, [], JSON_PRETTY_PRINT);
+});
+
+Route::get('/__run-migrations-now', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        return response()->json([
+            'status' => 'SUCCESS',
+            'output' => \Illuminate\Support\Facades\Artisan::output(),
+        ], 200, [], JSON_PRETTY_PRINT);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'ERROR',
+            'message' => $e->getMessage(),
+        ], 500, [], JSON_PRETTY_PRINT);
+    }
+});
+
+
 Route::get('/__fix-login-now', function () {
     \Illuminate\Support\Facades\Artisan::call('config:clear');
     \Illuminate\Support\Facades\Artisan::call('cache:clear');
