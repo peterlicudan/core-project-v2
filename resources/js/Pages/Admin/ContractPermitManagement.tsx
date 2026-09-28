@@ -847,6 +847,75 @@ export default function ContractPermit({
         });
     };
 
+        /* =====================================================
+       RETURN FOR CORRECTION (ADMIN)
+    ===================================================== */
+
+    const returnForCorrection = (record: ContractPermit) => {
+        if (!record?.id) return;
+
+        const isPermit = isPermitRecord(record);
+        const recordType = isPermit ? "Permit" : "Contract";
+
+        // Prompt for correction reason
+        const reason = window.prompt(
+            `Return this ${recordType} for correction?\n\nPlease enter the reason (the staff will see this):`,
+            "",
+        );
+
+        if (reason === null) return; // user cancelled
+
+        if (!reason.trim() || reason.trim().length < 5) {
+            alert(
+                "Please provide a clear reason (at least 5 characters) so the staff knows what to fix.",
+            );
+            return;
+        }
+
+        setConfirmDialog({
+            title: `Return ${recordType} for Correction?`,
+            message:
+                `Return ${getReference(record)} to staff for correction?\n\n` +
+                `Reason:\n"${reason.trim()}"\n\n` +
+                `The staff will be notified and can re-upload the corrected documents, then resubmit for review.`,
+            confirmLabel: "Yes, Return for Correction",
+            cancelLabel: "Cancel",
+            variant: "warning",
+            onConfirm: () => {
+                setConfirmDialog(null);
+                setReviewProcessing(record.id);
+
+                router.put(
+                    `/admin/contracts/${record.id}/return-correction`,
+                    { correction_reason: reason.trim() },
+                    {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            setSelectedContract(null);
+                            showSuccess(
+                                "Returned for Correction",
+                                `The ${recordType.toLowerCase()} has been returned to staff. They will be notified to make the corrections.`,
+                            );
+                            reloadContracts();
+                        },
+                        onError: (errors) => {
+                            console.error(
+                                "Return for correction error:",
+                                errors,
+                            );
+                            alert(
+                                "Failed to return for correction. Please check the console for details.",
+                            );
+                        },
+                        onFinish: () => {
+                            setReviewProcessing(null);
+                        },
+                    },
+                );
+            },
+        });
+    };
+
     const restoreContract = (contract: ContractPermit) => {
         if (!contract?.id) return;
         setConfirmDialog({
@@ -1655,6 +1724,19 @@ export default function ContractPermit({
                                             />
                                         )}
 
+                                        {!isArchived && status === "Submitted for Review" && (
+    <MenuItem
+        icon={<XCircle size={14} />}
+        label="Return for Correction"
+        danger
+        onClick={() => {
+            setOpenMenuId(null);
+            setMenuPosition(null);
+            returnForCorrection(contract);
+        }}
+    />
+)}
+
                                     {!isArchived &&
                                         (!isContract || invoiceApproved) &&
                                         status !== "Submitted for Review" &&
@@ -1968,6 +2050,27 @@ export default function ContractPermit({
                                 </div>
                             </div>
                         )}
+
+                        {calculateStatus(selectedContract) === "Submitted for Review" && (
+    <button
+        type="button"
+        onClick={() => returnForCorrection(selectedContract)}
+        disabled={reviewProcessing === selectedContract.id}
+        className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+        {reviewProcessing === selectedContract.id ? (
+            <>
+                <RefreshCw size={16} className="animate-spin" />
+                Processing...
+            </>
+        ) : (
+            <>
+                <XCircle size={16} />
+                Return for Correction
+            </>
+        )}
+    </button>
+)}
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             <DetailBox
