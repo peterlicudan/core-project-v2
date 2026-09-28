@@ -844,11 +844,12 @@ export default function ContractPermit({
             );
             return;
         }
-        const message =
+           const message =
             workflow === "Needs Correction"
                 ? "The corrected record will be submitted to Admin for final review. Continue?"
                 : "Submit this record to Admin for final review?";
         if (!window.confirm(message)) return;
+
         router.post(
             `/contract-permit/${contract.id}/submit-review`,
             {},
@@ -860,6 +861,13 @@ export default function ContractPermit({
                         "The record has been submitted to Admin for final review. You will be notified once it is approved.",
                     );
                     reloadContracts();
+                },
+                onError: (errors) => {
+                    console.error("Submit for review error:", errors);
+                    const errorMsg =
+                        Object.values(errors).join("\n") ||
+                        "Failed to submit for review. Please try again.";
+                    alert(errorMsg);
                 },
             },
         );
