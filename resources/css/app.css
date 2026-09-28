@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+
+@keyframes galleryMove {
+
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
+    }
+
+}
+
+
+.gallery-scroll {
+
+    display: flex;
+    width: max-content;
+    animation: galleryMove 35s linear infinite;
+    will-change: transform;
+
+}
+
+
+.gallery-scroll:hover {
+
+    animation-play-state: paused;
+
+}
