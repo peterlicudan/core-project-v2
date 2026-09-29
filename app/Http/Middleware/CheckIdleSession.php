@@ -12,7 +12,7 @@ class CheckIdleSession
     /**
      * Idle timeout in seconds (20 minutes).
      */
-   protected int $timeout = 5 * 60;
+   protected int $timeout = 10 * 60;
 
     public function handle(Request $request, Closure $next): Response
     {
