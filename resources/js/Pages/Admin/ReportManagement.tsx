@@ -554,14 +554,21 @@ function sanitizeOklchColors(root: HTMLElement): void {
 
 /*
 |--------------------------------------------------------------------------
-| MAIN ADMIN COMPONENT — Contract Management Style
+| MAIN ADMIN COMPONENT
 |--------------------------------------------------------------------------
 */
 
 export default function AdminReportManagement() {
+    // Existing: filter for the LIST view
     const [reportType, setReportType] = useState<ReportType>("All");
     const [dateRange, setDateRange] = useState<DateRangeOption>("Last 6 Months");
     const [client, setClient] = useState("All Clients");
+
+    // ✅ NEW: state for the GENERATE form
+    const [generateReportType, setGenerateReportType] = useState<ReportType>("All");
+    const [generateDateRange, setGenerateDateRange] = useState<DateRangeOption>("Last 6 Months");
+    const [generateClient, setGenerateClient] = useState("All Clients");
+    const [generating, setGenerating] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [rows, setRows] = useState<ReportRow[]>([]);
@@ -648,7 +655,7 @@ export default function AdminReportManagement() {
 
     /*
     |--------------------------------------------------------------------------
-    | FETCH REPORTS
+    | FETCH REPORTS (LIST)
     |--------------------------------------------------------------------------
     */
 
@@ -720,6 +727,88 @@ export default function AdminReportManagement() {
     useEffect(() => {
         void fetchReports();
     }, [fetchReports]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ GENERATE REPORT — Admin creates own report
+    |--------------------------------------------------------------------------
+    */
+
+    const handleGenerate = async (event: React.FormEvent) => {
+        event.preventDefault();
+
+        if (generating) return;
+
+        setGenerating(true);
+
+        try {
+            const dates = getDateRangeValues(generateDateRange);
+            const selectedClient =
+                generateClient === "All Clients" ? null : generateClient;
+
+            const response = await fetch("/admin/reports/save", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({
+                    name: null,
+                    type: generateReportType,
+                    report_type: generateReportType,
+                    start_date: dates.start_date,
+                    end_date: dates.end_date,
+                    client: selectedClient,
+                    client_name: selectedClient,
+                    ai_generated: false,
+                }),
+            });
+
+            const body = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                const validationMessage = body?.errors
+                    ? Object.values(body.errors).flat().join(" ")
+                    : null;
+
+                throw new Error(
+                    validationMessage ??
+                        body?.message ??
+                        `Request failed: ${response.status}`,
+                );
+            }
+
+            if (!body?.success) {
+                throw new Error(
+                    body?.message ?? "Report could not be created.",
+                );
+            }
+
+            pushToast({
+                type: "success",
+                title: "Report generated",
+                message: `${
+                    selectedClient ?? "All Clients"
+                } report created successfully.`,
+            });
+
+            // Refresh the list so the new report appears
+            await fetchReports();
+        } catch (error) {
+            console.error("Failed to generate admin report:", error);
+            pushToast({
+                type: "error",
+                title: "Failed to generate report",
+                message:
+                    error instanceof Error ? error.message : "Please try again.",
+            });
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     /*
     |--------------------------------------------------------------------------
@@ -876,7 +965,7 @@ export default function AdminReportManagement() {
 
     /*
     |--------------------------------------------------------------------------
-    | RENDER — Contract Management Style
+    | RENDER
     |--------------------------------------------------------------------------
     */
 
@@ -898,16 +987,15 @@ export default function AdminReportManagement() {
                             </h1>
 
                             <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-                                Overview of all reports submitted across users and
-                                clients. Review, download, or remove records as
-                                needed.
+                                Generate your own admin reports and manage them here.
+                                Reports are private to your admin account.
                             </p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/15 bg-yellow-400/[0.05] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-yellow-400">
-                                <Eye size={12} />
-                                View Only
+                                <Sparkles size={12} />
+                                Admin Only
                             </span>
 
                             <button
@@ -925,36 +1013,122 @@ export default function AdminReportManagement() {
                         </div>
                     </div>
 
-{/* STATS — 2 Full-Width Cards */}
-<div className="mb-6 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
-    <StatCard
-        label="Total Reports"
-        value={summary.total_reports}
-        delta={summary.reports_delta}
-        icon={<FileBarChart size={18} />}
-        tone="yellow"
-    />
-    <StatCard
-        label="Active Users"
-        value={summary.total_users}
-        delta={summary.users_delta}
-        icon={<Users size={18} />}
-        tone="blue"
-    />
-</div>
+                    {/* ✅ GENERATE REPORT FORM */}
+                    <form
+                        onSubmit={handleGenerate}
+                        className="mb-6 rounded-3xl border border-yellow-400/10 bg-yellow-400/[0.02] p-4 shadow-xl sm:p-5"
+                    >
+                        <div className="mb-4 flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-black">
+                                <FileBarChart size={18} />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-black text-white">
+                                    Generate Admin Report
+                                </h2>
+                                <p className="text-[10px] text-zinc-600">
+                                    Create a private report based on selected filters. Only you can see this.
+                                </p>
+                            </div>
+                        </div>
 
+                        <div className="grid gap-4 lg:grid-cols-4">
+                            <FilterField
+                                label="Report Type"
+                                value={generateReportType}
+                                onChange={(value) =>
+                                    setGenerateReportType(value as ReportType)
+                                }
+                                options={[
+                                    ["All", "All Reports"],
+                                    ["Operations", "Operations"],
+                                    ["Compliance", "Compliance"],
+                                    ["Documents", "Documents"],
+                                    ["Job Orders", "Job Orders"],
+                                    ["Financial", "Financial"],
+                                    ["Billing", "Billing"],
+                                    ["Accounts Receivable", "Accounts Receivable"],
+                                ]}
+                            />
+
+                            <FilterField
+                                label="Date Range"
+                                value={generateDateRange}
+                                onChange={(value) =>
+                                    setGenerateDateRange(value as DateRangeOption)
+                                }
+                                options={[
+                                    ["Last 6 Months", "Last 6 Months"],
+                                    ["This Month", "This Month"],
+                                    ["This Quarter", "This Quarter"],
+                                    ["This Year", "This Year"],
+                                    ["Last 30 Days", "Last 30 Days"],
+                                ]}
+                                icon={<CalendarDays size={14} />}
+                            />
+
+                            <FilterField
+                                label="Client"
+                                value={generateClient}
+                                onChange={setGenerateClient}
+                                options={[
+                                    ["All Clients", "All Clients"],
+                                    ...clients.map(
+                                        (item) =>
+                                            [item, item] as [string, string],
+                                    ),
+                                ]}
+                                icon={<User size={14} />}
+                            />
+
+                            <div className="flex items-end">
+                                <button
+                                    type="submit"
+                                    disabled={generating}
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 py-3 text-xs font-black text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {generating ? (
+                                        <RefreshCw
+                                            size={14}
+                                            className="animate-spin"
+                                        />
+                                    ) : (
+                                        <FileBarChart size={14} />
+                                    )}
+                                    {generating ? "Generating..." : "Generate Report"}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    {/* STATS — 2 Full-Width Cards */}
+                    <div className="mb-6 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+                        <StatCard
+                            label="Total Reports"
+                            value={summary.total_reports}
+                            delta={summary.reports_delta}
+                            icon={<FileBarChart size={18} />}
+                            tone="yellow"
+                        />
+                        <StatCard
+                            label="Active Users"
+                            value={summary.total_users}
+                            delta={summary.users_delta}
+                            icon={<Users size={18} />}
+                            tone="blue"
+                        />
+                    </div>
 
                     {/* RECORDS */}
                     <div className="min-w-0">
                         <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="text-lg font-black text-white">
-                                    All Company Reports
+                                    My Admin Reports
                                 </h2>
 
                                 <p className="mt-1 text-xs text-zinc-600">
-                                    Review all reports submitted by users and
-                                    clients.
+                                    These reports belong to your admin account only.
                                 </p>
                             </div>
 
@@ -986,8 +1160,7 @@ export default function AdminReportManagement() {
                                 </h3>
 
                                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
-                                    There are no reports matching your current
-                                    filters.
+                                    Generate your first admin report above.
                                 </p>
                             </div>
                         ) : (
@@ -1046,9 +1219,7 @@ export default function AdminReportManagement() {
 
                                                                 {rowClient && (
                                                                     <p className="mt-0.5 truncate text-[10px] font-medium text-zinc-600">
-                                                                        {
-                                                                            rowClient
-                                                                        }
+                                                                        {rowClient}
                                                                     </p>
                                                                 )}
                                                             </div>
@@ -1058,9 +1229,7 @@ export default function AdminReportManagement() {
                                                     <td className="px-5 py-4">
                                                         <div className="flex items-center gap-2 text-xs text-zinc-400">
                                                             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-yellow-400/10 bg-yellow-400/[0.05] text-yellow-400">
-                                                                <Shield
-                                                                    size={12}
-                                                                />
+                                                                <Shield size={12} />
                                                             </div>
 
                                                             <div className="min-w-0">
@@ -1072,9 +1241,7 @@ export default function AdminReportManagement() {
 
                                                                 {row.owner_email && (
                                                                     <p className="mt-0.5 truncate text-[10px] text-zinc-600">
-                                                                        {
-                                                                            row.owner_email
-                                                                        }
+                                                                        {row.owner_email}
                                                                     </p>
                                                                 )}
                                                             </div>
@@ -1087,16 +1254,13 @@ export default function AdminReportManagement() {
                                                                 size={13}
                                                                 className="text-yellow-400"
                                                             />
-                                                            {rowClient ||
-                                                                "All Clients"}
+                                                            {rowClient || "All Clients"}
                                                         </span>
                                                     </td>
 
                                                     <td className="px-5 py-4">
                                                         <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-zinc-400">
-                                                            {row.type ||
-                                                                row.report_type ||
-                                                                "All"}
+                                                            {row.type || row.report_type || "All"}
                                                         </span>
                                                     </td>
 
@@ -1105,57 +1269,38 @@ export default function AdminReportManagement() {
                                                     </td>
 
                                                     <td className="px-5 py-4 text-xs text-zinc-400">
-                                                        {formatDateDisplay(
-                                                            row.generated_on,
-                                                        )}
+                                                        {formatDateDisplay(row.generated_on)}
                                                     </td>
 
                                                     <td className="px-5 py-4">
                                                         <div className="flex items-center gap-1.5">
                                                             <button
                                                                 type="button"
-                                                                onClick={() =>
-                                                                    handleView(
-                                                                        row,
-                                                                    )
-                                                                }
+                                                                onClick={() => handleView(row)}
                                                                 className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-zinc-500 transition hover:border-yellow-400/30 hover:bg-yellow-400/[0.07] hover:text-yellow-400"
                                                                 title="View"
                                                             >
-                                                                <Eye
-                                                                    size={14}
-                                                                />
+                                                                <Eye size={14} />
                                                             </button>
 
                                                             <button
                                                                 type="button"
-                                                                onClick={() =>
-                                                                    handleDownload(
-                                                                        row,
-                                                                    )
-                                                                }
+                                                                onClick={() => handleDownload(row)}
                                                                 className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-zinc-500 transition hover:border-yellow-400/30 hover:bg-yellow-400/[0.07] hover:text-yellow-400"
                                                                 title="Download PDF"
                                                             >
-                                                                <Download
-                                                                    size={14}
-                                                                />
+                                                                <Download size={14} />
                                                             </button>
 
                                                             <button
                                                                 type="button"
                                                                 onClick={(event) =>
-                                                                    openMenu(
-                                                                        event,
-                                                                        row.id,
-                                                                    )
+                                                                    openMenu(event, row.id)
                                                                 }
                                                                 className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-zinc-500 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                                                                 title="More"
                                                             >
-                                                                <MoreVertical
-                                                                    size={14}
-                                                                />
+                                                                <MoreVertical size={14} />
                                                             </button>
                                                         </div>
                                                     </td>
@@ -1166,7 +1311,6 @@ export default function AdminReportManagement() {
                                 </table>
                             </div>
                         )}
-
                     </div>
                 </div>
             </div>
@@ -1214,10 +1358,7 @@ export default function AdminReportManagement() {
                                 onClick={() => handleDownload(row)}
                                 className="flex w-full items-center gap-2 border-b border-white/5 px-4 py-3 text-left text-xs font-bold text-zinc-300 transition hover:bg-white/[0.04] hover:text-white"
                             >
-                                <Download
-                                    size={14}
-                                    className="text-yellow-400"
-                                />
+                                <Download size={14} className="text-yellow-400" />
                                 Download PDF
                             </button>
 
@@ -1227,7 +1368,7 @@ export default function AdminReportManagement() {
                                 className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs font-bold text-red-400 transition hover:bg-red-400/[0.07]"
                             >
                                 <Trash2 size={14} />
-                                Delete (Admin)
+                                Delete
                             </button>
                         </div>
                     );
@@ -1243,7 +1384,7 @@ export default function AdminReportManagement() {
                         pushToast({
                             type: "success",
                             title: "PDF downloaded",
-                            message: "Company report saved as PDF.",
+                            message: "Admin report saved as PDF.",
                         });
                     }}
                     onDownloadError={(message) => {
@@ -1272,7 +1413,7 @@ export default function AdminReportManagement() {
                                     </h2>
 
                                     <p className="mt-1 text-xs leading-5 text-zinc-600">
-                                        Admin Override
+                                        This action cannot be undone.
                                     </p>
                                 </div>
                             </div>
@@ -1300,8 +1441,8 @@ export default function AdminReportManagement() {
                                         </p>
 
                                         <p className="mt-1 break-words text-xs leading-5 text-red-300/60">
-                                            This will permanently remove the
-                                            report owned by{" "}
+                                            This will permanently remove the report
+                                            owned by{" "}
                                             <strong className="text-red-300">
                                                 {deletingReport.owner_name ??
                                                     deletingReport.created_by}
