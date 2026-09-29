@@ -1504,13 +1504,18 @@ Route::post('/logout', [
     AdminAuthController::class,
     'destroy',
 ])->middleware('auth')->name('logout');
-        /*
+              /*
         |--------------------------------------------------------------------------
         | ADMIN FORECASTING
         |--------------------------------------------------------------------------
         */
 
-               Route::get('/forecasting/data', [
+        Route::get('/forecasting', [
+            AdminForecastingController::class,
+            'index',
+        ])->name('forecasting');
+
+        Route::get('/forecasting/data', [
             AdminForecastingController::class,
             'data',
         ])->name('forecasting.data');
