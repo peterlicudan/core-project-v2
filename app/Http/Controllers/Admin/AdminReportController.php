@@ -5,17 +5,30 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Report;
 use App\Models\User;
+use App\Services\ReportService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class AdminReportController extends Controller
 {
+    protected ReportService $reportService;
+
+    public function __construct(ReportService $reportService)
+    {
+        $this->reportService = $reportService;
+    }
+
     /*
     |--------------------------------------------------------------------------
-    | LIST — Company-wide reports (all users, all clients)
+    | LIST — Admin's OWN reports only (Full Separation)
     |--------------------------------------------------------------------------
+    |
+    | ✅ FULL SEPARATION:
+    | - Admin nakikita lang ang SARILING reports (created_by = Auth::id())
+    | - Hindi kasama ang reports ng staff
+    |
     */
 
     public function index(Request $request)
@@ -26,7 +39,10 @@ class AdminReportController extends Controller
         $client     = $request->query('client', 'All Clients');
         $owner      = $request->query('owner', 'All Users');
 
-        $query = Report::query()->with('user:id,name,email');
+        // ✅ FULL SEPARATION — sariling reports lang ng admin
+        $query = Report::query()
+            ->where('created_by', Auth::id())
+            ->with('user:id,name,email');
 
         if ($startDate && $endDate) {
             $query->whereBetween('created_at', [
@@ -55,7 +71,6 @@ class AdminReportController extends Controller
 
         $reports = $query->orderByDesc('created_at')->get();
 
-        // Map to include owner name
         $mapped = $reports->map(function ($report) {
             $arr = $report->toArray();
             $arr['user'] = $report->user ? [
@@ -76,13 +91,15 @@ class AdminReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | COMPANY-WIDE SUMMARY
+    | ADMIN'S OWN SUMMARY
     |--------------------------------------------------------------------------
     */
 
     private function computeCompanySummary(?string $startDate, ?string $endDate): array
     {
-        $base = Report::query();
+        // ✅ FULL SEPARATION — sariling reports lang
+        $base = Report::query()
+            ->where('created_by', Auth::id());
 
         if ($startDate && $endDate) {
             $base->whereBetween('created_at', [
@@ -102,25 +119,39 @@ class AdminReportController extends Controller
                                      ->count('client');
         $totalAiReports = (clone $base)->where('ai_generated', true)->count();
 
-        // Deltas — last 30 days vs previous 30 days
         $last30Start = now()->subDays(30);
         $prev30Start = now()->subDays(60);
         $prev30End   = now()->subDays(30);
 
-        $last30 = Report::where('created_at', '>=', $last30Start)->count();
-        $prev30 = Report::whereBetween('created_at', [$prev30Start, $prev30End])->count();
+        $last30 = Report::where('created_by', Auth::id())
+            ->where('created_at', '>=', $last30Start)
+            ->count();
 
-        $usersLast30 = Report::where('created_at', '>=', $last30Start)
-            ->distinct('created_by')->count('created_by');
-        $usersPrev30 = Report::whereBetween('created_at', [$prev30Start, $prev30End])
-            ->distinct('created_by')->count('created_by');
+        $prev30 = Report::where('created_by', Auth::id())
+            ->whereBetween('created_at', [$prev30Start, $prev30End])
+            ->count();
 
-        $clientsLast30 = Report::where('created_at', '>=', $last30Start)
+        $usersLast30 = Report::where('created_by', Auth::id())
+            ->where('created_at', '>=', $last30Start)
+            ->distinct('created_by')
+            ->count('created_by');
+
+        $usersPrev30 = Report::where('created_by', Auth::id())
+            ->whereBetween('created_at', [$prev30Start, $prev30End])
+            ->distinct('created_by')
+            ->count('created_by');
+
+        $clientsLast30 = Report::where('created_by', Auth::id())
+            ->where('created_at', '>=', $last30Start)
             ->whereNotNull('client')
-            ->distinct('client')->count('client');
-        $clientsPrev30 = Report::whereBetween('created_at', [$prev30Start, $prev30End])
+            ->distinct('client')
+            ->count('client');
+
+        $clientsPrev30 = Report::where('created_by', Auth::id())
+            ->whereBetween('created_at', [$prev30Start, $prev30End])
             ->whereNotNull('client')
-            ->distinct('client')->count('client');
+            ->distinct('client')
+            ->count('client');
 
         return [
             'total_reports'    => $totalReports,
@@ -135,13 +166,15 @@ class AdminReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | FILTER OPTIONS
+    | FILTER OPTIONS — Admin's OWN reports only
     |--------------------------------------------------------------------------
     */
 
     public function filterOptions()
     {
-        $clients = Report::whereNotNull('client')
+        // ✅ FULL SEPARATION — sariling reports lang
+        $clients = Report::where('created_by', Auth::id())
+            ->whereNotNull('client')
             ->where('client', '!=', '')
             ->where('client', '!=', 'All Clients')
             ->distinct()
@@ -149,11 +182,9 @@ class AdminReportController extends Controller
             ->filter()
             ->values();
 
+        // ✅ Sarili lang ang owner
         $owners = User::select('id', 'name', 'email')
-            ->whereIn('id', Report::whereNotNull('created_by')
-                                    ->distinct()
-                                    ->pluck('created_by'))
-            ->orderBy('name')
+            ->where('id', Auth::id())
             ->get();
 
         return response()->json([
@@ -164,7 +195,7 @@ class AdminReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | SUMMARY BY USER
+    | SUMMARY BY USER — Admin's OWN reports only
     |--------------------------------------------------------------------------
     */
 
@@ -173,10 +204,12 @@ class AdminReportController extends Controller
         $startDate = $request->query('start_date');
         $endDate   = $request->query('end_date');
 
+        // ✅ FULL SEPARATION
         $query = Report::query()
             ->selectRaw('created_by, COUNT(*) as total_reports,
                 SUM(CASE WHEN ai_generated = 1 THEN 1 ELSE 0 END) as ai_reports,
                 MAX(created_at) as last_report_at')
+            ->where('created_by', Auth::id())
             ->whereNotNull('created_by')
             ->groupBy('created_by');
 
@@ -205,7 +238,7 @@ class AdminReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | SUMMARY BY TYPE
+    | SUMMARY BY TYPE — Admin's OWN reports only
     |--------------------------------------------------------------------------
     */
 
@@ -214,8 +247,10 @@ class AdminReportController extends Controller
         $startDate = $request->query('start_date');
         $endDate   = $request->query('end_date');
 
+        // ✅ FULL SEPARATION
         $query = Report::query()
             ->selectRaw('type, COUNT(*) as total')
+            ->where('created_by', Auth::id())
             ->groupBy('type');
 
         if ($startDate && $endDate) {
@@ -230,7 +265,7 @@ class AdminReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | SUMMARY BY CLIENT
+    | SUMMARY BY CLIENT — Admin's OWN reports only
     |--------------------------------------------------------------------------
     */
 
@@ -239,8 +274,10 @@ class AdminReportController extends Controller
         $startDate = $request->query('start_date');
         $endDate   = $request->query('end_date');
 
+        // ✅ FULL SEPARATION
         $query = Report::query()
             ->selectRaw('client, COUNT(*) as total')
+            ->where('created_by', Auth::id())
             ->whereNotNull('client')
             ->where('client', '!=', '')
             ->where('client', '!=', 'All Clients')
@@ -258,12 +295,12 @@ class AdminReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | SAVE — Admin can generate company-wide reports
+    | SAVE — Admin generates own reports (full separation)
     |--------------------------------------------------------------------------
     |
-    | Note: Reuses the SAME /reports/save logic pattern. Since Report model
-    | already exists, we just call the same Report creation.
-    |--------------------------------------------------------------------------
+    | ✅ Gumagamit ng ReportService (existing) — consistent sa staff side
+    | ✅ Walang ReportGeneratorService dependency
+    |
     */
 
     public function save(Request $request)
@@ -281,11 +318,31 @@ class AdminReportController extends Controller
         try {
             $client = $validated['client_name'] ?? $validated['client'] ?? null;
 
-            // Try to reuse existing ReportGeneratorService if it exists
-            $content = [];
-            if (class_exists(\App\Services\ReportGeneratorService::class)) {
-                $content = app(\App\Services\ReportGeneratorService::class)
-                    ->generateCompanyReport($validated);
+            // ✅ Gamitin ang ReportService (existing) — consistent sa staff side
+            try {
+                $content = $this->reportService->generate(
+                    $validated['start_date'],
+                    $validated['end_date'],
+                    $validated['report_type'] ?? $validated['type'] ?? 'All',
+                    $client
+                );
+            } catch (\Throwable $e) {
+                report($e);
+
+                // Fallback: minimal content
+                $content = [
+                    'summary' => [
+                        'generated_by' => 'admin',
+                        'admin_id'     => Auth::id(),
+                        'type'         => $validated['type'],
+                        'client'       => $client,
+                        'date_range'   => [
+                            'start' => $validated['start_date'],
+                            'end'   => $validated['end_date'],
+                        ],
+                        'generated_at' => now()->toIso8601String(),
+                    ],
+                ];
             }
 
             $report = Report::create([
@@ -294,12 +351,11 @@ class AdminReportController extends Controller
                 'start_date'   => $validated['start_date'],
                 'end_date'     => $validated['end_date'],
                 'client'       => $client,
-                'created_by'   => Auth::id(),           // ← FK to User
+                'created_by'   => Auth::id(),
                 'ai_generated' => $validated['ai_generated'] ?? false,
                 'content'      => json_encode($content),
             ]);
 
-            // Reload with user relationship
             $report->load('user:id,name,email');
 
             $arr = $report->toArray();
@@ -325,19 +381,21 @@ class AdminReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DELETE — Admin override
+    | DELETE — Admin deletes OWN reports only (full separation)
     |--------------------------------------------------------------------------
     */
 
     public function destroy($id)
     {
-        $report = Report::findOrFail($id);
+        // ✅ FULL SEPARATION — sariling reports lang
+        $report = Report::where('id', $id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
 
-        Log::info('Admin deleted report', [
-            'report_id'   => $report->id,
-            'owner_id'    => $report->created_by,
-            'admin_id'    => Auth::id(),
-            'report_name' => $report->name,
+        Log::info('Admin deleted own report', [
+            'report_id' => $report->id,
+            'admin_id'  => Auth::id(),
+            'name'      => $report->name,
         ]);
 
         $report->delete();
