@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\ReportExport;
 use App\Models\Compliance;
 use App\Models\Contract;
 use App\Models\Document;
@@ -23,25 +22,15 @@ class ReportController extends Controller
 {
     protected ReportService $reportService;
 
-    /**
-     * Cache of `table.column` existence checks per request.
-     *
-     * @var array<string, bool>
-     */
     protected array $columnCache = [];
 
-    /**
-     * Maps each module table to the column that holds the client name.
-     *
-     * A `null` value means: DO NOT filter this table by client.
-     */
     protected array $clientColumnMap = [
         'invoices'    => 'client',
         'payments'    => 'client',
         'job_orders'  => 'client',
         'contracts'   => 'client',
-        'compliances' => null, // no client column — skip
-        'documents'   => null, // no client column — skip
+        'compliances' => null,
+        'documents'   => null,
     ];
 
     public function __construct(ReportService $reportService)
@@ -173,8 +162,6 @@ class ReportController extends Controller
             'ai_generated' => ['nullable', 'boolean'],
         ]);
 
-        /* ---------- DATE RANGE ---------- */
-
         $startDate = Carbon::parse($validated['start_date'])->startOfDay();
         $endDate   = Carbon::parse($validated['end_date'])->endOfDay();
 
@@ -184,21 +171,15 @@ class ReportController extends Controller
             $endDate   = $endDate->copy()->endOfDay();
         }
 
-        /* ---------- REPORT TYPE ---------- */
-
         $reportType = $this->normalizeReportType(
             $validated['type']
             ?? $validated['report_type']
             ?? 'All'
         );
 
-        /* ---------- CLIENT ---------- */
-
         $client = $this->normalizeClient(
             $validated['client'] ?? null
         );
-
-        /* ---------- GENERATE FROM DATABASE ---------- */
 
         $generatedData = $this->reportService->generate(
             $startDate->toDateString(),
@@ -207,8 +188,6 @@ class ReportController extends Controller
             $client
         );
 
-        /* ---------- REPORT NAME ---------- */
-
         $clientName = $client ?? 'All Clients';
 
         $reportName = trim((string) ($validated['name'] ?? ''));
@@ -216,8 +195,6 @@ class ReportController extends Controller
         if ($reportName === '') {
             $reportName = "{$clientName} report";
         }
-
-        /* ---------- SAVE SNAPSHOT ---------- */
 
         $report = Report::create([
             'name'         => $reportName,
@@ -383,35 +360,30 @@ class ReportController extends Controller
     {
         $clients = collect();
 
-        /* ---------- INVOICES ---------- */
         $clients = $clients->merge(
             Invoice::query()
                 ->whereNotNull('client')
                 ->pluck('client')
         );
 
-        /* ---------- PAYMENTS ---------- */
         $clients = $clients->merge(
             Payment::query()
                 ->whereNotNull('client')
                 ->pluck('client')
         );
 
-        /* ---------- JOB ORDERS ---------- */
         $clients = $clients->merge(
             JobOrder::query()
                 ->whereNotNull('client')
                 ->pluck('client')
         );
 
-        /* ---------- CONTRACTS ---------- */
         $clients = $clients->merge(
             Contract::query()
                 ->whereNotNull('client')
                 ->pluck('client')
         );
 
-        /* ---------- COMPLIANCE (only if column exists) ---------- */
         if ($this->hasColumn('compliances', 'client')) {
             $clients = $clients->merge(
                 Compliance::query()
@@ -420,7 +392,6 @@ class ReportController extends Controller
             );
         }
 
-        /* ---------- DOCUMENTS (only if column exists) ---------- */
         if ($this->hasColumn('documents', 'client')) {
             $clients = $clients->merge(
                 Document::query()
@@ -429,7 +400,6 @@ class ReportController extends Controller
             );
         }
 
-        /* ---------- NORMALIZE ---------- */
         $clients = $clients
             ->map(fn ($client) => trim((string) $client))
             ->filter(fn ($client) => $client !== '')
@@ -446,17 +416,22 @@ class ReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | LIST SAVED REPORTS
+    | LIST SAVED REPORTS — FILTERED BY CURRENT USER
     |--------------------------------------------------------------------------
+    |
+    | Ang staff ay makikita lang ang SARILING reports (created_by = Auth::id()).
+    | Hindi makikita ang reports ng ibang staff o ng admin.
+    |
     */
 
     public function list(Request $request): JsonResponse
     {
+        // ✅ FILTERED BY CURRENT USER — sarili lang ni staff ang makikita
         $query = Report::query()
+            ->where('created_by', Auth::id())
             ->with('user')
             ->latest('created_at');
 
-        /* ---------- CLIENT ---------- */
         $requestedClient = $this->normalizeClient(
             $request->input('client')
         );
@@ -468,7 +443,6 @@ class ReportController extends Controller
             );
         }
 
-        /* ---------- DATE RANGE ---------- */
         $startDate = $request->input('start_date');
         $endDate   = $request->input('end_date');
 
@@ -609,6 +583,8 @@ class ReportController extends Controller
             function () use ($data) {
                 $handle = fopen('php://output', 'w');
 
+                fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
                 fputcsv($handle, [
                     'Module',
                     'ID',
@@ -735,7 +711,6 @@ class ReportController extends Controller
 
         $title = $this->buildReportTitle($reportType, $client);
 
-        /* ---------- Prefer Dompdf if installed ---------- */
         if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.pdf', [
                 'title'     => $title,
@@ -748,7 +723,6 @@ class ReportController extends Controller
             return $pdf->download($this->safeFilename($title) . '.pdf');
         }
 
-        /* ---------- HTML fallback ---------- */
         $html = $this->buildPrintableHtml(
             $title,
             $data,
@@ -767,7 +741,7 @@ class ReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | EXPORT EXCEL
+    | EXPORT EXCEL — Native CSV (walang external package)
     |--------------------------------------------------------------------------
     */
 
@@ -789,11 +763,111 @@ class ReportController extends Controller
 
         $client = $this->normalizeClient($validated['client'] ?? null);
 
-        return new ReportExport(
+        $data = $this->reportService->generate(
             $startDate->toDateString(),
             $endDate->toDateString(),
             $reportType,
             $client
+        );
+
+        $filename = 'alibaton-report-' . now()->format('Y-m-d-His') . '.csv';
+
+        return response()->streamDownload(
+            function () use ($data) {
+                $handle = fopen('php://output', 'w');
+
+                fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+                fputcsv($handle, [
+                    'Module',
+                    'ID',
+                    'Client',
+                    'Reference',
+                    'Amount',
+                    'Status',
+                    'Date',
+                ]);
+
+                foreach (($data['records']['invoices'] ?? []) as $invoice) {
+                    fputcsv($handle, [
+                        'Invoice',
+                        $invoice['id']     ?? '',
+                        $invoice['client'] ?? '',
+                        $invoice['number'] ?? '',
+                        $invoice['amount'] ?? 0,
+                        $invoice['status'] ?? '',
+                        $invoice['created_at'] ?? '',
+                    ]);
+                }
+
+                foreach (($data['records']['payments'] ?? []) as $payment) {
+                    fputcsv($handle, [
+                        'Payment',
+                        $payment['id']     ?? '',
+                        $payment['client'] ?? '',
+                        $payment['invoice_number'] ?? '',
+                        $payment['amount'] ?? 0,
+                        $payment['status'] ?? '',
+                        $payment['payment_date']
+                            ?? $payment['created_at']
+                            ?? '',
+                    ]);
+                }
+
+                foreach (($data['records']['job_orders'] ?? []) as $jobOrder) {
+                    fputcsv($handle, [
+                        'Job Order',
+                        $jobOrder['id']     ?? '',
+                        $jobOrder['client'] ?? '',
+                        $jobOrder['number'] ?? '',
+                        $jobOrder['amount'] ?? 0,
+                        $jobOrder['status'] ?? '',
+                        $jobOrder['start_date']
+                            ?? $jobOrder['created_at']
+                            ?? '',
+                    ]);
+                }
+
+                foreach (($data['records']['contracts'] ?? []) as $contract) {
+                    fputcsv($handle, [
+                        'Contract',
+                        $contract['id']          ?? '',
+                        $contract['client']      ?? '',
+                        $contract['contract_no'] ?? '',
+                        '',
+                        $contract['status']      ?? '',
+                        $contract['start_date']  ?? '',
+                    ]);
+                }
+
+                foreach (($data['records']['compliance'] ?? []) as $item) {
+                    fputcsv($handle, [
+                        'Compliance',
+                        $item['id'] ?? '',
+                        '',
+                        $item['reference_number'] ?? '',
+                        '',
+                        $item['status']   ?? '',
+                        $item['due_date'] ?? '',
+                    ]);
+                }
+
+                foreach (($data['records']['documents'] ?? []) as $document) {
+                    fputcsv($handle, [
+                        'Document',
+                        $document['id'] ?? '',
+                        '',
+                        $document['reference_number'] ?? '',
+                        '',
+                        $document['status']     ?? '',
+                        $document['created_at'] ?? '',
+                    ]);
+                }
+
+                fclose($handle);
+            },
+            $filename,
+            ['Content-Type' => 'text/csv; charset=UTF-8']
         );
     }
 
@@ -803,9 +877,6 @@ class ReportController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * Map a saved Report model into a React-friendly payload.
-     */
     protected function mapSavedReport(
         Report $report,
         array $content = [],
@@ -845,9 +916,6 @@ class ReportController extends Controller
         ];
     }
 
-    /**
-     * Decode a stored report content blob into an array.
-     */
     protected function decodeContent(mixed $content): array
     {
         if (is_array($content)) {
@@ -866,9 +934,6 @@ class ReportController extends Controller
         return [];
     }
 
-    /**
-     * Normalize a client string; returns null for "all" style values.
-     */
     protected function normalizeClient(mixed $client): ?string
     {
         if ($client === null || !is_string($client)) {
@@ -901,9 +966,6 @@ class ReportController extends Controller
         return $client;
     }
 
-    /**
-     * Normalize report type to one of the officially supported modules.
-     */
     protected function normalizeReportType(mixed $type): string
     {
         $allowed = [
@@ -926,7 +988,6 @@ class ReportController extends Controller
             }
         }
 
-        /* Common aliases */
         $aliases = [
             'contracts'  => 'Operations',
             'contract'   => 'Operations',
@@ -950,9 +1011,6 @@ class ReportController extends Controller
         return 'All';
     }
 
-    /**
-     * Memoized schema column existence check.
-     */
     protected function hasColumn(string $table, string $column): bool
     {
         $key = "{$table}.{$column}";
@@ -972,9 +1030,6 @@ class ReportController extends Controller
         return $exists;
     }
 
-    /**
-     * Return the client column for a table, or null if the table has none.
-     */
     protected function clientColumnFor(string $table): ?string
     {
         $column = $this->clientColumnMap[$table] ?? null;
@@ -990,9 +1045,6 @@ class ReportController extends Controller
         return $column;
     }
 
-    /**
-     * Build a professional report title.
-     */
     protected function buildReportTitle(
         string $reportType,
         ?string $client
@@ -1002,9 +1054,6 @@ class ReportController extends Controller
         return $clientName . ' - ' . $reportType . ' Report';
     }
 
-    /**
-     * Convert a name into a safe filename slug.
-     */
     protected function safeFilename(string $name): string
     {
         $filename = Str::slug($name);
@@ -1012,9 +1061,6 @@ class ReportController extends Controller
         return $filename !== '' ? $filename : 'alibaton-report';
     }
 
-    /**
-     * Build a printable HTML fallback for PDF export.
-     */
     protected function buildPrintableHtml(
         string $title,
         array $data,
@@ -1070,7 +1116,6 @@ Client: ' . $escape($client ?? 'All Clients') . '
 
         $html .= '</div><h2>Records</h2>';
 
-        /* Invoices */
         if (!empty($records['invoices'] ?? [])) {
             $html .= '<h3>Invoices</h3><table>
 <tr><th>ID</th><th>Number</th><th>Client</th><th>Amount</th><th>Status</th></tr>';
@@ -1088,7 +1133,6 @@ Client: ' . $escape($client ?? 'All Clients') . '
             $html .= '</table>';
         }
 
-        /* Payments */
         if (!empty($records['payments'] ?? [])) {
             $html .= '<h3>Payments</h3><table>
 <tr><th>ID</th><th>Client</th><th>Invoice</th><th>Amount</th><th>Status</th></tr>';
@@ -1106,7 +1150,6 @@ Client: ' . $escape($client ?? 'All Clients') . '
             $html .= '</table>';
         }
 
-        /* Job Orders */
         if (!empty($records['job_orders'] ?? [])) {
             $html .= '<h3>Job Orders</h3><table>
 <tr><th>ID</th><th>Number</th><th>Client</th><th>Amount</th><th>Status</th></tr>';
@@ -1124,7 +1167,6 @@ Client: ' . $escape($client ?? 'All Clients') . '
             $html .= '</table>';
         }
 
-        /* Empty state */
         $hasRecords =
             !empty($records['invoices']   ?? [])
             || !empty($records['payments']   ?? [])
