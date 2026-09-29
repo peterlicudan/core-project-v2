@@ -314,6 +314,13 @@ const normalizeNotification = (raw: any): Notification => ({
 export default function BillingManagement() {
     const page = usePage<PageProps>();
 
+      // ✅ TEMPORARY DEBUG — ito ang idadagdag mo
+    console.log("🔍 ADMIN DEBUG:", {
+        userId: (page.props as any)?.auth?.user?.id,
+        pendingJobOrders: page.props.pendingJobOrders?.length,
+        notifications: page.props.notifications?.length,
+        stats: page.props.stats,
+    });
     const backendInvoices = page.props.invoices ?? page.props.allInvoices ?? [];
     const backendPendingInvoices = page.props.pendingInvoices ?? [];
     const backendPendingJobOrders = page.props.pendingJobOrders ?? [];
