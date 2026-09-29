@@ -1118,11 +1118,11 @@ export default function AdminSidebar({
                                         icon: FileText,
                                     })}
 
-                                    {renderMenuLink({
-                                        label: "Forecasting",
-                                        href: "/admin/forecasting",
-                                        icon: TrendingUp,
-                                    })}
+     {renderMenuLink({
+    label: "Forecasting",
+    href: "/admin/forecasting",    // ⬅️ BAGO
+    icon: TrendingUp,
+})}
                                 </div>
                             )}
                         </div>
