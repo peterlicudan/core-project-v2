@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Head, router, useForm } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
 import {
@@ -26,9 +26,9 @@ import {
     XCircle,
 } from "lucide-react";
 
-// =========================================================
-// TYPES
-// =========================================================
+/* =========================================================
+   TYPES
+========================================================= */
 
 type ContractStatus =
     | "Active"
@@ -58,7 +58,7 @@ interface InvoiceRecord {
 
 interface ContractFileRecord {
     id: number;
-    type?: "contract" | "signed";
+    type?: "contract" | "signed" | string;
     file_path?: string | null;
     file_name: string;
     file_size?: number | null;
@@ -68,79 +68,108 @@ interface ContractFileRecord {
 
 interface ContractPermit {
     id: number;
+
     title?: string | null;
     name?: string | null;
+
     type?: string | null;
     contract_type?: string | null;
+
     is_permit?: boolean;
     isPermit?: boolean;
+
     description?: string | null;
     notes?: string | null;
+
     client?: string | null;
     client_name?: string | null;
     client_email?: string | null;
     email?: string | null;
+
     project?: string | null;
     project_name?: string | null;
+
     contract_no?: string | null;
     contract_number?: string | null;
     reference_number?: string | null;
     permit_number?: string | null;
+
     start_date?: string | null;
     issue_date?: string | null;
     end_date?: string | null;
     expiry_date?: string | null;
+
     status?: string | null;
+
     location?: string | null;
+
     invoice?: InvoiceRecord | null;
     invoice_id?: number | null;
+
     is_invoice_approved?: boolean | number | null;
     invoice_approved_at?: string | null;
     invoice_approved_by?: Staff | null;
+
     assigned_to?: number | Staff | null;
     assigned_staff?: Staff | null;
     staff?: Staff | null;
     creator?: Staff | null;
+
     rejection_reason?: string | null;
     correction_reason?: string | null;
     correctionReason?: string | null;
+
     archived?: boolean | number | null;
     is_archived?: boolean | number | null;
     isArchived?: boolean;
+
     days_until_expiry?: number | null;
     daysUntilExpiry?: number | null;
+
     created_at?: string | null;
     updated_at?: string | null;
+
     workflow_status?: string | null;
     workflowStatus?: string | null;
+
     contract_file_path?: string | null;
     contract_file_name?: string | null;
+
     signed_contract_path?: string | null;
     signed_contract_file_name?: string | null;
+
+    contract_file_url?: string | null;
+    signed_contract_url?: string | null;
+
     sent_at?: string | null;
     submitted_at?: string | null;
     submitted_by?: Staff | null;
+
     reviewed_at?: string | null;
     reviewed_by?: Staff | null;
+
     approved_at?: string | null;
+
     calculatedStatus?: ContractStatus;
+
     invoiceApproved?: boolean;
+
     files?: ContractFileRecord[];
     contract_files?: ContractFileRecord[];
     signed_files?: ContractFileRecord[];
 }
 
 interface Props {
-    contracts: ContractPermit[];
+    contracts?: ContractPermit[];
     contractPermits?: ContractPermit[];
     permits?: ContractPermit[];
     approvedInvoices?: InvoiceRecord[];
     staff?: Staff[];
 }
 
-// =========================================================
-// ✅ PERMIT TYPES — para sa Edit modal dropdown
-// =========================================================
+/* =========================================================
+   OPTIONS
+========================================================= */
 
 const EDIT_TYPE_OPTIONS = [
     "Contract",
@@ -169,9 +198,9 @@ const EDIT_TYPE_OPTIONS = [
     "Other",
 ];
 
-// =========================================================
-// HELPERS
-// =========================================================
+/* =========================================================
+   HELPERS
+========================================================= */
 
 const getTitle = (record: ContractPermit): string =>
     record.title ||
@@ -188,17 +217,26 @@ const getType = (record: ContractPermit): string => {
     ) {
         return record.contract_type;
     }
+
     return record.type || record.contract_type || "Contract";
 };
 
 const getClient = (record: ContractPermit): string =>
-    record.client || record.client_name || record.invoice?.client || "—";
+    record.client ||
+    record.client_name ||
+    record.invoice?.client ||
+    "—";
 
 const getClientEmail = (record: ContractPermit): string =>
-    record.client_email || record.email || "";
+    record.client_email ||
+    record.email ||
+    "";
 
 const getProject = (record: ContractPermit): string =>
-    record.project || record.project_name || record.invoice?.project || "—";
+    record.project ||
+    record.project_name ||
+    record.invoice?.project ||
+    "—";
 
 const getReference = (record: ContractPermit): string =>
     record.contract_no ||
@@ -208,67 +246,268 @@ const getReference = (record: ContractPermit): string =>
     `CTR-${record.id}`;
 
 const getStartDate = (record: ContractPermit): string | null =>
-    record.start_date || record.issue_date || null;
+    record.start_date ||
+    record.issue_date ||
+    null;
 
 const getExpiryDate = (record: ContractPermit): string | null =>
-    record.end_date || record.expiry_date || null;
+    record.end_date ||
+    record.expiry_date ||
+    null;
 
-const getAssignedStaff = (record: ContractPermit): Staff | null => {
-    if (record.assigned_staff && typeof record.assigned_staff === "object") {
+const getAssignedStaff = (
+    record: ContractPermit,
+): Staff | null => {
+    if (
+        record.assigned_staff &&
+        typeof record.assigned_staff === "object"
+    ) {
         return record.assigned_staff;
     }
-    if (record.staff && typeof record.staff === "object") {
+
+    if (
+        record.staff &&
+        typeof record.staff === "object"
+    ) {
         return record.staff;
     }
+
     return null;
 };
 
-const isInvoiceApproved = (record: ContractPermit): boolean =>
+const isInvoiceApproved = (
+    record: ContractPermit,
+): boolean =>
     record.is_invoice_approved === true ||
     record.is_invoice_approved === 1 ||
     Boolean(record.invoice_approved_at);
 
-const isArchivedRecord = (record: ContractPermit): boolean =>
+const isArchivedRecord = (
+    record: ContractPermit,
+): boolean =>
     Boolean(
         record.archived ||
-        record.is_archived ||
-        record.isArchived ||
-        String(record.status || "").toLowerCase() === "archived",
+            record.is_archived ||
+            record.isArchived ||
+            String(record.status || "").toLowerCase() ===
+                "archived",
     );
 
-const isContractRecord = (record: ContractPermit): boolean => {
+const isContractRecord = (
+    record: ContractPermit,
+): boolean => {
     const type = String(getType(record)).toLowerCase();
-    return type === "contract" || type.includes("contract");
+
+    return (
+        type === "contract" ||
+        type.includes("contract")
+    );
 };
 
-const isPermitRecord = (record: ContractPermit): boolean => {
+const isPermitRecord = (
+    record: ContractPermit,
+): boolean => {
     const type = String(getType(record)).toLowerCase();
-    return type === "permit" || type.includes("permit");
+
+    return (
+        type === "permit" ||
+        type.includes("permit")
+    );
 };
 
-const getCorrectionReason = (record: ContractPermit): string =>
+const getCorrectionReason = (
+    record: ContractPermit,
+): string =>
     record.correction_reason ||
     record.correctionReason ||
     record.rejection_reason ||
     "";
 
-const getContractFileCount = (record: ContractPermit): number => {
-    if (record.contract_files && record.contract_files.length > 0) {
-        return record.contract_files.length;
+const getContractFiles = (
+    record: ContractPermit,
+): ContractFileRecord[] => {
+    if (
+        record.contract_files &&
+        record.contract_files.length > 0
+    ) {
+        return record.contract_files;
     }
-    return record.contract_file_path ? 1 : 0;
+
+    if (
+        record.files &&
+        record.files.length > 0
+    ) {
+        return record.files.filter(
+            (file) =>
+                String(file.type || "")
+                    .toLowerCase() === "contract",
+        );
+    }
+
+    if (record.contract_file_path) {
+        return [
+            {
+                id: -record.id,
+                type: "contract",
+                file_path:
+                    record.contract_file_path,
+                file_name:
+                    record.contract_file_name ||
+                    "Contract Document",
+            },
+        ];
+    }
+
+    return [];
 };
 
-const getSignedFileCount = (record: ContractPermit): number => {
-    if (record.signed_files && record.signed_files.length > 0) {
-        return record.signed_files.length;
+const getSignedFiles = (
+    record: ContractPermit,
+): ContractFileRecord[] => {
+    if (
+        record.signed_files &&
+        record.signed_files.length > 0
+    ) {
+        return record.signed_files;
     }
-    return record.signed_contract_path ? 1 : 0;
+
+    if (
+        record.files &&
+        record.files.length > 0
+    ) {
+        return record.files.filter(
+            (file) =>
+                String(file.type || "")
+                    .toLowerCase() === "signed",
+        );
+    }
+
+    if (record.signed_contract_path) {
+        return [
+            {
+                id: -record.id,
+                type: "signed",
+                file_path:
+                    record.signed_contract_path,
+                file_name:
+                    record.signed_contract_file_name ||
+                    "Signed Contract",
+            },
+        ];
+    }
+
+    return [];
 };
 
-// ✅ UPDATED: Alisin ang invoice check
-const canApproveDirectly = (record: ContractPermit): boolean => {
-    if (calculateStatus(record) !== "Submitted for Review") {
+const getContractFileCount = (
+    record: ContractPermit,
+): number =>
+    getContractFiles(record).length;
+
+const getSignedFileCount = (
+    record: ContractPermit,
+): number =>
+    getSignedFiles(record).length;
+
+const daysUntil = (
+    dateValue?: string | null,
+): number | null => {
+    if (!dateValue) return null;
+
+    const target = new Date(dateValue);
+    if (Number.isNaN(target.getTime())) {
+        return null;
+    }
+
+    const now = new Date();
+
+    target.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+
+    return Math.ceil(
+        (target.getTime() - now.getTime()) /
+            (1000 * 60 * 60 * 24),
+    );
+};
+
+const calculateStatus = (
+    record: ContractPermit,
+): ContractStatus => {
+    if (isArchivedRecord(record)) {
+        return "Archived";
+    }
+
+    const rawStatus = String(
+        record.workflow_status ||
+            record.workflowStatus ||
+            record.status ||
+            "",
+    ).trim();
+
+    if (rawStatus === "Needs Correction") {
+        return "Needs Correction";
+    }
+
+    if (rawStatus === "Submitted for Review") {
+        return "Submitted for Review";
+    }
+
+    if (rawStatus === "Renewed") {
+        return "Renewed";
+    }
+
+    if (rawStatus === "Expired") {
+        return "Expired";
+    }
+
+    if (!record.approved_at) {
+        return "Pending";
+    }
+
+    const expiry = getExpiryDate(record);
+
+    if (!expiry) {
+        return "Active";
+    }
+
+    const remaining = daysUntil(expiry);
+
+    if (remaining === null) {
+        return "Active";
+    }
+
+    if (remaining < 0) {
+        return "Expired";
+    }
+
+    if (remaining <= 30) {
+        return "Expiring Soon";
+    }
+
+    return "Active";
+};
+
+/*
+|--------------------------------------------------------------------------
+| IMPORTANT
+|--------------------------------------------------------------------------
+| Invoice approval is intentionally NOT checked here.
+|
+| Contract:
+|   Contract file + Signed file
+|
+| Permit:
+|   Permit document(s)
+|
+| Submitted for Review is required.
+*/
+const canApproveDirectly = (
+    record: ContractPermit,
+): boolean => {
+    if (
+        calculateStatus(record) !==
+        "Submitted for Review"
+    ) {
         return false;
     }
 
@@ -280,2720 +519,3174 @@ const canApproveDirectly = (record: ContractPermit): boolean => {
         return false;
     }
 
-    if (isContractRecord(record)) {
-        // ✅ Alisin ang invoice check
-        // if (!isInvoiceApproved(record)) return false;
-        if (getSignedFileCount(record) === 0) return false;
+    if (
+        isContractRecord(record) &&
+        getSignedFileCount(record) === 0
+    ) {
+        return false;
     }
 
     return true;
 };
 
-const formatDate = (value?: string | null): string => {
+const formatDate = (
+    value?: string | null,
+): string => {
     if (!value) return "—";
+
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    });
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleDateString(
+        "en-PH",
+        {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        },
+    );
 };
 
-const formatShortDate = (value?: string | null): string => {
+const formatDateTime = (
+    value?: string | null,
+): string => {
     if (!value) return "—";
+
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleDateString("en-US", {
-        year: "2-digit",
-        month: "short",
-        day: "numeric",
-    });
-};
 
-const daysUntil = (value?: string | null): number | null => {
-    if (!value) return null;
-    const target = new Date(value);
-    if (Number.isNaN(target.getTime())) return null;
-    const now = new Date();
-    target.setHours(0, 0, 0, 0);
-    now.setHours(0, 0, 0, 0);
-    return Math.ceil(
-        (target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-    );
-};
-
-const calculateStatus = (record: ContractPermit): ContractStatus => {
-    if (isArchivedRecord(record)) return "Archived";
-
-    const rawStatus = String(
-        record.workflow_status || record.workflowStatus || record.status || "",
-    ).trim();
-
-    if (rawStatus === "Needs Correction") return "Needs Correction";
-    if (rawStatus === "Submitted for Review") return "Submitted for Review";
-    if (rawStatus === "Renewed") return "Renewed";
-    if (rawStatus === "Expired") return "Expired";
-    if (!record.approved_at) return "Pending";
-
-    const expiry = getExpiryDate(record);
-    if (!expiry) return "Active";
-    const remaining = daysUntil(expiry);
-    if (remaining === null) return "Active";
-    if (remaining < 0) return "Expired";
-    if (remaining <= 30) return "Expiring Soon";
-    return "Active";
-};
-
-const statusClasses = (status: ContractStatus): string => {
-    switch (status) {
-        case "Active":
-            return "border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-400";
-        case "Needs Correction":
-            return "border-red-400/20 bg-red-400/[0.06] text-red-400";
-        case "Submitted for Review":
-            return "border-blue-400/20 bg-blue-400/[0.06] text-blue-400";
-        case "Expiring Soon":
-            return "border-orange-400/20 bg-orange-400/[0.06] text-orange-400";
-        case "Expired":
-            return "border-red-400/20 bg-red-400/[0.06] text-red-400";
-        case "Renewed":
-            return "border-violet-400/20 bg-violet-400/[0.06] text-violet-400";
-        case "Archived":
-            return "border-zinc-800 bg-zinc-900/50 text-zinc-500";
-        default:
-            return "border-yellow-400/20 bg-yellow-400/[0.06] text-yellow-400";
+    if (Number.isNaN(date.getTime())) {
+        return value;
     }
+
+    return date.toLocaleString(
+        "en-PH",
+        {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+        },
+    );
 };
 
-const statusShortLabel = (status: ContractStatus): string => {
-    switch (status) {
-        case "Needs Correction":
-            return "Correction";
-        case "Submitted for Review":
-            return "Review";
-        case "Expiring Soon":
-            return "Expiring";
-        default:
-            return status;
+const formatMoney = (
+    value?: number | string | null,
+): string => {
+    const amount = Number(value || 0);
+
+    return new Intl.NumberFormat(
+        "en-PH",
+        {
+            style: "currency",
+            currency: "PHP",
+            minimumFractionDigits: 2,
+        },
+    ).format(amount);
+};
+
+const formatFileSize = (
+    bytes?: number | null,
+): string => {
+    if (!bytes) return "";
+
+    if (bytes < 1024) {
+        return `${bytes} B`;
     }
-};
 
-const statusIcon = (status: ContractStatus): React.ReactNode => {
-    switch (status) {
-        case "Active":
-            return <CheckCircle2 size={12} />;
-        case "Needs Correction":
-            return <AlertTriangle size={12} />;
-        case "Submitted for Review":
-            return <Send size={12} />;
-        case "Expiring Soon":
-            return <AlertTriangle size={12} />;
-        case "Expired":
-            return <XCircle size={12} />;
-        case "Renewed":
-            return <RefreshCw size={12} />;
-        case "Archived":
-            return <Archive size={12} />;
-        default:
-            return <Clock3 size={12} />;
+    if (bytes < 1024 * 1024) {
+        return `${(
+            bytes / 1024
+        ).toFixed(1)} KB`;
     }
+
+    return `${(
+        bytes /
+        (1024 * 1024)
+    ).toFixed(1)} MB`;
 };
 
-const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-};
+/* =========================================================
+   SMALL UI COMPONENTS
+========================================================= */
 
-const truncate = (value: string, max: number = 30): string => {
-    if (!value) return "—";
-    return value.length > max ? value.slice(0, max) + "…" : value;
-};
-
-const SCROLL_THRESHOLD = 4;
-const ROW_HEIGHT = 76;
-const HEADER_HEIGHT = 48;
-
-// =========================================================
-// COMPONENT
-// =========================================================
-
-export default function ContractPermit({
-    contracts = [],
-    contractPermits = [],
-    permits = [],
-    approvedInvoices = [],
-    staff = [],
-}: Props) {
-    const records = useMemo(() => {
-        const source =
-            contracts.length > 0
-                ? contracts
-                : contractPermits.length > 0
-                  ? contractPermits
-                  : permits;
-        return source;
-    }, [contracts, contractPermits, permits]);
-
-    const [search, setSearch] = useState("");
-    const [typeFilter, setTypeFilter] = useState("All");
-    const [selectedContract, setSelectedContract] =
-        useState<ContractPermit | null>(null);
-    const [editingRecord, setEditingRecord] = useState<ContractPermit | null>(
-        null,
-    );
-    const [deleteRecord, setDeleteRecord] = useState<ContractPermit | null>(
-        null,
-    );
-    const [emailContract, setEmailContract] = useState<ContractPermit | null>(
-        null,
-    );
-
-    const [confirmDialog, setConfirmDialog] = useState<{
-        title: string;
-        message: string;
-        confirmLabel: string;
-        cancelLabel: string;
-        variant: "success" | "danger" | "warning";
-        onConfirm: () => void;
-    } | null>(null);
-
-    const [successMessage, setSuccessMessage] = useState<{
-        title: string;
-        description: string;
-    } | null>(null);
-
-    const [reviewProcessing, setReviewProcessing] = useState<number | null>(
-        null,
-    );
-
-    const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-    const [menuPosition, setMenuPosition] = useState<{
-        top: number;
-        left: number;
-        openUpward: boolean;
-    } | null>(null);
-    const menuButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
-
-    const [activeTab, setActiveTab] = useState<
-        | "all"
-        | "active"
-        | "pending"
-        | "correction"
-        | "review"
-        | "expiring"
-        | "archive"
-    >("all");
-
-    const editForm = useForm({
-        title: "",
-        type: "Contract",
-        project: "",
-        location: "",
-        assigned_to: "",
-        start_date: "",
-        end_date: "",
-        description: "",
-        notes: "",
-    });
-
-    const emailForm = useForm({
-        recipient_email: "",
-        subject: "",
-        message: "",
-    });
-
-    useEffect(() => {
-        const handleOutside = (event: MouseEvent) => {
-            const target = event.target as Element;
-            if (!target.closest("[data-contract-action-menu]")) {
-                setOpenMenuId(null);
-                setMenuPosition(null);
-            }
-        };
-        document.addEventListener("mousedown", handleOutside);
-        return () => document.removeEventListener("mousedown", handleOutside);
-    }, []);
-
-    useEffect(() => {
-        const close = () => {
-            setOpenMenuId(null);
-            setMenuPosition(null);
-        };
-        window.addEventListener("scroll", close, true);
-        window.addEventListener("resize", close);
-        return () => {
-            window.removeEventListener("scroll", close, true);
-            window.removeEventListener("resize", close);
-        };
-    }, []);
-
-    // ✅ Auto-refresh with guards
-    useEffect(() => {
-        const interval = window.setInterval(() => {
-            const hasOpenModal =
-                selectedContract ||
-                editingRecord ||
-                deleteRecord ||
-                emailContract ||
-                confirmDialog;
-
-            const isBusy = reviewProcessing !== null;
-
-            if (hasOpenModal || isBusy || document.hidden) return;
-
-            const scrollY = window.scrollY;
-
-            router.reload({
-                only: [
-                    "contracts",
-                    "contractPermits",
-                    "permits",
-                    "approvedInvoices",
-                    "staff",
-                ],
-                onSuccess: () => {
-                    window.requestAnimationFrame(() => {
-                        window.scrollTo({
-                            top: scrollY,
-                            behavior: "instant" as ScrollBehavior,
-                        });
-                    });
-                },
-            });
-        }, 30000);
-        return () => window.clearInterval(interval);
-    }, [
-        selectedContract,
-        editingRecord,
-        deleteRecord,
-        emailContract,
-        confirmDialog,
-        reviewProcessing,
-    ]);
-
-    const normalizedRecords = useMemo(() => {
-        return records.map((record) => ({
-            ...record,
-            calculatedStatus: calculateStatus(record),
-            invoiceApproved: isInvoiceApproved(record),
-        }));
-    }, [records]);
-
-    const types = useMemo(() => {
-        const unique = Array.from(
-            new Set(
-                normalizedRecords
-                    .map((record) => getType(record))
-                    .filter(Boolean),
-            ),
-        );
-        return ["All", ...unique];
-    }, [normalizedRecords]);
-
-    const counts = useMemo(() => {
-        return {
-            all: normalizedRecords.filter(
-                (record) => record.calculatedStatus !== "Archived",
-            ).length,
-            active: normalizedRecords.filter(
-                (record) => record.calculatedStatus === "Active",
-            ).length,
-            pending: normalizedRecords.filter(
-                (record) => record.calculatedStatus === "Pending",
-            ).length,
-            correction: normalizedRecords.filter(
-                (record) => record.calculatedStatus === "Needs Correction",
-            ).length,
-            review: normalizedRecords.filter(
-                (record) => record.calculatedStatus === "Submitted for Review",
-            ).length,
-            expiring: normalizedRecords.filter(
-                (record) => record.calculatedStatus === "Expiring Soon",
-            ).length,
-            archive: normalizedRecords.filter(
-                (record) => record.calculatedStatus === "Archived",
-            ).length,
-        };
-    }, [normalizedRecords]);
-
-    const filteredRecords = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        return normalizedRecords.filter((record) => {
-            const status = record.calculatedStatus;
-            if (activeTab === "all" && status === "Archived") return false;
-            if (activeTab === "active" && status !== "Active") return false;
-            if (activeTab === "pending" && status !== "Pending") return false;
-            if (activeTab === "correction" && status !== "Needs Correction")
-                return false;
-            if (activeTab === "review" && status !== "Submitted for Review")
-                return false;
-            if (activeTab === "expiring" && status !== "Expiring Soon")
-                return false;
-            if (activeTab === "archive" && status !== "Archived") return false;
-            if (typeFilter !== "All" && getType(record) !== typeFilter)
-                return false;
-            if (!query) return true;
-
-            const searchable = [
-                getTitle(record),
-                getType(record),
-                getClient(record),
-                getProject(record),
-                getReference(record),
-                record.location || "",
-                getCorrectionReason(record),
-            ]
-                .join(" ")
-                .toLowerCase();
-
-            return searchable.includes(query);
-        });
-    }, [normalizedRecords, activeTab, typeFilter, search]);
-
-    const shouldScroll = filteredRecords.length >= SCROLL_THRESHOLD;
-    const tableMaxHeight = shouldScroll
-        ? HEADER_HEIGHT + SCROLL_THRESHOLD * ROW_HEIGHT
-        : undefined;
-
-    const reloadContracts = () => {
-        router.reload({
-            only: [
-                "contracts",
-                "contractPermits",
-                "permits",
-                "approvedInvoices",
-                "staff",
-            ],
-        });
-    };
-
-    const showSuccess = (title: string, description: string) => {
-        setSuccessMessage({ title, description });
-        window.setTimeout(() => setSuccessMessage(null), 3500);
-    };
-
-    const clearFilters = () => {
-        setSearch("");
-        setTypeFilter("All");
-    };
-
-    const openActionMenu = (
-        event: React.MouseEvent<HTMLButtonElement>,
-        contractId: number,
-    ) => {
-        event.stopPropagation();
-
-        if (openMenuId === contractId) {
-            setOpenMenuId(null);
-            setMenuPosition(null);
-            return;
-        }
-
-        const button = menuButtonRefs.current[contractId];
-        if (!button) return;
-
-        const rect = button.getBoundingClientRect();
-        const menuWidth = 240;
-        const menuHeight = 420;
-        const gap = 6;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        const spaceBelow = viewportHeight - rect.bottom;
-        const openUpward = spaceBelow < menuHeight + gap;
-
-        let left = rect.right - menuWidth;
-        if (left < 12) left = 12;
-        if (left + menuWidth > viewportWidth - 12) {
-            left = viewportWidth - menuWidth - 12;
-        }
-
-        let top = openUpward ? rect.top - menuHeight - gap : rect.bottom + gap;
-        if (top < 12) top = 12;
-        if (top + menuHeight > viewportHeight - 12) {
-            top = viewportHeight - menuHeight - 12;
-        }
-
-        setMenuPosition({ top, left, openUpward });
-        setOpenMenuId(contractId);
-    };
-
-    const openEdit = (record: ContractPermit) => {
-        if (isArchivedRecord(record)) return;
-        if (calculateStatus(record) === "Submitted for Review") return;
-
-        editForm.setData({
-            title: record.title || record.name || "",
-            type: getType(record) || "Contract",
-            project: record.project || record.project_name || "",
-            location: record.location || "",
-            assigned_to: record.assigned_to ? String(record.assigned_to) : "",
-            start_date: record.start_date ? record.start_date.slice(0, 10) : "",
-            end_date: record.end_date ? record.end_date.slice(0, 10) : "",
-            description: record.description || "",
-            notes: record.notes || "",
-        });
-
-        setEditingRecord(record);
-    };
-
-    const submitEdit = (event: React.FormEvent) => {
-        event.preventDefault();
-        if (!editingRecord) return;
-        editForm.put(`/admin/contracts/${editingRecord.id}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEditingRecord(null);
-                editForm.reset();
-                showSuccess(
-                    "Record Updated Successfully",
-                    "The Contract / Permit details have been saved.",
-                );
-                reloadContracts();
-            },
-        });
-    };
-
-    // ✅ UPDATED: Alisin ang invoice check sa approveContract
-    const approveContract = (record: ContractPermit) => {
-        const isPermit = isPermitRecord(record);
-
-        if (
-            getContractFileCount(record) === 0 ||
-            (!isPermit && getSignedFileCount(record) === 0)
-        )
-            return;
-
-        setConfirmDialog({
-            title: isPermit
-                ? "Approve Permit and Make it Active?"
-                : "Approve Contract and Make it Active?",
-            message: isPermit
-                ? `By approving, you confirm that you have VERIFIED the attached permit document(s).\n\nThe 90-day validity period will start on the Admin approval date.`
-                : `The 90-day validity period will start on the Admin approval date.`,
-            confirmLabel: isPermit
-                ? "Yes, Verify & Approve"
-                : "Yes, Approve & Activate",
-            cancelLabel: "Cancel",
-            variant: "success",
-            onConfirm: () => {
-                setConfirmDialog(null);
-                setReviewProcessing(record.id);
-                router.put(
-                    `/admin/contracts/${record.id}/approve`,
-                    {},
-                    {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedContract(null);
-                            showSuccess(
-                                isPermit
-                                    ? "Permit Approved Successfully"
-                                    : "Contract Approved Successfully",
-                                `The ${isPermit ? "permit" : "contract"} is now Active for 90 days from today.`,
-                            );
-                            reloadContracts();
-                        },
-                        onFinish: () => {
-                            setReviewProcessing(null);
-                        },
-                    },
-                );
-            },
-        });
-    };
-
-    const archiveContract = (contract: ContractPermit) => {
-        if (!contract?.id) return;
-        if (isArchivedRecord(contract)) return;
-        setConfirmDialog({
-            title: "Archive Record?",
-            message: `Archive ${getReference(
-                contract,
-            )}?\n\nThe record will move to the Archive tab.`,
-            confirmLabel: "Yes, Archive",
-            cancelLabel: "Cancel",
-            variant: "danger",
-            onConfirm: () => {
-                setConfirmDialog(null);
-                router.put(
-                    `/admin/contracts/${contract.id}/archive`,
-                    {},
-                    {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            showSuccess(
-                                "Moved to Archive Successfully",
-                                "The record has been moved to the Archive tab.",
-                            );
-                            reloadContracts();
-                        },
-                    },
-                );
-            },
-        });
-    };
-
-    const returnForCorrection = (record: ContractPermit) => {
-        if (!record?.id) return;
-
-        const isPermit = isPermitRecord(record);
-        const recordType = isPermit ? "Permit" : "Contract";
-
-        const reason = window.prompt(
-            `Return this ${recordType} for correction?\n\nPlease enter the reason (the staff will see this):`,
-            "",
-        );
-
-        if (reason === null) return;
-
-        if (!reason.trim() || reason.trim().length < 5) {
-            alert(
-                "Please provide a clear reason (at least 5 characters) so the staff knows what to fix.",
-            );
-            return;
-        }
-
-        setConfirmDialog({
-            title: `Return ${recordType} for Correction?`,
-            message:
-                `Return ${getReference(record)} to staff for correction?\n\n` +
-                `Reason:\n"${reason.trim()}"\n\n` +
-                `The staff will be notified and can re-upload the corrected documents, then resubmit for review.`,
-            confirmLabel: "Yes, Return for Correction",
-            cancelLabel: "Cancel",
-            variant: "warning",
-            onConfirm: () => {
-                setConfirmDialog(null);
-                setReviewProcessing(record.id);
-
-                router.put(
-                    `/admin/contracts/${record.id}/return-correction`,
-                    { correction_reason: reason.trim() },
-                    {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedContract(null);
-                            showSuccess(
-                                "Returned for Correction",
-                                `The ${recordType.toLowerCase()} has been returned to staff.`,
-                            );
-                            reloadContracts();
-                        },
-                        onError: (errors) => {
-                            console.error(
-                                "Return for correction error:",
-                                errors,
-                            );
-                            alert(
-                                "Failed to return for correction. Please check the console for details.",
-                            );
-                        },
-                        onFinish: () => {
-                            setReviewProcessing(null);
-                        },
-                    },
-                );
-            },
-        });
-    };
-
-    const restoreContract = (contract: ContractPermit) => {
-        if (!contract?.id) return;
-        setConfirmDialog({
-            title: "Restore Record?",
-            message: `Restore ${getReference(contract)} back to active records?`,
-            confirmLabel: "Yes, Restore",
-            cancelLabel: "Cancel",
-            variant: "success",
-            onConfirm: () => {
-                setConfirmDialog(null);
-                router.put(
-                    `/admin/contracts/${contract.id}/restore`,
-                    {},
-                    {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            showSuccess(
-                                "Restored Successfully",
-                                "The record has been restored from Archive.",
-                            );
-                            reloadContracts();
-                        },
-                    },
-                );
-            },
-        });
-    };
-
-    const permanentlyDelete = () => {
-        if (!deleteRecord) return;
-        setConfirmDialog({
-            title: "Delete Permanently?",
-            message: `You are about to permanently delete ${getTitle(
-                deleteRecord,
-            )}.\n\nThis action CANNOT be undone.`,
-            confirmLabel: "Yes, Delete Forever",
-            cancelLabel: "Cancel",
-            variant: "danger",
-            onConfirm: () => {
-                setConfirmDialog(null);
-                router.delete(`/admin/contracts/${deleteRecord.id}`, {
-                    preserveScroll: true,
-                    onSuccess: () => {
-                        setDeleteRecord(null);
-                        showSuccess(
-                            "Deleted Permanently",
-                            "The archived record has been permanently removed.",
-                        );
-                        reloadContracts();
-                    },
-                });
-            },
-        });
-    };
-
-    const openEmail = (contract: ContractPermit) => {
-        if (!contract?.id) return;
-
-        if (!isContractRecord(contract)) {
-            alert("Email sending is only available for Contract records.");
-            return;
-        }
-
-        if (isArchivedRecord(contract)) {
-            alert("Cannot email an archived contract.");
-            return;
-        }
-
-        // ✅ Alisin ang invoice check
-        // if (!isInvoiceApproved(contract)) {
-        //     alert("Invoice must be approved...");
-        //     return;
-        // }
-
-        const recipient = getClientEmail(contract);
-        emailForm.clearErrors();
-        emailForm.setData({
-            recipient_email: recipient,
-            subject: `Contract Agreement - ${getReference(contract)}`,
-            message:
-                `Dear ${getClient(contract)},\n\n` +
-                `Please find the Contract Agreement for ${getProject(
-                    contract,
-                )} attached to this email.\n\n` +
-                `Kindly review the agreement, sign the designated signature section, and return the signed agreement to ALIBATON.\n\n` +
-                `Reference: ${getReference(contract)}\n\n` +
-                `Thank you,\n\nALIBATON\nHeavy Equipment & Logistics`,
-        });
-        setEmailContract(contract);
-    };
-
-    const submitEmail = (event: React.FormEvent) => {
-        event.preventDefault();
-        if (!emailContract?.id) return;
-        emailForm.post(`/admin/contracts/${emailContract.id}/notify`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEmailContract(null);
-                emailForm.reset();
-                emailForm.clearErrors();
-                showSuccess(
-                    "Email Sent Successfully",
-                    "The Contract Agreement has been emailed to the client.",
-                );
-            },
-        });
-    };
-
-    const downloadContract = (contract: ContractPermit) => {
-        if (!contract?.id) return;
-        if (!contract.contract_file_path) {
-            alert("No contract file uploaded for this record.");
-            return;
-        }
-        window.location.href = `/admin/contracts/${contract.id}/download-contract`;
-    };
-
-    const downloadSignedContract = (contract: ContractPermit) => {
-        if (!contract?.id) return;
-        if (!contract.signed_contract_path) {
-            alert("No signed contract uploaded for this record.");
-            return;
-        }
-        window.location.href = `/admin/contracts/${contract.id}/download-signed`;
-    };
-
-    const downloadFile = (fileId: number) => {
-        window.location.href = `/admin/contracts/files/${fileId}/download`;
+function StatusBadge({
+    status,
+}: {
+    status: ContractStatus;
+}) {
+    const config: Record<
+        ContractStatus,
+        string
+    > = {
+        Active:
+            "border-green-400/20 bg-green-400/10 text-green-300",
+        Pending:
+            "border-yellow-400/20 bg-yellow-400/10 text-yellow-300",
+        "Needs Correction":
+            "border-red-400/20 bg-red-400/10 text-red-300",
+        "Submitted for Review":
+            "border-blue-400/20 bg-blue-400/10 text-blue-300",
+        "Expiring Soon":
+            "border-orange-400/20 bg-orange-400/10 text-orange-300",
+        Expired:
+            "border-red-400/20 bg-red-400/10 text-red-300",
+        Renewed:
+            "border-purple-400/20 bg-purple-400/10 text-purple-300",
+        Archived:
+            "border-zinc-400/20 bg-zinc-400/10 text-zinc-300",
     };
 
     return (
-        <AdminLayout>
-            <Head title="Contract & Permit Management" />
-
-            <style>{`
-                .alibaton-scroll::-webkit-scrollbar {
-                    width: 8px;
-                    height: 8px;
-                }
-                .alibaton-scroll::-webkit-scrollbar-track {
-                    background: rgba(0, 0, 0, 0.6);
-                    border-radius: 999px;
-                }
-                .alibaton-scroll::-webkit-scrollbar-thumb {
-                    background: rgba(250, 204, 21, 0.4);
-                    border-radius: 999px;
-                    border: 1px solid rgba(250, 204, 21, 0.2);
-                }
-                .alibaton-scroll::-webkit-scrollbar-thumb:hover {
-                    background: rgba(250, 204, 21, 0.7);
-                }
-                .alibaton-scroll::-webkit-scrollbar-corner {
-                    background: transparent;
-                }
-                .alibaton-scroll {
-                    scrollbar-width: thin;
-                    scrollbar-color: rgba(250, 204, 21, 0.5) rgba(0, 0, 0, 0.6);
-                }
-            `}</style>
-
-            <div className="min-w-0 flex-1 bg-black px-4 pb-8 pt-20 text-white sm:px-6 lg:px-8 lg:pt-8">
-                <div className="mx-auto w-full max-w-[1600px]">
-                    {/* HEADER */}
-                    <div className="mb-6 flex min-w-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                        <div className="min-w-0">
-                            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">
-                                <ShieldCheck size={15} />
-                                Administration
-                            </div>
-                            <h1 className="break-words text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
-                                Contract & Permit Management
-                            </h1>
-                            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-                                Admin reviews and manages Contract and Permit
-                                records. Approve to activate with 90-day
-                                validity.
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* STAT CARDS */}
-                    <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
-                        <StatCard
-                            label="All"
-                            value={counts.all}
-                            icon={<FileText size={19} />}
-                            active={activeTab === "all"}
-                            onClick={() => setActiveTab("all")}
-                        />
-                        <StatCard
-                            label="Active"
-                            value={counts.active}
-                            icon={<CheckCircle2 size={19} />}
-                            active={activeTab === "active"}
-                            onClick={() => setActiveTab("active")}
-                        />
-                        <StatCard
-                            label="Pending"
-                            value={counts.pending}
-                            icon={<Clock3 size={19} />}
-                            active={activeTab === "pending"}
-                            onClick={() => setActiveTab("pending")}
-                        />
-                        <StatCard
-                            label="Needs Correction"
-                            value={counts.correction}
-                            icon={<AlertTriangle size={19} />}
-                            active={activeTab === "correction"}
-                            onClick={() => setActiveTab("correction")}
-                        />
-                        <StatCard
-                            label="For Review"
-                            value={counts.review}
-                            icon={<Send size={19} />}
-                            active={activeTab === "review"}
-                            onClick={() => setActiveTab("review")}
-                            highlight
-                        />
-                        <StatCard
-                            label="Expiring Soon"
-                            value={counts.expiring}
-                            icon={<AlertTriangle size={19} />}
-                            active={activeTab === "expiring"}
-                            onClick={() => setActiveTab("expiring")}
-                        />
-                        <StatCard
-                            label="Archive"
-                            value={counts.archive}
-                            icon={<Archive size={19} />}
-                            active={activeTab === "archive"}
-                            onClick={() => setActiveTab("archive")}
-                        />
-                    </div>
-
-                    {/* SEARCH / FILTER */}
-                    <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-xl">
-                        <div className="flex min-w-0 flex-col gap-3 lg:flex-row">
-                            <div className="relative min-w-0 flex-1">
-                                <Search
-                                    size={17}
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"
-                                />
-                                <input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search title, client, project, reference..."
-                                    className="w-full rounded-xl border border-zinc-800 bg-black py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-yellow-400/50"
-                                />
-                            </div>
-                            <div className="relative w-full lg:w-56">
-                                <select
-                                    value={typeFilter}
-                                    onChange={(e) =>
-                                        setTypeFilter(e.target.value)
-                                    }
-                                    className="w-full appearance-none rounded-xl border border-zinc-800 bg-black px-4 py-3 pr-10 text-sm font-semibold text-zinc-300 outline-none focus:border-yellow-400/50"
-                                >
-                                    {types.map((type) => (
-                                        <option
-                                            key={type}
-                                            value={type}
-                                            className="bg-black"
-                                        >
-                                            {type === "All"
-                                                ? "All Types"
-                                                : type}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown
-                                    size={16}
-                                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* TABLE */}
-                    {filteredRecords.length === 0 ? (
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 px-6 py-20 text-center shadow-xl">
-                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-zinc-800 bg-black">
-                                <FileCheck2
-                                    size={28}
-                                    className="text-zinc-600"
-                                />
-                            </div>
-                            <h3 className="text-lg font-black text-zinc-300">
-                                No records found
-                            </h3>
-                            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
-                                There are no Contract or Permit records matching
-                                your current filters.
-                            </p>
-                            {(search || typeFilter !== "All") && (
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm font-bold text-zinc-300 transition hover:border-yellow-400/20 hover:bg-zinc-900 hover:text-white"
-                                >
-                                    Clear Filters
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <section className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-zinc-950 shadow-2xl shadow-black/50">
-                            <div
-                                className="alibaton-scroll"
-                                style={{
-                                    maxHeight:
-                                        shouldScroll && tableMaxHeight
-                                            ? `${tableMaxHeight}px`
-                                            : undefined,
-                                    overflowY: shouldScroll
-                                        ? "auto"
-                                        : "visible",
-                                }}
-                            >
-                                <table className="w-full table-fixed">
-                                    <thead className="sticky top-0 z-10 bg-black/95 backdrop-blur-sm">
-                                        <tr className="border-b border-zinc-800 bg-black">
-                                            <th className="w-[13%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                                                Contract
-                                            </th>
-                                            <th className="w-[10%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                                                Type
-                                            </th>
-                                            <th className="w-[22%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                                                Project
-                                            </th>
-                                            <th className="w-[15%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                                                Validity
-                                            </th>
-                                            <th className="w-[13%] px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                                                Status
-                                            </th>
-                                            <th className="w-[11%] px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                                                Files
-                                            </th>
-                                            <th className="w-[16%] px-3 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                                                Action
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredRecords.map((contract) => {
-                                            const status =
-                                                contract.calculatedStatus;
-                                            const expiry =
-                                                getExpiryDate(contract);
-                                            const remaining = daysUntil(expiry);
-                                            const contractFileCount =
-                                                getContractFileCount(contract);
-                                            const signedFileCount =
-                                                getSignedFileCount(contract);
-                                            const isPermit =
-                                                isPermitRecord(contract);
-
-                                            return (
-                                                <tr
-                                                    key={contract.id}
-                                                    className="border-b border-zinc-900 transition hover:bg-yellow-400/[0.025]"
-                                                >
-                                                    <td className="px-3 py-4 align-top">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setSelectedContract(
-                                                                    contract,
-                                                                )
-                                                            }
-                                                            className="text-left"
-                                                        >
-                                                            <p className="truncate text-xs font-black text-white hover:text-yellow-400">
-                                                                {getReference(
-                                                                    contract,
-                                                                )}
-                                                            </p>
-                                                            <p className="mt-0.5 truncate text-[10px] text-zinc-500">
-                                                                {getTitle(
-                                                                    contract,
-                                                                )}
-                                                            </p>
-                                                        </button>
-                                                    </td>
-
-                                                    <td className="px-3 py-4 align-top">
-                                                        <span
-                                                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${
-                                                                isPermit
-                                                                    ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-400"
-                                                                    : "border-yellow-400/20 bg-yellow-400/5 text-yellow-400"
-                                                            }`}
-                                                        >
-                                                            {isPermit ? (
-                                                                <FileCheck2
-                                                                    size={10}
-                                                                />
-                                                            ) : (
-                                                                <FileText
-                                                                    size={10}
-                                                                />
-                                                            )}
-                                                            <span className="truncate">
-                                                                {truncate(
-                                                                    getType(
-                                                                        contract,
-                                                                    ),
-                                                                    10,
-                                                                )}
-                                                            </span>
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-3 py-4 align-top">
-                                                        <p
-                                                            className="truncate text-[11px] text-zinc-300"
-                                                            title={getProject(
-                                                                contract,
-                                                            )}
-                                                        >
-                                                            {truncate(
-                                                                getProject(
-                                                                    contract,
-                                                                ),
-                                                                30,
-                                                            )}
-                                                        </p>
-                                                        {contract.location && (
-                                                            <p
-                                                                className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-zinc-600"
-                                                                title={
-                                                                    contract.location
-                                                                }
-                                                            >
-                                                                <MapPin
-                                                                    size={10}
-                                                                    className="shrink-0"
-                                                                />
-                                                                <span className="truncate">
-                                                                    {truncate(
-                                                                        contract.location,
-                                                                        28,
-                                                                    )}
-                                                                </span>
-                                                            </p>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-3 py-4 align-top">
-                                                        <div className="flex items-start gap-1.5">
-                                                            <CalendarDays
-                                                                size={12}
-                                                                className="mt-0.5 shrink-0 text-zinc-700"
-                                                            />
-                                                            <div className="min-w-0">
-                                                                <p className="truncate text-[11px] text-zinc-300">
-                                                                    {getStartDate(
-                                                                        contract,
-                                                                    )
-                                                                        ? formatShortDate(
-                                                                              getStartDate(
-                                                                                  contract,
-                                                                              ),
-                                                                          )
-                                                                        : "—"}
-                                                                </p>
-                                                                <p
-                                                                    className={`mt-0.5 truncate text-[10px] ${
-                                                                        remaining !==
-                                                                            null &&
-                                                                        remaining <
-                                                                            0
-                                                                            ? "text-red-400"
-                                                                            : remaining !==
-                                                                                    null &&
-                                                                                remaining <=
-                                                                                    30
-                                                                              ? "text-orange-400"
-                                                                              : "text-zinc-600"
-                                                                    }`}
-                                                                >
-                                                                    to{" "}
-                                                                    {expiry
-                                                                        ? formatShortDate(
-                                                                              expiry,
-                                                                          )
-                                                                        : "—"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    <td className="px-3 py-4 text-center align-top">
-                                                        <span
-                                                            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${statusClasses(status)}`}
-                                                        >
-                                                            {statusIcon(status)}
-                                                            {statusShortLabel(
-                                                                status,
-                                                            )}
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-3 py-4 text-center align-top">
-                                                        <div className="mt-1.5 flex flex-col items-center gap-1">
-                                                            <span
-                                                                className={`inline-flex items-center gap-1 text-[9px] font-bold ${
-                                                                    contractFileCount >
-                                                                    0
-                                                                        ? "text-emerald-400"
-                                                                        : "text-slate-700"
-                                                                }`}
-                                                            >
-                                                                <FileText
-                                                                    size={11}
-                                                                />
-                                                                {contractFileCount >
-                                                                0
-                                                                    ? `${contractFileCount} file${contractFileCount > 1 ? "s" : ""}`
-                                                                    : "Missing"}
-                                                            </span>
-                                                            {!isPermit && (
-                                                                <span
-                                                                    className={`inline-flex items-center gap-1 text-[9px] font-bold ${
-                                                                        signedFileCount >
-                                                                        0
-                                                                            ? "text-emerald-400"
-                                                                            : "text-slate-700"
-                                                                    }`}
-                                                                >
-                                                                    <FileCheck2
-                                                                        size={
-                                                                            11
-                                                                        }
-                                                                    />
-                                                                    {signedFileCount >
-                                                                    0
-                                                                        ? `${signedFileCount} signed`
-                                                                        : "No Signed"}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-
-                                                    <td className="px-3 py-4 align-top">
-                                                        <div className="flex items-center justify-end gap-1.5">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    setSelectedContract(
-                                                                        contract,
-                                                                    )
-                                                                }
-                                                                className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-zinc-700 px-2 text-[10px] font-bold text-zinc-300 transition hover:border-yellow-400/40 hover:bg-zinc-900 hover:text-yellow-400"
-                                                            >
-                                                                <Eye
-                                                                    size={12}
-                                                                />
-                                                                View
-                                                            </button>
-                                                            <button
-                                                                ref={(el) => {
-                                                                    menuButtonRefs.current[
-                                                                        contract.id
-                                                                    ] = el;
-                                                                }}
-                                                                type="button"
-                                                                onClick={(e) =>
-                                                                    openActionMenu(
-                                                                        e,
-                                                                        contract.id,
-                                                                    )
-                                                                }
-                                                                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition ${
-                                                                    openMenuId ===
-                                                                    contract.id
-                                                                        ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
-                                                                        : "border-zinc-700 text-zinc-400 hover:border-yellow-400/40 hover:text-yellow-400"
-                                                                }`}
-                                                            >
-                                                                <MoreVertical
-                                                                    size={13}
-                                                                />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-                    )}
-
-                    {/* FOOTER */}
-                    <div className="mt-6 flex min-w-0 flex-col gap-2 border-t border-zinc-800 pt-5 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
-                        <span>
-                            Showing{" "}
-                            <strong className="text-zinc-400">
-                                {filteredRecords.length}
-                            </strong>{" "}
-                            of{" "}
-                            <strong className="text-zinc-400">
-                                {normalizedRecords.length}
-                            </strong>{" "}
-                            records
-                            {shouldScroll && (
-                                <span className="ml-2 text-yellow-400/60">
-                                    (scroll to view more)
-                                </span>
-                            )}
-                        </span>
-                        <span>ALIBATON Contract & Permit Management</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* ACTION MENU */}
-            {openMenuId !== null &&
-                menuPosition &&
-                (() => {
-                    const contract = filteredRecords.find(
-                        (c) => c.id === openMenuId,
-                    );
-                    if (!contract) return null;
-
-                    const status = contract.calculatedStatus;
-                    const isArchived = status === "Archived";
-
-                    const isContract = isContractRecord(contract);
-                    const isPermit = isPermitRecord(contract);
-
-                    const contractFiles = contract.contract_files ?? [];
-                    const signedFiles = contract.signed_files ?? [];
-
-                    return (
-                        <>
-                            <button
-                                type="button"
-                                className="fixed inset-0 z-[9998] cursor-default"
-                                onClick={() => {
-                                    setOpenMenuId(null);
-                                    setMenuPosition(null);
-                                }}
-                                aria-label="Close menu"
-                            />
-                            <div
-                                data-contract-action-menu
-                                className="alibaton-scroll fixed z-[9999] w-64 overflow-y-auto rounded-2xl border border-zinc-700 bg-black shadow-[0_25px_80px_rgba(0,0,0,0.9)]"
-                                style={{
-                                    top: `${menuPosition.top}px`,
-                                    left: `${menuPosition.left}px`,
-                                    maxHeight: "420px",
-                                }}
-                            >
-                                <div className="border-b border-zinc-800 px-3 py-2.5">
-                                    <p className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500">
-                                        Admin Actions
-                                    </p>
-                                    <p className="mt-0.5 truncate text-xs font-bold text-white">
-                                        {getReference(contract)}
-                                    </p>
-                                </div>
-                                <div className="p-1">
-                                    <MenuItem
-                                        icon={<Eye size={14} />}
-                                        label="View Details"
-                                        onClick={() => {
-                                            setOpenMenuId(null);
-                                            setMenuPosition(null);
-                                            setSelectedContract(contract);
-                                        }}
-                                    />
-
-                                    {/* ✅ APPROVE — kung For Review */}
-                                    {!isArchived &&
-                                        status === "Submitted for Review" &&
-                                        canApproveDirectly(contract) && (
-                                            <>
-                                                <div className="my-1 border-t border-zinc-800" />
-                                                <MenuItem
-                                                    icon={
-                                                        <CheckCircle2
-                                                            size={14}
-                                                        />
-                                                    }
-                                                    label={
-                                                        isPermit
-                                                            ? "Approve Permit & Activate"
-                                                            : "Approve & Make Active"
-                                                    }
-                                                    highlight
-                                                    onClick={() => {
-                                                        setOpenMenuId(null);
-                                                        setMenuPosition(null);
-                                                        approveContract(
-                                                            contract,
-                                                        );
-                                                    }}
-                                                />
-                                            </>
-                                        )}
-
-                                    {/* ✅ RETURN FOR CORRECTION — kung For Review */}
-                                    {!isArchived &&
-                                        status === "Submitted for Review" && (
-                                            <MenuItem
-                                                icon={<XCircle size={14} />}
-                                                label="Return for Correction"
-                                                danger
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    returnForCorrection(
-                                                        contract,
-                                                    );
-                                                }}
-                                            />
-                                        )}
-
-                                    {contract.contract_file_path &&
-                                        contractFiles.length === 0 && (
-                                            <MenuItem
-                                                icon={<Download size={14} />}
-                                                label={
-                                                    isPermit
-                                                        ? "Download Permit Document"
-                                                        : "Download Contract"
-                                                }
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    downloadContract(contract);
-                                                }}
-                                            />
-                                        )}
-
-                                    {contractFiles.length > 0 && (
-                                        <>
-                                            <div className="my-1 border-t border-zinc-800" />
-                                            <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-zinc-500">
-                                                {isPermit
-                                                    ? "Permit Documents"
-                                                    : "Contract Documents"}
-                                            </p>
-                                            {contractFiles.map((file) => (
-                                                <MenuItem
-                                                    key={file.id}
-                                                    icon={
-                                                        <Download size={14} />
-                                                    }
-                                                    label={truncate(
-                                                        file.file_name,
-                                                        28,
-                                                    )}
-                                                    onClick={() => {
-                                                        setOpenMenuId(null);
-                                                        setMenuPosition(null);
-                                                        downloadFile(file.id);
-                                                    }}
-                                                />
-                                            ))}
-                                        </>
-                                    )}
-
-                                    {isContract &&
-                                        contract.signed_contract_path &&
-                                        signedFiles.length === 0 && (
-                                            <MenuItem
-                                                icon={<FileCheck2 size={14} />}
-                                                label="Download Signed Contract"
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    downloadSignedContract(
-                                                        contract,
-                                                    );
-                                                }}
-                                            />
-                                        )}
-
-                                    {isContract && signedFiles.length > 0 && (
-                                        <>
-                                            <div className="my-1 border-t border-zinc-800" />
-                                            <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-zinc-500">
-                                                Signed Documents
-                                            </p>
-                                            {signedFiles.map((file) => (
-                                                <MenuItem
-                                                    key={file.id}
-                                                    icon={
-                                                        <Download size={14} />
-                                                    }
-                                                    label={truncate(
-                                                        file.file_name,
-                                                        28,
-                                                    )}
-                                                    onClick={() => {
-                                                        setOpenMenuId(null);
-                                                        setMenuPosition(null);
-                                                        downloadFile(file.id);
-                                                    }}
-                                                />
-                                            ))}
-                                        </>
-                                    )}
-
-                                    {!isArchived &&
-                                        (!isContract ||
-                                            status !== "Submitted for Review") &&
-                                        status !== "Active" &&
-                                        status !== "Expiring Soon" &&
-                                        status !== "Expired" && (
-                                            <MenuItem
-                                                icon={<Edit3 size={14} />}
-                                                label="Edit Record"
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    openEdit(contract);
-                                                }}
-                                            />
-                                        )}
-
-                                    {isContract && !isArchived && (
-                                        <MenuItem
-                                            icon={<Mail size={14} />}
-                                            label="Email Client"
-                                            onClick={() => {
-                                                setOpenMenuId(null);
-                                                setMenuPosition(null);
-                                                openEmail(contract);
-                                            }}
-                                        />
-                                    )}
-
-                                    <div className="my-1 border-t border-zinc-800" />
-                                    {!isArchived ? (
-                                        <MenuItem
-                                            icon={<Archive size={14} />}
-                                            label="Archive"
-                                            danger
-                                            onClick={() => {
-                                                setOpenMenuId(null);
-                                                setMenuPosition(null);
-                                                archiveContract(contract);
-                                            }}
-                                        />
-                                    ) : (
-                                        <>
-                                            <MenuItem
-                                                icon={<RefreshCw size={14} />}
-                                                label="Restore"
-                                                highlight
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    restoreContract(contract);
-                                                }}
-                                            />
-                                            <MenuItem
-                                                icon={<Trash2 size={14} />}
-                                                label="Delete Permanently"
-                                                danger
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    setDeleteRecord(contract);
-                                                }}
-                                            />
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </>
-                    );
-                })()}
-
-            {/* EDIT MODAL */}
-            {editingRecord && (
-                <Modal
-                    title="Edit Contract / Permit"
-                    subtitle={`Editing existing record ${getReference(editingRecord)}`}
-                    icon={<Edit3 size={20} />}
-                    onClose={() => setEditingRecord(null)}
-                    wide
-                >
-                    <form onSubmit={submitEdit} className="space-y-5">
-                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                            <FormInput
-                                label="Contract Title"
-                                value={editForm.data.title}
-                                onChange={(value) =>
-                                    editForm.setData("title", value)
-                                }
-                                required
-                            />
-                            <SelectInput
-                                label="Type"
-                                value={editForm.data.type}
-                                onChange={(value) =>
-                                    editForm.setData("type", value)
-                                }
-                                options={EDIT_TYPE_OPTIONS}
-                                required
-                            />
-                            <FormInput
-                                label="Project"
-                                value={editForm.data.project}
-                                onChange={(value) =>
-                                    editForm.setData("project", value)
-                                }
-                            />
-                            <FormInput
-                                label="Location"
-                                value={editForm.data.location}
-                                onChange={(value) =>
-                                    editForm.setData("location", value)
-                                }
-                            />
-                            <div className="md:col-span-2">
-                                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                                    Assigned Staff
-                                </label>
-                                <select
-                                    value={editForm.data.assigned_to}
-                                    onChange={(e) =>
-                                        editForm.setData(
-                                            "assigned_to",
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="w-full rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm text-white outline-none focus:border-yellow-400/60"
-                                >
-                                    <option value="" className="bg-black">
-                                        All Staff
-                                    </option>
-                                    {staff.map((person) => (
-                                        <option
-                                            key={person.id}
-                                            value={String(person.id)}
-                                            className="bg-black"
-                                        >
-                                            {person.name}
-                                            {person.email
-                                                ? ` — ${person.email}`
-                                                : ""}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <TextArea
-                                label="Description"
-                                value={editForm.data.description}
-                                onChange={(value) =>
-                                    editForm.setData("description", value)
-                                }
-                                rows={4}
-                                full
-                            />
-                            <TextArea
-                                label="Notes"
-                                value={editForm.data.notes}
-                                onChange={(value) =>
-                                    editForm.setData("notes", value)
-                                }
-                                rows={3}
-                                full
-                            />
-                        </div>
-                        <div className="flex flex-col-reverse gap-3 border-t border-zinc-800 pt-5 sm:flex-row sm:justify-end">
-                            <button
-                                type="button"
-                                onClick={() => setEditingRecord(null)}
-                                className="rounded-xl border border-zinc-800 bg-zinc-950 px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-white"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={editForm.processing}
-                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-6 py-3 text-sm font-black text-black transition hover:bg-yellow-300 disabled:opacity-50"
-                            >
-                                {editForm.processing ? (
-                                    <>
-                                        <RefreshCw
-                                            size={16}
-                                            className="animate-spin"
-                                        />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <CheckCircle2 size={16} />
-                                        Save Changes
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
-            )}
-
-            {/* VIEW MODAL */}
-            {selectedContract && (
-                <Modal
-                    title={getTitle(selectedContract)}
-                    subtitle={getReference(selectedContract)}
-                    icon={<Eye size={20} />}
-                    onClose={() => setSelectedContract(null)}
-                    wide
-                >
-                    <div className="space-y-5">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span
-                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-wider ${statusClasses(calculateStatus(selectedContract))}`}
-                            >
-                                {statusIcon(calculateStatus(selectedContract))}
-                                {calculateStatus(selectedContract)}
-                            </span>
-                            <span
-                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${
-                                    isPermitRecord(selectedContract)
-                                        ? "border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-400"
-                                        : "border-zinc-800 bg-zinc-950 text-zinc-400"
-                                }`}
-                            >
-                                {getType(selectedContract)}
-                            </span>
-                        </div>
-
-                        {getCorrectionReason(selectedContract) && (
-                            <div className="rounded-2xl border border-red-400/20 bg-red-400/[0.05] p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertTriangle
-                                        size={19}
-                                        className="mt-0.5 shrink-0 text-red-400"
-                                    />
-                                    <div className="min-w-0">
-                                        <p className="text-xs font-black uppercase tracking-wider text-red-300">
-                                            Admin Correction Required
-                                        </p>
-                                        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-400">
-                                            {getCorrectionReason(
-                                                selectedContract,
-                                            )}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {calculateStatus(selectedContract) ===
-                            "Submitted for Review" && (
-                            <div className="rounded-2xl border border-blue-400/15 bg-blue-400/[0.04] p-4">
-                                <div className="flex items-start gap-3">
-                                    <Send
-                                        size={19}
-                                        className="mt-0.5 shrink-0 text-blue-400"
-                                    />
-                                    <div>
-                                        <p className="text-xs font-black uppercase tracking-wider text-blue-300">
-                                            Awaiting Admin Review
-                                        </p>
-                                        <p className="mt-1 text-xs leading-6 text-zinc-500">
-                                            This record has been submitted for
-                                            final Admin approval.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            <DetailBox
-                                label="Reference Number"
-                                value={getReference(selectedContract)}
-                            />
-                            <DetailBox
-                                label="Status"
-                                value={calculateStatus(selectedContract)}
-                            />
-                            <DetailBox
-                                label="Client"
-                                value={getClient(selectedContract)}
-                            />
-                            <DetailBox
-                                label="Client Email"
-                                value={getClientEmail(selectedContract) || "—"}
-                            />
-                            <DetailBox
-                                label="Project"
-                                value={getProject(selectedContract)}
-                            />
-                            <DetailBox
-                                label="Assigned Staff"
-                                value={
-                                    getAssignedStaff(selectedContract)?.name ||
-                                    "All Staff"
-                                }
-                            />
-                            <DetailBox
-                                label="Start / Issue Date"
-                                value={
-                                    getStartDate(selectedContract)
-                                        ? formatDate(
-                                              getStartDate(selectedContract),
-                                          )
-                                        : "Starts after Admin approval"
-                                }
-                            />
-                            <DetailBox
-                                label="Expiry Date"
-                                value={
-                                    getExpiryDate(selectedContract)
-                                        ? formatDate(
-                                              getExpiryDate(selectedContract),
-                                          )
-                                        : "Starts after Admin approval"
-                                }
-                            />
-                            <DetailBox
-                                label="Location"
-                                value={selectedContract.location || "—"}
-                            />
-                            <DetailBox
-                                label="Created"
-                                value={formatDate(selectedContract.created_at)}
-                            />
-                            <DetailBox
-                                label="Last Updated"
-                                value={formatDate(selectedContract.updated_at)}
-                            />
-                            <DetailBox
-                                label="Admin Approved At"
-                                value={formatDate(selectedContract.approved_at)}
-                            />
-                        </div>
-
-                        <DetailBox
-                            label="Description"
-                            value={
-                                selectedContract.description ||
-                                "No description provided."
-                            }
-                            full
-                        />
-                        <DetailBox
-                            label="Notes"
-                            value={
-                                selectedContract.notes || "No additional notes."
-                            }
-                            full
-                        />
-
-                        {(() => {
-                            const contractFiles =
-                                selectedContract.contract_files ?? [];
-                            const signedFiles =
-                                selectedContract.signed_files ?? [];
-                            const isPermit = isPermitRecord(selectedContract);
-                            const hasLegacyContract =
-                                !contractFiles.length &&
-                                selectedContract.contract_file_path;
-                            const hasLegacySigned =
-                                !signedFiles.length &&
-                                selectedContract.signed_contract_path;
-
-                            if (
-                                !contractFiles.length &&
-                                !signedFiles.length &&
-                                !hasLegacyContract &&
-                                !hasLegacySigned
-                            ) {
-                                return null;
-                            }
-
-                            return (
-                                <div className="space-y-4">
-                                    {(contractFiles.length > 0 ||
-                                        hasLegacyContract) && (
-                                        <div>
-                                            <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">
-                                                {isPermit
-                                                    ? "📁 Permit"
-                                                    : "📁 Contract"}{" "}
-                                                Documents (
-                                                {contractFiles.length || 1})
-                                            </p>
-                                            <div className="space-y-2">
-                                                {contractFiles.length > 0 ? (
-                                                    contractFiles.map((f) => (
-                                                        <FileRow
-                                                            key={f.id}
-                                                            file={f}
-                                                            accent="yellow"
-                                                            href={`/admin/contracts/files/${f.id}/download`}
-                                                        />
-                                                    ))
-                                                ) : (
-                                                    <FileRow
-                                                        file={{
-                                                            id: 0,
-                                                            file_name:
-                                                                selectedContract.contract_file_name ||
-                                                                "Contract file",
-                                                            file_size: null,
-                                                        }}
-                                                        accent="yellow"
-                                                        href={`/admin/contracts/${selectedContract.id}/download-contract`}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {!isPermit &&
-                                        (signedFiles.length > 0 ||
-                                            hasLegacySigned) && (
-                                            <div>
-                                                <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">
-                                                    ✍️ Signed Documents (
-                                                    {signedFiles.length || 1})
-                                                </p>
-                                                <div className="space-y-2">
-                                                    {signedFiles.length > 0 ? (
-                                                        signedFiles.map((f) => (
-                                                            <FileRow
-                                                                key={f.id}
-                                                                file={f}
-                                                                accent="emerald"
-                                                                href={`/admin/contracts/files/${f.id}/download`}
-                                                            />
-                                                        ))
-                                                    ) : (
-                                                        <FileRow
-                                                            file={{
-                                                                id: 0,
-                                                                file_name:
-                                                                    selectedContract.signed_contract_file_name ||
-                                                                    "Signed contract",
-                                                                file_size: null,
-                                                            }}
-                                                            accent="emerald"
-                                                            href={`/admin/contracts/${selectedContract.id}/download-signed`}
-                                                        />
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                </div>
-                            );
-                        })()}
-
-                        {calculateStatus(selectedContract) ===
-                            "Submitted for Review" && (
-                            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-                                <p className="mb-4 text-xs font-black uppercase tracking-wider text-zinc-500">
-                                    Admin Review Checklist
-                                </p>
-                                <div className="space-y-2">
-                                    {isPermitRecord(selectedContract) && (
-                                        <ReviewCheck
-                                            label={`Permit document attached (${getContractFileCount(selectedContract)} file${getContractFileCount(selectedContract) > 1 ? "s" : ""})`}
-                                            passed={
-                                                getContractFileCount(
-                                                    selectedContract,
-                                                ) > 0
-                                            }
-                                        />
-                                    )}
-                                    <ReviewCheck
-                                        label="Client information is available"
-                                        passed={
-                                            getClient(selectedContract) !== "—"
-                                        }
-                                    />
-                                    <ReviewCheck
-                                        label={
-                                            isPermitRecord(selectedContract)
-                                                ? "Permit information is available"
-                                                : "Project / contract information is available"
-                                        }
-                                        passed={Boolean(
-                                            getTitle(selectedContract),
-                                        )}
-                                    />
-                                    {!isPermitRecord(selectedContract) && (
-                                        <ReviewCheck
-                                            label="Original contract uploaded"
-                                            passed={
-                                                getContractFileCount(
-                                                    selectedContract,
-                                                ) > 0
-                                            }
-                                        />
-                                    )}
-                                    {!isPermitRecord(selectedContract) && (
-                                        <ReviewCheck
-                                            label="Signed contract uploaded"
-                                            passed={
-                                                getSignedFileCount(
-                                                    selectedContract,
-                                                ) > 0
-                                            }
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex flex-wrap gap-2 border-t border-zinc-800 pt-5">
-                            {calculateStatus(selectedContract) ===
-                                "Submitted for Review" &&
-                                canApproveDirectly(selectedContract) && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            approveContract(selectedContract)
-                                        }
-                                        disabled={
-                                            reviewProcessing ===
-                                            selectedContract.id
-                                        }
-                                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-black text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {reviewProcessing ===
-                                        selectedContract.id ? (
-                                            <>
-                                                <RefreshCw
-                                                    size={16}
-                                                    className="animate-spin"
-                                                />
-                                                Processing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CheckCircle2 size={16} />
-                                                {isPermitRecord(
-                                                    selectedContract,
-                                                )
-                                                    ? "✅ Verify & Approve Permit"
-                                                    : "✅ Approve & Make Active"}
-                                            </>
-                                        )}
-                                    </button>
-                                )}
-
-                            {calculateStatus(selectedContract) ===
-                                "Submitted for Review" && (
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        returnForCorrection(selectedContract)
-                                    }
-                                    disabled={
-                                        reviewProcessing ===
-                                        selectedContract.id
-                                    }
-                                    className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {reviewProcessing ===
-                                    selectedContract.id ? (
-                                        <>
-                                            <RefreshCw
-                                                size={16}
-                                                className="animate-spin"
-                                            />
-                                            Processing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <XCircle size={16} />
-                                            Return for Correction
-                                        </>
-                                    )}
-                                </button>
-                            )}
-
-                            {isContractRecord(selectedContract) &&
-                                !isArchivedRecord(selectedContract) && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedContract(null);
-                                            openEmail(selectedContract);
-                                        }}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2.5 text-sm font-bold text-zinc-300 transition hover:border-yellow-400/40 hover:text-yellow-400"
-                                    >
-                                        <Mail size={16} />
-                                        Email Client
-                                    </button>
-                                )}
-
-                            {!isArchivedRecord(selectedContract) &&
-                                calculateStatus(selectedContract) !==
-                                    "Submitted for Review" && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedContract(null);
-                                            openEdit(selectedContract);
-                                        }}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2.5 text-sm font-bold text-zinc-300 transition hover:border-yellow-400/40 hover:text-yellow-400"
-                                    >
-                                        <Edit3 size={16} />
-                                        Edit Record
-                                    </button>
-                                )}
-
-                            {!isArchivedRecord(selectedContract) && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setSelectedContract(null);
-                                        archiveContract(selectedContract);
-                                    }}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/[0.05] px-4 py-2.5 text-sm font-bold text-red-400 transition hover:bg-red-400/10"
-                                >
-                                    <Archive size={16} />
-                                    Archive
-                                </button>
-                            )}
-
-                            {isArchivedRecord(selectedContract) && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedContract(null);
-                                            restoreContract(selectedContract);
-                                        }}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.05] px-4 py-2.5 text-sm font-bold text-emerald-400 transition hover:bg-emerald-400/10"
-                                    >
-                                        <RefreshCw size={16} />
-                                        Restore
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedContract(null);
-                                            setDeleteRecord(selectedContract);
-                                        }}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/[0.05] px-4 py-2.5 text-sm font-bold text-red-400 transition hover:bg-red-400/10"
-                                    >
-                                        <Trash2 size={16} />
-                                        Delete Permanently
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </Modal>
-            )}
-
-            {/* EMAIL MODAL */}
-            {emailContract && isContractRecord(emailContract) && (
-                <Modal
-                    title="Send Contract Agreement"
-                    subtitle={`Send Contract Agreement for ${getReference(emailContract)}`}
-                    icon={<Mail size={20} />}
-                    onClose={() => {
-                        if (emailForm.processing) return;
-                        setEmailContract(null);
-                        emailForm.reset();
-                        emailForm.clearErrors();
-                    }}
-                >
-                    <form onSubmit={submitEmail} className="space-y-5">
-                        <FormInput
-                            label="Client Email"
-                            value={emailForm.data.recipient_email}
-                            onChange={(value) =>
-                                emailForm.setData("recipient_email", value)
-                            }
-                            placeholder="client@example.com"
-                            type="email"
-                            required
-                        />
-                        {emailForm.errors.recipient_email && (
-                            <p className="-mt-3 text-xs font-semibold text-red-400">
-                                {emailForm.errors.recipient_email}
-                            </p>
-                        )}
-                        <FormInput
-                            label="Subject"
-                            value={emailForm.data.subject}
-                            onChange={(value) =>
-                                emailForm.setData("subject", value)
-                            }
-                            required
-                        />
-                        <TextArea
-                            label="Message"
-                            value={emailForm.data.message}
-                            onChange={(value) =>
-                                emailForm.setData("message", value)
-                            }
-                            rows={9}
-                            full
-                            required
-                        />
-                        <div className="flex flex-col-reverse gap-3 border-t border-zinc-800 pt-5 sm:flex-row sm:justify-end">
-                            <button
-                                type="button"
-                                disabled={emailForm.processing}
-                                onClick={() => {
-                                    setEmailContract(null);
-                                    emailForm.reset();
-                                    emailForm.clearErrors();
-                                }}
-                                className="rounded-xl border border-zinc-800 bg-zinc-950 px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-white disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={
-                                    emailForm.processing ||
-                                    !emailForm.data.recipient_email.trim()
-                                }
-                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-6 py-3 text-sm font-black text-black transition hover:bg-yellow-300 disabled:opacity-50"
-                            >
-                                {emailForm.processing ? (
-                                    <>
-                                        <RefreshCw
-                                            size={16}
-                                            className="animate-spin"
-                                        />
-                                        Sending...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Send size={16} />
-                                        Send Email
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
-            )}
-
-            {/* DELETE MODAL */}
-            {deleteRecord && (
-                <Modal
-                    title="Delete Archived Record"
-                    subtitle="This action cannot be undone."
-                    icon={<Trash2 size={20} />}
-                    onClose={() => setDeleteRecord(null)}
-                >
-                    <div className="space-y-5">
-                        <div className="rounded-2xl border border-red-400/15 bg-red-400/[0.05] p-4">
-                            <div className="flex gap-3">
-                                <AlertTriangle
-                                    size={20}
-                                    className="mt-0.5 shrink-0 text-red-400"
-                                />
-                                <div className="min-w-0">
-                                    <p className="text-sm font-bold text-red-300">
-                                        Permanent deletion
-                                    </p>
-                                    <p className="mt-1 break-words text-xs leading-5 text-red-300/60">
-                                        You are about to permanently delete{" "}
-                                        <strong>
-                                            {getTitle(deleteRecord)}
-                                        </strong>
-                                        .
-                                    </p>
-                                    <p className="mt-2 text-xs leading-5 text-red-300/50">
-                                        Only archived Contract / Permit records
-                                        can be permanently deleted.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                            <button
-                                type="button"
-                                onClick={() => setDeleteRecord(null)}
-                                className="rounded-xl border border-zinc-800 bg-zinc-950 px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={permanentlyDelete}
-                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-5 py-3 text-sm font-black text-white transition hover:bg-red-400"
-                            >
-                                <Trash2 size={16} />
-                                Delete Permanently
-                            </button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-
-            {/* CUSTOM CONFIRM DIALOG */}
-            {confirmDialog && (
-                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-                    <div
-                        className={`pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border bg-black shadow-2xl ${
-                            confirmDialog.variant === "danger"
-                                ? "border-red-400/30 shadow-red-400/10"
-                                : confirmDialog.variant === "warning"
-                                  ? "border-amber-400/30 shadow-amber-400/10"
-                                  : "border-emerald-400/30 shadow-emerald-400/10"
-                        }`}
-                    >
-                        <div className="px-5 py-5">
-                            <div className="flex items-start gap-3">
-                                <div
-                                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                                        confirmDialog.variant === "danger"
-                                            ? "bg-red-400/15 text-red-400"
-                                            : confirmDialog.variant ===
-                                                "warning"
-                                              ? "bg-amber-400/15 text-amber-400"
-                                              : "bg-emerald-400/15 text-emerald-400"
-                                    }`}
-                                >
-                                    {confirmDialog.variant === "danger" ? (
-                                        <AlertTriangle size={24} />
-                                    ) : confirmDialog.variant === "warning" ? (
-                                        <AlertTriangle size={24} />
-                                    ) : (
-                                        <CheckCircle2 size={24} />
-                                    )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-black text-white">
-                                        {confirmDialog.title}
-                                    </p>
-                                    <p className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-5 text-zinc-400">
-                                        {confirmDialog.message}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col-reverse gap-2 border-t border-zinc-800 bg-zinc-950/50 px-5 py-4 sm:flex-row sm:justify-end">
-                            <button
-                                type="button"
-                                onClick={() => setConfirmDialog(null)}
-                                className="rounded-xl border border-zinc-800 bg-zinc-950 px-5 py-2.5 text-sm font-bold text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-white"
-                            >
-                                {confirmDialog.cancelLabel}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={confirmDialog.onConfirm}
-                                className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-black transition ${
-                                    confirmDialog.variant === "danger"
-                                        ? "bg-red-500 text-white hover:bg-red-400"
-                                        : confirmDialog.variant === "warning"
-                                          ? "bg-amber-500 text-black hover:bg-amber-400"
-                                          : "bg-emerald-500 text-white hover:bg-emerald-400"
-                                }`}
-                            >
-                                {confirmDialog.variant === "danger" ? (
-                                    <Trash2 size={16} />
-                                ) : confirmDialog.variant === "warning" ? (
-                                    <AlertTriangle size={16} />
-                                ) : (
-                                    <CheckCircle2 size={16} />
-                                )}
-                                {confirmDialog.confirmLabel}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* SUCCESS NOTIFICATION */}
-            {successMessage && (
-                <div className="pointer-events-none fixed inset-0 z-[200] flex items-center justify-center p-4">
-                    <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-emerald-400/30 bg-black px-5 py-5 shadow-2xl shadow-emerald-400/10">
-                        <div className="flex items-start gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-400">
-                                <CheckCircle2 size={24} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm font-black text-white">
-                                    {successMessage.title}
-                                </p>
-                                <p className="mt-1 text-xs leading-5 text-zinc-400">
-                                    {successMessage.description}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setSuccessMessage(null)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-900 hover:text-white"
-                            >
-                                <X size={15} />
-                            </button>
-                        </div>
-                        <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-zinc-900">
-                            <div
-                                className="h-full bg-emerald-400"
-                                style={{
-                                    animation:
-                                        "successProgress 3.5s linear forwards",
-                                }}
-                            />
-                        </div>
-                    </div>
-                    <style>{`
-                        @keyframes successProgress {
-                            from { width: 100%; }
-                            to { width: 0%; }
-                        }
-                    `}</style>
-                </div>
-            )}
-        </AdminLayout>
+        <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${config[status]}`}
+        >
+            {status}
+        </span>
     );
 }
 
-// =========================================================
-// FILE ROW
-// =========================================================
-
 function FileRow({
     file,
-    href,
-    accent = "yellow",
 }: {
     file: ContractFileRecord;
-    href: string;
-    accent?: "yellow" | "emerald";
 }) {
-    const accentBg =
-        accent === "emerald"
-            ? "bg-emerald-400/10 text-emerald-400"
-            : "bg-yellow-400/10 text-yellow-400";
+    const downloadUrl =
+        file.id > 0
+            ? `/admin/contracts/files/${file.id}/download`
+            : file.file_path
+              ? `/storage/${String(
+                    file.file_path,
+                ).replace(/^\/+/, "")}`
+              : "#";
 
     return (
-        <div className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-            <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${accentBg}`}
-            >
-                <FileText size={18} />
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-yellow-400/20 bg-yellow-400/10 text-yellow-300">
+                    <FileText
+                        size={17}
+                    />
+                </div>
+
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">
+                        {file.file_name ||
+                            "Document"}
+                    </p>
+
+                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                        {file.mime_type ||
+                            "File"}
+
+                        {file.file_size
+                            ? ` • ${formatFileSize(
+                                  file.file_size,
+                              )}`
+                            : ""}
+                    </p>
+                </div>
             </div>
-            <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-white">
-                    {file.file_name}
-                </p>
-                <p className="mt-0.5 text-[10px] text-zinc-500">
-                    {file.file_size ? formatFileSize(file.file_size) : "—"}
-                </p>
-            </div>
+
             <a
-                href={href}
-                className="inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[10px] font-bold text-zinc-300 transition hover:border-zinc-700 hover:text-white"
+                href={downloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-300"
             >
-                <Download size={12} />
+                <Download
+                    size={14}
+                />
                 Download
             </a>
         </div>
     );
 }
 
-// =========================================================
-// MENU ITEM
-// =========================================================
-
-function MenuItem({
-    icon,
-    label,
-    onClick,
-    highlight = false,
-    danger = false,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    onClick: () => void;
-    highlight?: boolean;
-    danger?: boolean;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${
-                danger
-                    ? "text-red-400 hover:bg-red-400/10"
-                    : highlight
-                      ? "text-yellow-400 hover:bg-yellow-400/10"
-                      : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
-            }`}
-        >
-            {icon}
-            <span className="truncate">{label}</span>
-        </button>
-    );
-}
-
-// =========================================================
-// STAT CARD
-// =========================================================
-
 function StatCard({
     label,
     value,
     icon,
-    active,
     onClick,
-    highlight = false,
+    active,
 }: {
     label: string;
     value: number;
     icon: React.ReactNode;
-    active: boolean;
-    onClick: () => void;
-    highlight?: boolean;
+    onClick?: () => void;
+    active?: boolean;
 }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className={`group min-w-0 rounded-2xl border p-4 text-left shadow-xl transition-all duration-300 hover:-translate-y-1 ${
+            className={`w-full rounded-2xl border p-4 text-left transition ${
                 active
-                    ? highlight
-                        ? "border-amber-400/30 bg-amber-400/[0.07] shadow-amber-400/[0.03]"
-                        : "border-yellow-400/30 bg-yellow-400/[0.07] shadow-yellow-400/[0.03]"
-                    : "border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900"
+                    ? "border-yellow-400/30 bg-yellow-400/[0.08]"
+                    : "border-white/10 bg-white/[0.025] hover:border-white/20 hover:bg-white/[0.04]"
             }`}
         >
-            <div className="flex items-center justify-between gap-2">
-                <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                        active
-                            ? highlight
-                                ? "bg-amber-400 text-black"
-                                : "bg-yellow-400 text-black"
-                            : "bg-black text-zinc-500 group-hover:text-zinc-300"
-                    }`}
-                >
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <p className="text-xs font-medium text-zinc-500">
+                        {label}
+                    </p>
+
+                    <p className="mt-2 text-2xl font-bold text-white">
+                        {value}
+                    </p>
+                </div>
+
+                <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-2 text-yellow-300">
                     {icon}
                 </div>
-                <span
-                    className={`text-2xl font-black ${
-                        active
-                            ? highlight
-                                ? "text-amber-300"
-                                : "text-yellow-300"
-                            : "text-white"
-                    }`}
-                >
-                    {value}
-                </span>
             </div>
-            <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-zinc-600">
-                {label}
-            </p>
         </button>
     );
 }
 
-// =========================================================
-// REVIEW CHECK
-// =========================================================
-
-function ReviewCheck({ label, passed }: { label: string; passed: boolean }) {
-    return (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-black px-3 py-3">
-            <span className="text-xs font-bold text-zinc-300">{label}</span>
-            {passed ? (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-400">
-                    <CheckCircle2 size={14} />
-                    Ready
-                </span>
-            ) : (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-red-400">
-                    <XCircle size={14} />
-                    Missing
-                </span>
-            )}
-        </div>
-    );
-}
-
-// =========================================================
-// FORM INPUT
-// =========================================================
-
-function FormInput({
-    label,
-    value,
-    onChange,
-    placeholder,
-    required = false,
-    type = "text",
+function MenuItem({
+    icon,
+    children,
+    danger,
+    disabled,
+    onClick,
 }: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    placeholder?: string;
-    required?: boolean;
-    type?: string;
+    icon: React.ReactNode;
+    children: React.ReactNode;
+    danger?: boolean;
+    disabled?: boolean;
+    onClick: () => void;
 }) {
     return (
-        <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                {label}
-                {required && <span className="ml-1 text-yellow-400">*</span>}
-            </label>
-            <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                required={required}
-                className="w-full rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-yellow-400/60 focus:bg-zinc-950"
-            />
-        </div>
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={onClick}
+            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition ${
+                disabled
+                    ? "cursor-not-allowed opacity-40"
+                    : danger
+                      ? "text-red-300 hover:bg-red-400/10"
+                      : "text-zinc-200 hover:bg-white/5 hover:text-yellow-300"
+            }`}
+        >
+            {icon}
+            {children}
+        </button>
     );
 }
-
-// =========================================================
-// SELECT INPUT
-// =========================================================
-
-function SelectInput({
-    label,
-    value,
-    onChange,
-    options,
-    required = false,
-}: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    options: string[];
-    required?: boolean;
-}) {
-    return (
-        <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                {label}
-                {required && <span className="ml-1 text-yellow-400">*</span>}
-            </label>
-            <div className="relative">
-                <select
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    required={required}
-                    className="w-full appearance-none rounded-xl border border-zinc-800 bg-black px-4 py-3 pr-10 text-sm text-white outline-none focus:border-yellow-400/60"
-                >
-                    {options.map((option) => (
-                        <option
-                            key={option}
-                            value={option}
-                            className="bg-black"
-                        >
-                            {option}
-                        </option>
-                    ))}
-                </select>
-                <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600"
-                />
-            </div>
-        </div>
-    );
-}
-
-// =========================================================
-// TEXT AREA
-// =========================================================
-
-function TextArea({
-    label,
-    value,
-    onChange,
-    placeholder,
-    rows = 4,
-    full = false,
-    required = false,
-}: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    placeholder?: string;
-    rows?: number;
-    full?: boolean;
-    required?: boolean;
-}) {
-    return (
-        <div className={full ? "md:col-span-2" : ""}>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                {label}
-                {required && <span className="ml-1 text-yellow-400">*</span>}
-            </label>
-            <textarea
-                rows={rows}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                required={required}
-                className="w-full resize-none rounded-xl border border-zinc-800 bg-black px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-yellow-400/60 focus:bg-zinc-950"
-            />
-        </div>
-    );
-}
-
-// =========================================================
-// DETAIL BOX
-// =========================================================
 
 function DetailBox({
     label,
     value,
-    full = false,
 }: {
     label: string;
-    value: string;
-    full?: boolean;
+    value?: React.ReactNode;
 }) {
     return (
-        <div
-            className={`min-w-0 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-xl ${
-                full ? "sm:col-span-2" : ""
-            }`}
-        >
-            <p className="mb-1 text-[9px] font-black uppercase tracking-[0.15em] text-zinc-600">
+        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                 {label}
             </p>
-            <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-zinc-300">
-                {value}
-            </p>
+
+            <div className="mt-1 text-sm text-white">
+                {value || "—"}
+            </div>
         </div>
     );
 }
 
-// =========================================================
-// MODAL
-// =========================================================
+/* =========================================================
+   PAGE
+========================================================= */
 
-function Modal({
-    title,
-    subtitle,
-    icon,
-    onClose,
-    children,
-    wide = false,
-}: {
-    title: string;
-    subtitle?: string;
-    icon: React.ReactNode;
-    onClose: () => void;
-    children: React.ReactNode;
-    wide?: boolean;
-}) {
+export default function ContractPermitManagement(
+    props: Props,
+) {
+    const records = useMemo(() => {
+        const merged = [
+            ...(props.contracts || []),
+            ...(props.contractPermits || []),
+            ...(props.permits || []),
+        ];
+
+        const map = new Map<
+            number,
+            ContractPermit
+        >();
+
+        merged.forEach((record) => {
+            map.set(record.id, record);
+        });
+
+        return Array.from(map.values());
+    }, [
+        props.contracts,
+        props.contractPermits,
+        props.permits,
+    ]);
+
+    const [search, setSearch] =
+        useState("");
+
+    const [statusFilter, setStatusFilter] =
+        useState<"All" | ContractStatus>(
+            "All",
+        );
+
+    const [typeFilter, setTypeFilter] =
+        useState<
+            "All" | "Contract" | "Permit"
+        >("All");
+
+    const [showArchived, setShowArchived] =
+        useState(false);
+
+    const [selectedContract, setSelectedContract] =
+        useState<ContractPermit | null>(
+            null,
+        );
+
+    const [menuOpen, setMenuOpen] =
+        useState<number | null>(null);
+
+    const [confirmDialog, setConfirmDialog] =
+        useState<{
+            title: string;
+            message: string;
+            confirmLabel: string;
+            cancelLabel: string;
+            variant:
+                | "success"
+                | "danger"
+                | "warning";
+            onConfirm: () => void;
+        } | null>(null);
+
+    const [correctionRecord, setCorrectionRecord] =
+        useState<ContractPermit | null>(
+            null,
+        );
+
+    const [correctionReason, setCorrectionReason] =
+        useState("");
+
+    const [emailRecord, setEmailRecord] =
+        useState<ContractPermit | null>(
+            null,
+        );
+
+    const [emailMessage, setEmailMessage] =
+        useState("");
+
+    const [reviewProcessing, setReviewProcessing] =
+        useState<number | null>(null);
+
+    const [actionProcessing, setActionProcessing] =
+        useState<number | null>(null);
+
+    const [lastRefresh, setLastRefresh] =
+        useState(new Date());
+
+    const menuRef =
+        useRef<HTMLDivElement | null>(null);
+
+    /* =====================================================
+       CLOSE MENU
+    ===================================================== */
+
+    useEffect(() => {
+        const handler = (
+            event: MouseEvent,
+        ) => {
+            if (
+                menuRef.current &&
+                !menuRef.current.contains(
+                    event.target as Node,
+                )
+            ) {
+                setMenuOpen(null);
+            }
+        };
+
+        document.addEventListener(
+            "mousedown",
+            handler,
+        );
+
+        return () => {
+            document.removeEventListener(
+                "mousedown",
+                handler,
+            );
+        };
+    }, []);
+
+  {/* =====================================================
+    LIVE REFRESH
+===================================================== */}
+
+useEffect(() => {
+    const interval = window.setInterval(() => {
+        router.reload();
+        setLastRefresh(new Date());
+    }, 30000);
+
+    return () => {
+        window.clearInterval(interval);
+    };
+}, []);
+
+const reloadContracts = () => {
+    router.reload();
+    setLastRefresh(new Date());
+};
+
+    /* =====================================================
+       FILTER
+    ===================================================== */
+
+    const filteredRecords = useMemo(() => {
+        const query =
+            search.trim().toLowerCase();
+
+        return records
+            .filter((record) => {
+                const archived =
+                    isArchivedRecord(record);
+
+                if (
+                    showArchived !== archived
+                ) {
+                    return false;
+                }
+
+                return true;
+            })
+            .filter((record) => {
+                if (
+                    statusFilter === "All"
+                ) {
+                    return true;
+                }
+
+                return (
+                    calculateStatus(
+                        record,
+                    ) === statusFilter
+                );
+            })
+            .filter((record) => {
+                if (
+                    typeFilter === "All"
+                ) {
+                    return true;
+                }
+
+                if (
+                    typeFilter ===
+                    "Permit"
+                ) {
+                    return isPermitRecord(
+                        record,
+                    );
+                }
+
+                return isContractRecord(
+                    record,
+                );
+            })
+            .filter((record) => {
+                if (!query) {
+                    return true;
+                }
+
+                const haystack = [
+                    getTitle(record),
+                    getType(record),
+                    getClient(record),
+                    getProject(record),
+                    getReference(record),
+                    getClientEmail(record),
+                    record.location || "",
+                ]
+                    .join(" ")
+                    .toLowerCase();
+
+                return haystack.includes(
+                    query,
+                );
+            });
+    }, [
+        records,
+        search,
+        statusFilter,
+        typeFilter,
+        showArchived,
+    ]);
+
+    /* =====================================================
+       COUNTS
+    ===================================================== */
+
+    const activeRecords =
+        records.filter(
+            (record) =>
+                !isArchivedRecord(record) &&
+                calculateStatus(
+                    record,
+                ) === "Active",
+        );
+
+    const pendingRecords =
+        records.filter(
+            (record) =>
+                !isArchivedRecord(record) &&
+                calculateStatus(
+                    record,
+                ) === "Pending",
+        );
+
+    const submittedRecords =
+        records.filter(
+            (record) =>
+                !isArchivedRecord(record) &&
+                calculateStatus(
+                    record,
+                ) ===
+                    "Submitted for Review",
+        );
+
+    const correctionRecords =
+        records.filter(
+            (record) =>
+                !isArchivedRecord(record) &&
+                calculateStatus(
+                    record,
+                ) === "Needs Correction",
+        );
+
+    const expiringRecords =
+        records.filter(
+            (record) =>
+                !isArchivedRecord(record) &&
+                calculateStatus(
+                    record,
+                ) === "Expiring Soon",
+        );
+
+    const archivedRecords =
+        records.filter((record) =>
+            isArchivedRecord(record),
+        );
+
+    /* =====================================================
+       SUCCESS
+    ===================================================== */
+
+    const showSuccess = (
+        title: string,
+        message: string,
+    ) => {
+        window.alert(
+            `${title}\n\n${message}`,
+        );
+    };
+
+    /* =====================================================
+       APPROVE
+    ===================================================== */
+
+    const approveContract = (
+        record: ContractPermit,
+    ) => {
+        const isPermit =
+            isPermitRecord(record);
+
+        const contractFileCount =
+            getContractFileCount(
+                record,
+            );
+
+        const signedFileCount =
+            getSignedFileCount(record);
+
+        if (contractFileCount === 0) {
+            window.alert(
+                isPermit
+                    ? "The permit document is required before approval."
+                    : "The actual contract file is required before approval.",
+            );
+
+            return;
+        }
+
+        if (
+            !isPermit &&
+            signedFileCount === 0
+        ) {
+            window.alert(
+                "A signed contract file is required before approval.",
+            );
+
+            return;
+        }
+
+        if (
+            calculateStatus(record) !==
+            "Submitted for Review"
+        ) {
+            window.alert(
+                "Only records submitted for review can be approved.",
+            );
+
+            return;
+        }
+
+        setConfirmDialog({
+            title: isPermit
+                ? "Approve Permit and Make it Active?"
+                : "Approve Contract and Make it Active?",
+
+            message: isPermit
+                ? "By approving, you confirm that you have VERIFIED the attached permit document(s).\n\nThe 90-day validity period will start on the Admin approval date."
+                : "The 90-day validity period will start on the Admin approval date.",
+
+            confirmLabel: isPermit
+                ? "Yes, Verify & Approve"
+                : "Yes, Approve & Activate",
+
+            cancelLabel: "Cancel",
+
+            variant: "success",
+
+            onConfirm: () => {
+                setConfirmDialog(
+                    null,
+                );
+
+                setReviewProcessing(
+                    record.id,
+                );
+
+                router.put(
+                    `/admin/contracts/${record.id}/approve`,
+                    {},
+                    {
+                        preserveScroll: true,
+
+                        onSuccess: () => {
+                            setSelectedContract(
+                                null,
+                            );
+
+                            showSuccess(
+                                isPermit
+                                    ? "Permit Approved Successfully"
+                                    : "Contract Approved Successfully",
+                                `The ${
+                                    isPermit
+                                        ? "permit"
+                                        : "contract"
+                                } is now Active for 90 days from the Admin approval date.`,
+                            );
+
+                            reloadContracts();
+                        },
+
+                        onError: (
+                            errors,
+                        ) => {
+                            console.error(
+                                "Approve error:",
+                                errors,
+                            );
+
+                            const firstError =
+                                Object.values(
+                                    errors,
+                                )[0] ||
+                                "Approval failed. Please check the record and try again.";
+
+                            window.alert(
+                                String(
+                                    firstError,
+                                ),
+                            );
+                        },
+
+                        onFinish: () => {
+                            setReviewProcessing(
+                                null,
+                            );
+                        },
+                    },
+                );
+            },
+        });
+    };
+
+    /* =====================================================
+       RETURN FOR CORRECTION
+    ===================================================== */
+
+    const openCorrection = (
+        record: ContractPermit,
+    ) => {
+        setMenuOpen(null);
+
+        setCorrectionRecord(
+            record,
+        );
+
+        setCorrectionReason(
+            getCorrectionReason(
+                record,
+            ),
+        );
+    };
+
+    const submitCorrection = () => {
+        if (!correctionRecord) {
+            return;
+        }
+
+        if (
+            !correctionReason.trim()
+        ) {
+            window.alert(
+                "Please provide a correction reason.",
+            );
+
+            return;
+        }
+
+        const record =
+            correctionRecord;
+
+        setActionProcessing(
+            record.id,
+        );
+
+        router.put(
+            `/admin/contracts/${record.id}/return-correction`,
+            {
+                reason:
+                    correctionReason.trim(),
+            },
+            {
+                preserveScroll: true,
+
+                onSuccess: () => {
+                    setCorrectionRecord(
+                        null,
+                    );
+
+                    setCorrectionReason(
+                        "",
+                    );
+
+                    showSuccess(
+                        "Returned for Correction",
+                        "The record is now marked as Needs Correction.",
+                    );
+
+                    reloadContracts();
+                },
+
+                onError: (errors) => {
+                    console.error(
+                        "Correction error:",
+                        errors,
+                    );
+
+                    const firstError =
+                        Object.values(
+                            errors,
+                        )[0] ||
+                        "Unable to return the record for correction.";
+
+                    window.alert(
+                        String(
+                            firstError,
+                        ),
+                    );
+                },
+
+                onFinish: () => {
+                    setActionProcessing(
+                        null,
+                    );
+                },
+            },
+        );
+    };
+
+    /* =====================================================
+       ARCHIVE
+    ===================================================== */
+
+    const archiveContract = (
+        record: ContractPermit,
+    ) => {
+        setMenuOpen(null);
+
+        setConfirmDialog({
+            title: "Archive Record?",
+            message:
+                "This record will be removed from the active list and moved to Archive. You can restore it later.",
+
+            confirmLabel:
+                "Yes, Archive",
+
+            cancelLabel: "Cancel",
+
+            variant: "warning",
+
+            onConfirm: () => {
+                setConfirmDialog(
+                    null,
+                );
+
+                setActionProcessing(
+                    record.id,
+                );
+
+                router.put(
+                    `/admin/contracts/${record.id}/archive`,
+                    {},
+                    {
+                        preserveScroll: true,
+
+                        onSuccess: () => {
+                            showSuccess(
+                                "Record Archived",
+                                "The record has been moved to Archive.",
+                            );
+
+                            reloadContracts();
+                        },
+
+                        onError: (
+                            errors,
+                        ) => {
+                            const firstError =
+                                Object.values(
+                                    errors,
+                                )[0] ||
+                                "Unable to archive the record.";
+
+                            window.alert(
+                                String(
+                                    firstError,
+                                ),
+                            );
+                        },
+
+                        onFinish: () => {
+                            setActionProcessing(
+                                null,
+                            );
+                        },
+                    },
+                );
+            },
+        });
+    };
+
+    /* =====================================================
+       RESTORE
+    ===================================================== */
+
+    const restoreContract = (
+        record: ContractPermit,
+    ) => {
+        setMenuOpen(null);
+
+        setConfirmDialog({
+            title: "Restore Record?",
+            message:
+                "This record will be restored to the active contract and permit list.",
+
+            confirmLabel:
+                "Yes, Restore",
+
+            cancelLabel: "Cancel",
+
+            variant: "success",
+
+            onConfirm: () => {
+                setConfirmDialog(
+                    null,
+                );
+
+                setActionProcessing(
+                    record.id,
+                );
+
+                router.put(
+                    `/admin/contracts/${record.id}/restore`,
+                    {},
+                    {
+                        preserveScroll: true,
+
+                        onSuccess: () => {
+                            showSuccess(
+                                "Record Restored",
+                                "The record has been restored successfully.",
+                            );
+
+                            reloadContracts();
+                        },
+
+                        onError: (
+                            errors,
+                        ) => {
+                            const firstError =
+                                Object.values(
+                                    errors,
+                                )[0] ||
+                                "Unable to restore the record.";
+
+                            window.alert(
+                                String(
+                                    firstError,
+                                ),
+                            );
+                        },
+
+                        onFinish: () => {
+                            setActionProcessing(
+                                null,
+                            );
+                        },
+                    },
+                );
+            },
+        });
+    };
+
+    /* =====================================================
+       DELETE
+    ===================================================== */
+
+    const deleteContract = (
+        record: ContractPermit,
+    ) => {
+        setMenuOpen(null);
+
+        setConfirmDialog({
+            title: "Delete Record Permanently?",
+            message:
+                "This action permanently deletes the record and cannot be undone.",
+
+            confirmLabel:
+                "Yes, Delete",
+
+            cancelLabel: "Cancel",
+
+            variant: "danger",
+
+            onConfirm: () => {
+                setConfirmDialog(
+                    null,
+                );
+
+                setActionProcessing(
+                    record.id,
+                );
+
+                router.delete(
+                    `/admin/contracts/${record.id}`,
+                    {
+                        preserveScroll: true,
+
+                        onSuccess: () => {
+                            setSelectedContract(
+                                null,
+                            );
+
+                            showSuccess(
+                                "Record Deleted",
+                                "The record has been permanently deleted.",
+                            );
+
+                            reloadContracts();
+                        },
+
+                        onError: (
+                            errors,
+                        ) => {
+                            const firstError =
+                                Object.values(
+                                    errors,
+                                )[0] ||
+                                "Unable to delete the record.";
+
+                            window.alert(
+                                String(
+                                    firstError,
+                                ),
+                            );
+                        },
+
+                        onFinish: () => {
+                            setActionProcessing(
+                                null,
+                            );
+                        },
+                    },
+                );
+            },
+        });
+    };
+
+    /* =====================================================
+       EMAIL
+    ===================================================== */
+
+    const openEmailModal = (
+        record: ContractPermit,
+    ) => {
+        setMenuOpen(null);
+
+        setEmailRecord(
+            record,
+        );
+
+        setEmailMessage(
+            `Dear ${getClient(record)},\n\nThis is a notification regarding your ${isPermitRecord(record) ? "permit" : "contract"} (${getReference(record)}).\n\nPlease review your ALIBATON account for the latest status and documents.\n\nThank you,\nALIBATON\nHeavy Equipment & Logistics`,
+        );
+    };
+
+    const sendEmail = () => {
+        if (!emailRecord) {
+            return;
+        }
+
+        const record =
+            emailRecord;
+
+        const email =
+            getClientEmail(record);
+
+        if (!email) {
+            window.alert(
+                "No client email address is available for this record.",
+            );
+
+            return;
+        }
+
+        if (
+            !emailMessage.trim()
+        ) {
+            window.alert(
+                "Please enter a message.",
+            );
+
+            return;
+        }
+
+        setActionProcessing(
+            record.id,
+        );
+
+        router.post(
+            `/admin/contracts/${record.id}/notify`,
+            {
+                message:
+                    emailMessage.trim(),
+            },
+            {
+                preserveScroll: true,
+
+                onSuccess: () => {
+                    setEmailRecord(
+                        null,
+                    );
+
+                    setEmailMessage(
+                        "",
+                    );
+
+                    showSuccess(
+                        "Email Sent",
+                        `The notification was sent to ${email}.`,
+                    );
+                },
+
+                onError: (errors) => {
+                    console.error(
+                        "Email error:",
+                        errors,
+                    );
+
+                    const firstError =
+                        Object.values(
+                            errors,
+                        )[0] ||
+                        "Unable to send the email.";
+
+                    window.alert(
+                        String(
+                            firstError,
+                        ),
+                    );
+                },
+
+                onFinish: () => {
+                    setActionProcessing(
+                        null,
+                    );
+                },
+            },
+        );
+    };
+
+    /* =====================================================
+       PRINT
+    ===================================================== */
+
+    const printRecord = (
+        record: ContractPermit,
+    ) => {
+        setMenuOpen(null);
+
+        const status =
+            calculateStatus(record);
+
+        const html = `
+            <html>
+            <head>
+                <title>${getTitle(
+                    record,
+                )}</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        padding: 40px;
+                        color: #111;
+                    }
+
+                    h1 {
+                        margin-bottom: 4px;
+                    }
+
+                    h2 {
+                        margin-top: 28px;
+                    }
+
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-top: 12px;
+                    }
+
+                    td {
+                        border: 1px solid #ddd;
+                        padding: 10px;
+                    }
+
+                    td:first-child {
+                        width: 30%;
+                        font-weight: bold;
+                    }
+
+                    .status {
+                        font-weight: bold;
+                    }
+                </style>
+            </head>
+
+            <body>
+                <h1>ALIBATON</h1>
+                <p>Heavy Equipment & Logistics</p>
+
+                <h2>${getTitle(
+                    record,
+                )}</h2>
+
+                <table>
+                    <tr>
+                        <td>Type</td>
+                        <td>${getType(
+                            record,
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Reference</td>
+                        <td>${getReference(
+                            record,
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Client</td>
+                        <td>${getClient(
+                            record,
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Client Email</td>
+                        <td>${getClientEmail(
+                            record,
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Project</td>
+                        <td>${getProject(
+                            record,
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Location</td>
+                        <td>${record.location || "—"}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Status</td>
+                        <td class="status">${status}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Start Date</td>
+                        <td>${formatDate(
+                            getStartDate(
+                                record,
+                            ),
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Expiry Date</td>
+                        <td>${formatDate(
+                            getExpiryDate(
+                                record,
+                            ),
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Approved At</td>
+                        <td>${formatDateTime(
+                            record.approved_at,
+                        )}</td>
+                    </tr>
+
+                    <tr>
+                        <td>Created At</td>
+                        <td>${formatDateTime(
+                            record.created_at,
+                        )}</td>
+                    </tr>
+                </table>
+
+                <h2>Documents</h2>
+
+                <p>
+                    Primary documents:
+                    ${getContractFileCount(
+                        record,
+                    )}
+                </p>
+
+                ${
+                    isContractRecord(
+                        record,
+                    )
+                        ? `<p>Signed documents: ${getSignedFileCount(
+                              record,
+                          )}</p>`
+                        : ""
+                }
+
+                <br />
+
+                <p>
+                    ALIBATON<br />
+                    Heavy Equipment & Logistics<br />
+                    45 Riverside, Quezon City, Philippines<br />
+                    info@alibaton.com
+                </p>
+            </body>
+            </html>
+        `;
+
+        const printWindow =
+            window.open(
+                "",
+                "_blank",
+                "width=900,height=700",
+            );
+
+        if (!printWindow) {
+            window.alert(
+                "Please allow pop-ups to print this record.",
+            );
+
+            return;
+        }
+
+        printWindow.document.write(
+            html,
+        );
+
+        printWindow.document.close();
+
+        printWindow.focus();
+
+        window.setTimeout(() => {
+            printWindow.print();
+        }, 300);
+    };
+
+    /* =====================================================
+       RENDER
+    ===================================================== */
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-md sm:p-6">
-            <div
-                className={`my-auto w-full ${
-                    wide ? "max-w-4xl" : "max-w-xl"
-                } overflow-hidden rounded-2xl border border-zinc-800 bg-black shadow-xl`}
-            >
-                <div className="flex items-start justify-between gap-4 border-b border-zinc-800 px-5 py-5 sm:px-6">
-                    <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-black">
-                            {icon}
+        <AdminLayout>
+            <Head title="Contract & Permit Management" />
+
+            <div className="min-h-screen bg-black text-white">
+                <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+                    {/* =====================================
+                        HEADER
+                    ===================================== */}
+
+                    <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-300">
+                                    <FileCheck2
+                                        size={22}
+                                    />
+                                </div>
+
+                                <div>
+                                    <h1 className="text-2xl font-bold tracking-tight text-white">
+                                        Contract &
+                                        Permit
+                                        Management
+                                    </h1>
+
+                                    <p className="mt-1 text-sm text-zinc-500">
+                                        Review, approve,
+                                        monitor, and manage
+                                        contracts and
+                                        permits.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <h2 className="break-words text-lg font-black text-white">
-                                {title}
-                            </h2>
-                            {subtitle && (
-                                <p className="mt-1 break-words text-xs leading-5 text-zinc-600">
-                                    {subtitle}
-                                </p>
+
+                        <div className="flex items-center gap-2 self-start lg:self-auto">
+                            <button
+                                type="button"
+                                onClick={
+                                    reloadContracts
+                                }
+                                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-300"
+                            >
+                                <RefreshCw
+                                    size={14}
+                                />
+
+                                Refresh
+                            </button>
+
+                            <div className="hidden items-center gap-2 rounded-xl border border-green-400/10 bg-green-400/[0.04] px-3 py-2 sm:flex">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+                                </span>
+
+                                <span className="text-[11px] font-medium text-green-300">
+                                    Live
+                                </span>
+
+                                <span className="text-[11px] text-zinc-500">
+                                    •
+                                </span>
+
+                                <span className="text-[11px] text-zinc-500">
+                                    {lastRefresh.toLocaleTimeString(
+                                        "en-PH",
+                                    )}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* =====================================
+                        STATS
+                    ===================================== */}
+
+                    <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                        <StatCard
+                            label="Active"
+                            value={
+                                activeRecords.length
+                            }
+                            icon={
+                                <CheckCircle2
+                                    size={18}
+                                />
+                            }
+                            active={
+                                statusFilter ===
+                                    "Active" &&
+                                !showArchived
+                            }
+                            onClick={() => {
+                                setShowArchived(
+                                    false,
+                                );
+
+                                setStatusFilter(
+                                    "Active",
+                                );
+                            }}
+                        />
+
+                        <StatCard
+                            label="Submitted for Review"
+                            value={
+                                submittedRecords.length
+                            }
+                            icon={
+                                <ShieldCheck
+                                    size={18}
+                                />
+                            }
+                            active={
+                                statusFilter ===
+                                    "Submitted for Review" &&
+                                !showArchived
+                            }
+                            onClick={() => {
+                                setShowArchived(
+                                    false,
+                                );
+
+                                setStatusFilter(
+                                    "Submitted for Review",
+                                );
+                            }}
+                        />
+
+                        <StatCard
+                            label="Needs Correction"
+                            value={
+                                correctionRecords.length
+                            }
+                            icon={
+                                <AlertTriangle
+                                    size={18}
+                                />
+                            }
+                            active={
+                                statusFilter ===
+                                    "Needs Correction" &&
+                                !showArchived
+                            }
+                            onClick={() => {
+                                setShowArchived(
+                                    false,
+                                );
+
+                                setStatusFilter(
+                                    "Needs Correction",
+                                );
+                            }}
+                        />
+
+                        <StatCard
+                            label="Pending"
+                            value={
+                                pendingRecords.length
+                            }
+                            icon={
+                                <Clock3
+                                    size={18}
+                                />
+                            }
+                            active={
+                                statusFilter ===
+                                    "Pending" &&
+                                !showArchived
+                            }
+                            onClick={() => {
+                                setShowArchived(
+                                    false,
+                                );
+
+                                setStatusFilter(
+                                    "Pending",
+                                );
+                            }}
+                        />
+
+                        <StatCard
+                            label="Expiring Soon"
+                            value={
+                                expiringRecords.length
+                            }
+                            icon={
+                                <CalendarDays
+                                    size={18}
+                                />
+                            }
+                            active={
+                                statusFilter ===
+                                    "Expiring Soon" &&
+                                !showArchived
+                            }
+                            onClick={() => {
+                                setShowArchived(
+                                    false,
+                                );
+
+                                setStatusFilter(
+                                    "Expiring Soon",
+                                );
+                            }}
+                        />
+
+                        <StatCard
+                            label="Archived"
+                            value={
+                                archivedRecords.length
+                            }
+                            icon={
+                                <Archive
+                                    size={18}
+                                />
+                            }
+                            active={
+                                showArchived
+                            }
+                            onClick={() => {
+                                setShowArchived(
+                                    true,
+                                );
+
+                                setStatusFilter(
+                                    "All",
+                                );
+                            }}
+                        />
+                    </div>
+
+                    {/* =====================================
+                        FILTER BAR
+                    ===================================== */}
+
+                    <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.025] p-3">
+                        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                            <div className="relative min-w-0 flex-1">
+                                <Search
+                                    size={17}
+                                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600"
+                                />
+
+                                <input
+                                    value={search}
+                                    onChange={(
+                                        event,
+                                    ) =>
+                                        setSearch(
+                                            event
+                                                .target
+                                                .value,
+                                        )
+                                    }
+                                    placeholder="Search client, project, reference, type..."
+                                    className="w-full rounded-xl border border-white/10 bg-black/40 py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-yellow-400/40"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <select
+                                    value={
+                                        statusFilter
+                                    }
+                                    onChange={(
+                                        event,
+                                    ) =>
+                                        setStatusFilter(
+                                            event
+                                                .target
+                                                .value as
+                                                | "All"
+                                                | ContractStatus,
+                                        )
+                                    }
+                                    className="rounded-xl border border-white/10 bg-black px-3 py-2.5 text-xs font-medium text-zinc-200 outline-none focus:border-yellow-400/40"
+                                >
+                                    <option value="All">
+                                        All Status
+                                    </option>
+                                    <option value="Active">
+                                        Active
+                                    </option>
+                                    <option value="Pending">
+                                        Pending
+                                    </option>
+                                    <option value="Needs Correction">
+                                        Needs Correction
+                                    </option>
+                                    <option value="Submitted for Review">
+                                        Submitted for Review
+                                    </option>
+                                    <option value="Expiring Soon">
+                                        Expiring Soon
+                                    </option>
+                                    <option value="Expired">
+                                        Expired
+                                    </option>
+                                    <option value="Renewed">
+                                        Renewed
+                                    </option>
+                                </select>
+
+                                <select
+                                    value={
+                                        typeFilter
+                                    }
+                                    onChange={(
+                                        event,
+                                    ) =>
+                                        setTypeFilter(
+                                            event
+                                                .target
+                                                .value as
+                                                | "All"
+                                                | "Contract"
+                                                | "Permit",
+                                        )
+                                    }
+                                    className="rounded-xl border border-white/10 bg-black px-3 py-2.5 text-xs font-medium text-zinc-200 outline-none focus:border-yellow-400/40"
+                                >
+                                    <option value="All">
+                                        All Types
+                                    </option>
+
+                                    <option value="Contract">
+                                        Contracts
+                                    </option>
+
+                                    <option value="Permit">
+                                        Permits
+                                    </option>
+                                </select>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearch(
+                                            "",
+                                        );
+
+                                        setStatusFilter(
+                                            "All",
+                                        );
+
+                                        setTypeFilter(
+                                            "All",
+                                        );
+                                    }}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
+                            <p className="text-xs text-zinc-500">
+                                Showing{" "}
+                                <span className="font-semibold text-zinc-300">
+                                    {
+                                        filteredRecords.length
+                                    }
+                                </span>{" "}
+                                record
+                                {filteredRecords.length ===
+                                1
+                                    ? ""
+                                    : "s"}
+                            </p>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowArchived(
+                                        !showArchived,
+                                    );
+
+                                    setStatusFilter(
+                                        "All",
+                                    );
+                                }}
+                                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                    showArchived
+                                        ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-300"
+                                        : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+                                }`}
+                            >
+                                <Archive
+                                    size={14}
+                                />
+
+                                {showArchived
+                                    ? "Viewing Archive"
+                                    : "View Archive"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* =====================================
+                        TABLE
+                    ===================================== */}
+
+                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-[1100px] w-full">
+                                <thead>
+                                    <tr className="border-b border-white/10 bg-white/[0.025]">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                            Contract / Permit
+                                        </th>
+
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                            Client
+                                        </th>
+
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                            Project
+                                        </th>
+
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                            Documents
+                                        </th>
+
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                            Validity
+                                        </th>
+
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                            Status
+                                        </th>
+
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                            Action
+                                        </th>
+                                    </tr>
+                                </thead>
+
+                                <tbody className="divide-y divide-white/5">
+                                    {filteredRecords.length ===
+                                    0 ? (
+                                        <tr>
+                                            <td
+                                                colSpan={
+                                                    7
+                                                }
+                                                className="px-6 py-16 text-center"
+                                            >
+                                                <div className="mx-auto flex max-w-md flex-col items-center">
+                                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-600">
+                                                        <FileText
+                                                            size={
+                                                                25
+                                                            }
+                                                        />
+                                                    </div>
+
+                                                    <p className="mt-4 text-sm font-semibold text-zinc-300">
+                                                        No records
+                                                        found
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-zinc-600">
+                                                        Try changing
+                                                        your search
+                                                        or filters.
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredRecords.map(
+                                            (
+                                                record,
+                                            ) => {
+                                                const status =
+                                                    calculateStatus(
+                                                        record,
+                                                    );
+
+                                                const isPermit =
+                                                    isPermitRecord(
+                                                        record,
+                                                    );
+
+                                                const canApprove =
+                                                    canApproveDirectly(
+                                                        record,
+                                                    );
+
+                                                const expiry =
+                                                    getExpiryDate(
+                                                        record,
+                                                    );
+
+                                                const remaining =
+                                                    daysUntil(
+                                                        expiry,
+                                                    );
+
+                                                const processing =
+                                                    reviewProcessing ===
+                                                        record.id ||
+                                                    actionProcessing ===
+                                                        record.id;
+
+                                                return (
+                                                    <tr
+                                                        key={
+                                                            record.id
+                                                        }
+                                                        className="transition hover:bg-white/[0.025]"
+                                                    >
+                                                        <td className="px-4 py-4">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-yellow-400/15 bg-yellow-400/[0.06] text-yellow-300">
+                                                                    {isPermit ? (
+                                                                        <ShieldCheck
+                                                                            size={
+                                                                                17
+                                                                            }
+                                                                        />
+                                                                    ) : (
+                                                                        <FileText
+                                                                            size={
+                                                                                17
+                                                                            }
+                                                                        />
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="min-w-0">
+                                                                    <p className="max-w-[220px] truncate text-sm font-semibold text-white">
+                                                                        {getTitle(
+                                                                            record,
+                                                                        )}
+                                                                    </p>
+
+                                                                    <p className="mt-1 text-[11px] text-zinc-500">
+                                                                        {getReference(
+                                                                            record,
+                                                                        )}
+                                                                    </p>
+
+                                                                    <div className="mt-2">
+                                                                        <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-zinc-400">
+                                                                            {getType(
+                                                                                record,
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
+                                                            <p className="text-sm font-medium text-zinc-200">
+                                                                {getClient(
+                                                                    record,
+                                                                )}
+                                                            </p>
+
+                                                            <p className="mt-1 text-[11px] text-zinc-600">
+                                                                {getClientEmail(
+                                                                    record,
+                                                                ) ||
+                                                                    "No email"}
+                                                            </p>
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
+                                                            <p className="max-w-[190px] truncate text-sm text-zinc-300">
+                                                                {getProject(
+                                                                    record,
+                                                                )}
+                                                            </p>
+
+                                                            {record.location && (
+                                                                <p className="mt-1 flex max-w-[190px] items-center gap-1 truncate text-[11px] text-zinc-600">
+                                                                    <MapPin
+                                                                        size={
+                                                                            11
+                                                                        }
+                                                                    />
+
+                                                                    {
+                                                                        record.location
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
+                                                            <div className="space-y-1">
+                                                                <p className="text-xs text-zinc-300">
+                                                                    <span className="font-semibold text-white">
+                                                                        {
+                                                                            getContractFileCount(
+                                                                                record,
+                                                                            )
+                                                                        }
+                                                                    </span>{" "}
+                                                                    document
+                                                                    {getContractFileCount(
+                                                                        record,
+                                                                    ) ===
+                                                                    1
+                                                                        ? ""
+                                                                        : "s"}
+                                                                </p>
+
+                                                                {!isPermit && (
+                                                                    <p className="text-[11px] text-zinc-600">
+                                                                        Signed:{" "}
+                                                                        <span className="text-zinc-400">
+                                                                            {
+                                                                                getSignedFileCount(
+                                                                                    record,
+                                                                                )
+                                                                            }
+                                                                        </span>
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
+                                                            {status ===
+                                                                "Active" ||
+                                                            status ===
+                                                                "Expiring Soon" ||
+                                                            status ===
+                                                                "Expired" ? (
+                                                                <div>
+                                                                    <p className="text-xs text-zinc-300">
+                                                                        {formatDate(
+                                                                            getStartDate(
+                                                                                record,
+                                                                            ),
+                                                                        )}
+                                                                    </p>
+
+                                                                    <p className="mt-1 text-[11px] text-zinc-600">
+                                                                        to{" "}
+                                                                        {formatDate(
+                                                                            expiry,
+                                                                        )}
+                                                                    </p>
+
+                                                                    {remaining !==
+                                                                        null && (
+                                                                        <p
+                                                                            className={`mt-1 text-[10px] font-semibold ${
+                                                                                remaining <
+                                                                                0
+                                                                                    ? "text-red-300"
+                                                                                    : remaining <=
+                                                                                        30
+                                                                                      ? "text-orange-300"
+                                                                                      : "text-green-300"
+                                                                            }`}
+                                                                        >
+                                                                            {remaining <
+                                                                            0
+                                                                                ? `${Math.abs(
+                                                                                      remaining,
+                                                                                  )} days expired`
+                                                                                : `${remaining} days remaining`}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-zinc-600">
+                                                                    Not active
+                                                                </span>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
+                                                            <StatusBadge
+                                                                status={
+                                                                    status
+                                                                }
+
+                                                            />
+
+                                                            {status ===
+                                                                "Needs Correction" &&
+                                                                getCorrectionReason(
+                                                                    record,
+                                                                ) && (
+                                                                    <p className="mt-2 max-w-[180px] truncate text-[10px] text-red-300/70">
+                                                                        {getCorrectionReason(
+                                                                            record,
+                                                                        )}
+                                                                    </p>
+                                                                )}
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
+                                                            <div
+                                                                ref={
+                                                                    menuOpen ===
+                                                                    record.id
+                                                                        ? menuRef
+                                                                        : null
+                                                                }
+                                                                className="relative flex justify-end"
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={
+                                                                        processing
+                                                                    }
+                                                                    onClick={() =>
+                                                                        setMenuOpen(
+                                                                            menuOpen ===
+                                                                                record.id
+                                                                                ? null
+                                                                                : record.id,
+                                                                        )
+                                                                    }
+                                                                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-300 disabled:opacity-40"
+                                                                >
+                                                                    {processing ? (
+                                                                        <RefreshCw
+                                                                            size={
+                                                                                16
+                                                                            }
+                                                                            className="animate-spin"
+                                                                        />
+                                                                    ) : (
+                                                                        <MoreVertical
+                                                                            size={
+                                                                                17
+                                                                            }
+                                                                        />
+                                                                    )}
+                                                                </button>
+
+                                                                {menuOpen ===
+                                                                    record.id && (
+                                                                    <div className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#101010] py-1 shadow-2xl shadow-black/70">
+                                                                        <MenuItem
+                                                                            icon={
+                                                                                <Eye
+                                                                                    size={
+                                                                                        14
+                                                                                    }
+                                                                                />
+                                                                            }
+                                                                            onClick={() => {
+                                                                                setMenuOpen(
+                                                                                    null,
+                                                                                );
+
+                                                                                setSelectedContract(
+                                                                                    record,
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            View
+                                                                            Details
+                                                                        </MenuItem>
+
+                                                                        <MenuItem
+                                                                            icon={
+                                                                                <Download
+                                                                                    size={
+                                                                                        14
+                                                                                    }
+                                                                                />
+                                                                            }
+                                                                            onClick={() => {
+                                                                                setMenuOpen(
+                                                                                    null,
+                                                                                );
+
+                                                                                if (
+                                                                                    getContractFiles(
+                                                                                        record,
+                                                                                    ).length >
+                                                                                    0
+                                                                                ) {
+                                                                                    const file =
+                                                                                        getContractFiles(
+                                                                                            record,
+                                                                                        )[0];
+
+                                                                                    const url =
+                                                                                        file.id >
+                                                                                        0
+                                                                                            ? `/admin/contracts/files/${file.id}/download`
+                                                                                            : record.contract_file_url ||
+                                                                                              `/storage/${String(
+                                                                                                  file.file_path ||
+                                                                                                      "",
+                                                                                              ).replace(
+                                                                                                  /^\/+/,
+                                                                                                  "",
+                                                                                              )}`;
+
+                                                                                    window.open(
+                                                                                        url,
+                                                                                        "_blank",
+                                                                                    );
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            Download
+                                                                            Document
+                                                                        </MenuItem>
+
+                                                                        {!isPermit &&
+                                                                            getSignedFileCount(
+                                                                                record,
+                                                                            ) >
+                                                                                0 && (
+                                                                                <MenuItem
+                                                                                    icon={
+                                                                                        <FileCheck2
+                                                                                            size={
+                                                                                                14
+                                                                                            }
+                                                                                        />
+                                                                                    }
+                                                                                    onClick={() => {
+                                                                                        setMenuOpen(
+                                                                                            null,
+                                                                                        );
+
+                                                                                        const file =
+                                                                                            getSignedFiles(
+                                                                                                record,
+                                                                                            )[0];
+
+                                                                                        const url =
+                                                                                            file.id >
+                                                                                            0
+                                                                                                ? `/admin/contracts/files/${file.id}/download`
+                                                                                                : record.signed_contract_url ||
+                                                                                                  `/storage/${String(
+                                                                                                      file.file_path ||
+                                                                                                          "",
+                                                                                                  ).replace(
+                                                                                                      /^\/+/,
+                                                                                                      "",
+                                                                                                  )}`;
+
+                                                                                        window.open(
+                                                                                            url,
+                                                                                            "_blank",
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    Download
+                                                                                    Signed
+                                                                                    Contract
+                                                                                </MenuItem>
+                                                                            )}
+
+                                                                        <MenuItem
+                                                                            icon={
+                                                                                <Send
+                                                                                    size={
+                                                                                        14
+                                                                                    }
+                                                                                />
+                                                                            }
+                                                                            onClick={() =>
+                                                                                openEmailModal(
+                                                                                    record,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Email
+                                                                            Client
+                                                                        </MenuItem>
+
+                                                                        <MenuItem
+                                                                            icon={
+                                                                                <FileText
+                                                                                    size={
+                                                                                        14
+                                                                                    }
+                                                                                />
+                                                                            }
+                                                                            onClick={() =>
+                                                                                printRecord(
+                                                                                    record,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Print
+                                                                        </MenuItem>
+
+                                                                        {!isArchivedRecord(
+                                                                            record,
+                                                                        ) &&
+                                                                            status ===
+                                                                                "Submitted for Review" && (
+                                                                                <>
+                                                                                    <div className="my-1 border-t border-white/10" />
+
+                                                                                    <MenuItem
+                                                                                        icon={
+                                                                                            <CheckCircle2
+                                                                                                size={
+                                                                                                    14
+                                                                                                }
+                                                                                            />
+                                                                                        }
+                                                                                        disabled={
+                                                                                            !canApprove
+                                                                                        }
+                                                                                        onClick={() =>
+                                                                                            approveContract(
+                                                                                                record,
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        {isPermit
+                                                                                            ? "Verify & Approve Permit"
+                                                                                            : "Approve & Activate"}
+                                                                                    </MenuItem>
+
+                                                                                    <MenuItem
+                                                                                        icon={
+                                                                                            <XCircle
+                                                                                                size={
+                                                                                                    14
+                                                                                                }
+                                                                                            />
+                                                                                        }
+                                                                                        onClick={() =>
+                                                                                            openCorrection(
+                                                                                                record,
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        Return
+                                                                                        for
+                                                                                        Correction
+                                                                                    </MenuItem>
+                                                                                </>
+                                                                            )}
+
+                                                                        {!isArchivedRecord(
+                                                                            record,
+                                                                        ) && (
+                                                                            <>
+                                                                                <div className="my-1 border-t border-white/10" />
+
+                                                                                <MenuItem
+                                                                                    icon={
+                                                                                        <Archive
+                                                                                            size={
+                                                                                                14
+                                                                                            }
+                                                                                        />
+                                                                                    }
+                                                                                    onClick={() =>
+                                                                                        archiveContract(
+                                                                                            record,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    Archive
+                                                                                </MenuItem>
+                                                                            </>
+                                                                        )}
+
+                                                                        {isArchivedRecord(
+                                                                            record,
+                                                                        ) && (
+                                                                            <>
+                                                                                <div className="my-1 border-t border-white/10" />
+
+                                                                                <MenuItem
+                                                                                    icon={
+                                                                                        <Archive
+                                                                                            size={
+                                                                                                14
+                                                                                            }
+                                                                                        />
+                                                                                    }
+                                                                                    onClick={() =>
+                                                                                        restoreContract(
+                                                                                            record,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    Restore
+                                                                                </MenuItem>
+
+                                                                                <MenuItem
+                                                                                    icon={
+                                                                                        <Trash2
+                                                                                            size={
+                                                                                                14
+                                                                                            }
+                                                                                        />
+                                                                                    }
+                                                                                    danger
+                                                                                    onClick={() =>
+                                                                                        deleteContract(
+                                                                                            record,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    Delete
+                                                                                    Permanently
+                                                                                </MenuItem>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            },
+                                        )
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* =====================================
+                        FOOTER INFO
+                    ===================================== */}
+
+                    <div className="mt-4 flex flex-col gap-2 rounded-xl border border-white/5 bg-white/[0.015] px-4 py-3 text-[11px] text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+                        <p>
+                            Contract approval requires
+                            the actual contract and
+                            signed contract file.
+                            Permit approval requires
+                            permit document(s).
+                        </p>
+
+                        <p>
+                            Invoice approval does not
+                            block contract or permit
+                            approval.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* =================================================
+                VIEW MODAL
+            ================================================= */}
+
+            {selectedContract && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="my-8 w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
+                        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5">
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-300">
+                                    {isPermitRecord(
+                                        selectedContract,
+                                    ) ? (
+                                        <ShieldCheck
+                                            size={
+                                                21
+                                            }
+                                        />
+                                    ) : (
+                                        <FileText
+                                            size={
+                                                21
+                                            }
+                                        />
+                                    )}
+                                </div>
+
+                                <div>
+                                    <h2 className="text-lg font-bold text-white">
+                                        {getTitle(
+                                            selectedContract,
+                                        )}
+                                    </h2>
+
+                                    <p className="mt-1 text-xs text-zinc-500">
+                                        {getReference(
+                                            selectedContract,
+                                        )}{" "}
+                                        •{" "}
+                                        {getType(
+                                            selectedContract,
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setSelectedContract(
+                                        null,
+                                    )
+                                }
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                            >
+                                <X
+                                    size={18}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="max-h-[75vh] overflow-y-auto p-5">
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                <DetailBox
+                                    label="Type"
+                                    value={
+                                        getType(
+                                            selectedContract,
+                                        )
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Reference Number"
+                                    value={
+                                        getReference(
+                                            selectedContract,
+                                        )
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Status"
+                                    value={
+                                        <StatusBadge
+                                            status={calculateStatus(
+                                                selectedContract,
+                                            )}
+                                        />
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Client"
+                                    value={
+                                        getClient(
+                                            selectedContract,
+                                        )
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Client Email"
+                                    value={
+                                        getClientEmail(
+                                            selectedContract,
+                                        )
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Project"
+                                    value={
+                                        getProject(
+                                            selectedContract,
+                                        )
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Location"
+                                    value={
+                                        selectedContract.location
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Assigned Staff"
+                                    value={
+                                        getAssignedStaff(
+                                            selectedContract,
+                                        )?.name ||
+                                        "Unassigned"
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Created"
+                                    value={formatDateTime(
+                                        selectedContract.created_at,
+                                    )}
+                                />
+
+                                <DetailBox
+                                    label="Submitted At"
+                                    value={formatDateTime(
+                                        selectedContract.submitted_at,
+                                    )}
+                                />
+
+                                <DetailBox
+                                    label="Approved At"
+                                    value={formatDateTime(
+                                        selectedContract.approved_at,
+                                    )}
+                                />
+
+                                <DetailBox
+                                    label="Start Date"
+                                    value={formatDate(
+                                        getStartDate(
+                                            selectedContract,
+                                        ),
+                                    )}
+                                />
+
+                                <DetailBox
+                                    label="End Date"
+                                    value={formatDate(
+                                        getExpiryDate(
+                                            selectedContract,
+                                        ),
+                                    )}
+                                />
+
+                                <DetailBox
+                                    label="Invoice Status"
+                                    value={
+                                        selectedContract.invoice
+                                            ? selectedContract
+                                                  .invoice
+                                                  .status ||
+                                              "—"
+                                            : "No Invoice"
+                                    }
+                                />
+
+                                <DetailBox
+                                    label="Invoice Approval"
+                                    value={
+                                        isInvoiceApproved(
+                                            selectedContract,
+                                        )
+                                            ? "Approved"
+                                            : "Not Approved"
+                                    }
+                                />
+                            </div>
+
+                            {getCorrectionReason(
+                                selectedContract,
+                            ) && (
+                                <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/[0.05] p-4">
+                                    <div className="flex gap-3">
+                                        <AlertTriangle
+                                            size={
+                                                18
+                                            }
+                                            className="mt-0.5 shrink-0 text-red-300"
+                                        />
+
+                                        <div>
+                                            <p className="text-sm font-semibold text-red-200">
+                                                Correction
+                                                Required
+                                            </p>
+
+                                            <p className="mt-1 text-sm leading-6 text-red-200/70">
+                                                {getCorrectionReason(
+                                                    selectedContract,
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedContract.description && (
+                                <div className="mt-4">
+                                    <DetailBox
+                                        label="Description"
+                                        value={
+                                            <p className="whitespace-pre-wrap leading-6 text-zinc-300">
+                                                {
+                                                    selectedContract.description
+                                                }
+                                            </p>
+                                        }
+                                    />
+                                </div>
+                            )}
+
+                            {selectedContract.notes && (
+                                <div className="mt-3">
+                                    <DetailBox
+                                        label="Notes"
+                                        value={
+                                            <p className="whitespace-pre-wrap leading-6 text-zinc-300">
+                                                {
+                                                    selectedContract.notes
+                                                }
+                                            </p>
+                                        }
+                                    />
+                                </div>
+                            )}
+
+                            {/* DOCUMENTS */}
+
+                            <div className="mt-6">
+                                <div className="mb-3 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-white">
+                                            {isPermitRecord(
+                                                selectedContract,
+                                            )
+                                                ? "Permit Documents"
+                                                : "Contract Documents"}
+                                        </h3>
+
+                                        <p className="mt-1 text-xs text-zinc-600">
+                                            {isPermitRecord(
+                                                selectedContract,
+                                            )
+                                                ? "Verify the attached permit document(s) before approval."
+                                                : "The actual contract and signed contract must be present before approval."}
+                                        </p>
+                                    </div>
+
+                                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-zinc-400">
+                                        {
+                                            getContractFileCount(
+                                                selectedContract,
+                                            )
+                                        }{" "}
+                                        file
+                                        {getContractFileCount(
+                                            selectedContract,
+                                        ) === 1
+                                            ? ""
+                                            : "s"}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {getContractFiles(
+                                        selectedContract,
+                                    ).length >
+                                    0 ? (
+                                        getContractFiles(
+                                            selectedContract,
+                                        ).map(
+                                            (
+                                                file,
+                                            ) => (
+                                                <FileRow
+                                                    key={
+                                                        file.id
+                                                    }
+                                                    file={
+                                                        file
+                                                    }
+                                                />
+                                            ),
+                                        )
+                                    ) : (
+                                        <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4 text-sm text-red-300">
+                                            No document
+                                            attached.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* SIGNED */}
+
+                            {isContractRecord(
+                                selectedContract,
+                            ) && (
+                                <div className="mt-6">
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-white">
+                                                Signed Contract
+                                            </h3>
+
+                                            <p className="mt-1 text-xs text-zinc-600">
+                                                Required before
+                                                contract approval.
+                                            </p>
+                                        </div>
+
+                                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-zinc-400">
+                                            {
+                                                getSignedFileCount(
+                                                    selectedContract,
+                                                )
+                                            }{" "}
+                                            file
+                                            {getSignedFileCount(
+                                                selectedContract,
+                                            ) === 1
+                                                ? ""
+                                                : "s"}
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {getSignedFiles(
+                                            selectedContract,
+                                        ).length >
+                                        0 ? (
+                                            getSignedFiles(
+                                                selectedContract,
+                                            ).map(
+                                                (
+                                                    file,
+                                                ) => (
+                                                    <FileRow
+                                                        key={
+                                                            file.id
+                                                        }
+                                                        file={
+                                                            file
+                                                        }
+                                                    />
+                                                ),
+                                            )
+                                        ) : (
+                                            <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4 text-sm text-red-300">
+                                                No signed
+                                                contract
+                                                attached.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* MODAL ACTIONS */}
+
+                        <div className="flex flex-col-reverse gap-2 border-t border-white/10 bg-black/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setSelectedContract(
+                                        null,
+                                    )
+                                }
+                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                            >
+                                Close
+                            </button>
+
+                            {calculateStatus(
+                                selectedContract,
+                            ) ===
+                                "Submitted for Review" && (
+                                <div className="flex flex-col gap-2 sm:flex-row">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            openCorrection(
+                                                selectedContract,
+                                            )
+                                        }
+                                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2.5 text-xs font-semibold text-red-300 transition hover:bg-red-400/15"
+                                    >
+                                        <XCircle
+                                            size={
+                                                15
+                                            }
+                                        />
+                                        Return for
+                                        Correction
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={
+                                            reviewProcessing ===
+                                            selectedContract.id
+                                        }
+                                        onClick={() =>
+                                            approveContract(
+                                                selectedContract,
+                                            )
+                                        }
+                                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 py-2.5 text-xs font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {reviewProcessing ===
+                                        selectedContract.id ? (
+                                            <RefreshCw
+                                                size={
+                                                    15
+                                                }
+                                                className="animate-spin"
+                                            />
+                                        ) : (
+                                            <CheckCircle2
+                                                size={
+                                                    15
+                                                }
+                                            />
+                                        )}
+
+                                        {isPermitRecord(
+                                            selectedContract,
+                                        )
+                                            ? "Verify & Approve Permit"
+                                            : "Approve & Activate"}
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-500 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-white"
-                    >
-                        <X size={17} />
-                    </button>
                 </div>
-                <div className="max-h-[82vh] overflow-y-auto overscroll-contain p-5 sm:p-6">
-                    {children}
+            )}
+
+            {/* =================================================
+                CORRECTION MODAL
+            ================================================= */}
+
+            {correctionRecord && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
+                        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                            <div>
+                                <h2 className="text-base font-bold text-white">
+                                    Return for
+                                    Correction
+                                </h2>
+
+                                <p className="mt-1 text-xs text-zinc-600">
+                                    {getReference(
+                                        correctionRecord,
+                                    )}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setCorrectionRecord(
+                                        null,
+                                    )
+                                }
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400"
+                            >
+                                <X
+                                    size={17}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="p-5">
+                            <label className="text-xs font-semibold text-zinc-300">
+                                Correction Reason
+                            </label>
+
+                            <textarea
+                                value={
+                                    correctionReason
+                                }
+                                onChange={(
+                                    event,
+                                ) =>
+                                    setCorrectionReason(
+                                        event
+                                            .target
+                                            .value,
+                                    )
+                                }
+                                rows={6}
+                                placeholder="Explain what needs to be corrected..."
+                                className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white outline-none placeholder:text-zinc-700 focus:border-yellow-400/40"
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setCorrectionRecord(
+                                        null,
+                                    )
+                                }
+                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={
+                                    actionProcessing ===
+                                    correctionRecord.id
+                                }
+                                onClick={
+                                    submitCorrection
+                                }
+                                className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-400 disabled:opacity-50"
+                            >
+                                {actionProcessing ===
+                                correctionRecord.id ? (
+                                    <RefreshCw
+                                        size={
+                                            14
+                                        }
+                                        className="animate-spin"
+                                    />
+                                ) : (
+                                    <Send
+                                        size={
+                                            14
+                                        }
+                                    />
+                                )}
+
+                                Return for
+                                Correction
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
+            )}
+
+            {/* =================================================
+                EMAIL MODAL
+            ================================================= */}
+
+            {emailRecord && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
+                        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                            <div>
+                                <h2 className="text-base font-bold text-white">
+                                    Email Client
+                                </h2>
+
+                                <p className="mt-1 text-xs text-zinc-600">
+                                    {getClient(
+                                        emailRecord,
+                                    )}{" "}
+                                    •{" "}
+                                    {getClientEmail(
+                                        emailRecord,
+                                    )}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setEmailRecord(
+                                        null,
+                                    )
+                                }
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400"
+                            >
+                                <X
+                                    size={17}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="p-5">
+                            <label className="text-xs font-semibold text-zinc-300">
+                                Message
+                            </label>
+
+                            <textarea
+                                value={
+                                    emailMessage
+                                }
+                                onChange={(
+                                    event,
+                                ) =>
+                                    setEmailMessage(
+                                        event
+                                            .target
+                                            .value,
+                                    )
+                                }
+                                rows={10}
+                                className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-black/40 p-3 text-sm leading-6 text-white outline-none placeholder:text-zinc-700 focus:border-yellow-400/40"
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setEmailRecord(
+                                        null,
+                                    )
+                                }
+                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={
+                                    actionProcessing ===
+                                    emailRecord.id
+                                }
+                                onClick={
+                                    sendEmail
+                                }
+                                className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2.5 text-xs font-bold text-black transition hover:bg-yellow-300 disabled:opacity-50"
+                            >
+                                {actionProcessing ===
+                                emailRecord.id ? (
+                                    <RefreshCw
+                                        size={
+                                            14
+                                        }
+                                        className="animate-spin"
+                                    />
+                                ) : (
+                                    <Mail
+                                        size={
+                                            14
+                                        }
+                                    />
+                                )}
+
+                                Send Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* =================================================
+                CONFIRM DIALOG
+            ================================================= */}
+
+            {confirmDialog && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
+                        <div className="p-5">
+                            <div
+                                className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${
+                                    confirmDialog.variant ===
+                                    "danger"
+                                        ? "border-red-400/20 bg-red-400/10 text-red-300"
+                                        : confirmDialog.variant ===
+                                            "warning"
+                                          ? "border-orange-400/20 bg-orange-400/10 text-orange-300"
+                                          : "border-green-400/20 bg-green-400/10 text-green-300"
+                                }`}
+                            >
+                                {confirmDialog.variant ===
+                                "danger" ? (
+                                    <Trash2
+                                        size={
+                                            20
+                                        }
+                                    />
+                                ) : confirmDialog.variant ===
+                                  "warning" ? (
+                                    <Archive
+                                        size={
+                                            20
+                                        }
+                                    />
+                                ) : (
+                                    <CheckCircle2
+                                        size={
+                                            20
+                                        }
+                                    />
+                                )}
+                            </div>
+
+                            <h2 className="mt-4 text-lg font-bold text-white">
+                                {
+                                    confirmDialog.title
+                                }
+                            </h2>
+
+                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-zinc-400">
+                                {
+                                    confirmDialog.message
+                                }
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setConfirmDialog(
+                                        null,
+                                    )
+                                }
+                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10"
+                            >
+                                {
+                                    confirmDialog.cancelLabel
+                                }
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={
+                                    confirmDialog.onConfirm
+                                }
+                                className={`rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                                    confirmDialog.variant ===
+                                    "danger"
+                                        ? "bg-red-500 text-white hover:bg-red-400"
+                                        : confirmDialog.variant ===
+                                            "warning"
+                                          ? "bg-orange-400 text-black hover:bg-orange-300"
+                                          : "bg-yellow-400 text-black hover:bg-yellow-300"
+                                }`}
+                            >
+                                {
+                                    confirmDialog.confirmLabel
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </AdminLayout>
     );
 }

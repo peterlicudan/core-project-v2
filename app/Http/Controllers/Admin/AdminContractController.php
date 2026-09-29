@@ -38,6 +38,16 @@ class AdminContractController extends Controller
                 'submittedBy:id,name,email',
                 'reviewedBy:id,name,email',
                 'invoice',
+
+                /*
+                |--------------------------------------------------------------------------
+                | MULTIPLE FILES
+                |--------------------------------------------------------------------------
+                */
+
+                'files',
+                'contractFiles',
+                'signedFiles',
             ])
             ->orderByDesc('created_at')
             ->get()
@@ -74,319 +84,651 @@ class AdminContractController extends Controller
                 $creator = $contract->creator;
                 $assignedStaff = $contract->assignedStaff;
 
-                // ✅ Detect type for frontend logic
-                $typeRaw = strtolower(trim((string) ($contract->type ?? 'Contract')));
-                $isPermit = $typeRaw === 'permit';
+                $typeRaw = strtolower(
+                    trim(
+                        (string) (
+                            $contract->type ?? 'Contract'
+                        )
+                    )
+                );
+
+                $isPermit =
+                    $typeRaw === 'permit' ||
+                    str_contains(
+                        $typeRaw,
+                        'permit'
+                    );
+
+                /*
+                |--------------------------------------------------------------------------
+                | MULTIPLE FILE SERIALIZATION
+                |--------------------------------------------------------------------------
+                */
+
+                $files = $contract->files
+                    ->map(function ($file) {
+                        return [
+                            'id' =>
+                                $file->id,
+
+                            'type' =>
+                                $file->type,
+
+                            'file_path' =>
+                                $file->file_path,
+
+                            'file_name' =>
+                                $file->file_name,
+
+                            'file_size' =>
+                                $file->file_size,
+
+                            'mime_type' =>
+                                $file->mime_type,
+
+                            'created_at' =>
+                                $file->created_at
+                                    ? $file->created_at->format(
+                                        'Y-m-d H:i:s'
+                                    )
+                                    : null,
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                $contractFiles = $contract->contractFiles
+                    ->map(function ($file) {
+                        return [
+                            'id' =>
+                                $file->id,
+
+                            'type' =>
+                                $file->type,
+
+                            'file_path' =>
+                                $file->file_path,
+
+                            'file_name' =>
+                                $file->file_name,
+
+                            'file_size' =>
+                                $file->file_size,
+
+                            'mime_type' =>
+                                $file->mime_type,
+
+                            'created_at' =>
+                                $file->created_at
+                                    ? $file->created_at->format(
+                                        'Y-m-d H:i:s'
+                                    )
+                                    : null,
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                $signedFiles = $contract->signedFiles
+                    ->map(function ($file) {
+                        return [
+                            'id' =>
+                                $file->id,
+
+                            'type' =>
+                                $file->type,
+
+                            'file_path' =>
+                                $file->file_path,
+
+                            'file_name' =>
+                                $file->file_name,
+
+                            'file_size' =>
+                                $file->file_size,
+
+                            'mime_type' =>
+                                $file->mime_type,
+
+                            'created_at' =>
+                                $file->created_at
+                                    ? $file->created_at->format(
+                                        'Y-m-d H:i:s'
+                                    )
+                                    : null,
+                        ];
+                    })
+                    ->values()
+                    ->all();
 
                 return [
-                    'id' => $contract->id,
+                    /*
+                    |--------------------------------------------------------------------------
+                    | BASIC
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'id' =>
+                        $contract->id,
 
                     'title' =>
-                    $contract->contract_no
-                        ?: 'Contract / Permit #' . $contract->id,
+                        $contract->contract_no
+                            ?: 'Contract / Permit #' . $contract->id,
 
                     'name' =>
-                    $contract->contract_no
-                        ?: 'Contract / Permit #' . $contract->id,
+                        $contract->contract_no
+                            ?: 'Contract / Permit #' . $contract->id,
 
                     'type' =>
-                    $contract->type ?: 'Contract',
+                        $contract->type ?: 'Contract',
 
-                    // ✅ Frontend logic flags
-                    'is_permit' => $isPermit,
-                    'isPermit' => $isPermit,
+                    'is_permit' =>
+                        $isPermit,
+
+                    'isPermit' =>
+                        $isPermit,
 
                     'contract_type' =>
-                    $contract->contract_type,
+                        $contract->contract_type,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CLIENT
+                    |--------------------------------------------------------------------------
+                    */
 
                     'client' =>
-                    $contract->client,
+                        $contract->client,
 
                     'client_name' =>
-                    $contract->client,
+                        $contract->client,
 
                     'email' =>
-                    $contract->email,
+                        $contract->email,
 
                     'client_email' =>
-                    $contract->email,
+                        $contract->email,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PROJECT
+                    |--------------------------------------------------------------------------
+                    */
 
                     'project' =>
-                    $contract->project,
+                        $contract->project,
 
                     'project_name' =>
-                    $contract->project,
+                        $contract->project,
 
                     'location' =>
-                    $contract->location,
+                        $contract->location,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | REFERENCE
+                    |--------------------------------------------------------------------------
+                    */
 
                     'contract_no' =>
-                    $contract->contract_no,
+                        $contract->contract_no,
 
                     'contract_number' =>
-                    $contract->contract_no,
+                        $contract->contract_no,
 
                     'reference_number' =>
-                    $contract->contract_no,
+                        $contract->contract_no,
 
                     'permit_number' =>
-                    $contract->contract_no,
+                        $contract->contract_no,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DATES
+                    |--------------------------------------------------------------------------
+                    */
 
                     'start_date' =>
-                    $contract->start_date
-                        ? $contract->start_date->format('Y-m-d')
-                        : null,
+                        $contract->start_date
+                            ? $contract->start_date->format('Y-m-d')
+                            : null,
 
                     'issue_date' =>
-                    $contract->start_date
-                        ? $contract->start_date->format('Y-m-d')
-                        : null,
+                        $contract->start_date
+                            ? $contract->start_date->format('Y-m-d')
+                            : null,
 
                     'end_date' =>
-                    $contract->end_date
-                        ? $contract->end_date->format('Y-m-d')
-                        : null,
+                        $contract->end_date
+                            ? $contract->end_date->format('Y-m-d')
+                            : null,
 
                     'expiry_date' =>
-                    $contract->end_date
-                        ? $contract->end_date->format('Y-m-d')
-                        : null,
+                        $contract->end_date
+                            ? $contract->end_date->format('Y-m-d')
+                            : null,
 
                     'approved_at' =>
-                    $contract->approved_at
-                        ? $contract->approved_at->format('Y-m-d H:i:s')
-                        : null,
+                        $contract->approved_at
+                            ? $contract->approved_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | INVOICE
+                    |--------------------------------------------------------------------------
+                    */
 
                     'invoice_id' =>
-                    $contract->invoice_id,
+                        $contract->invoice_id,
 
                     'is_invoice_approved' =>
-                    (bool) ($contract->is_invoice_approved ?? false),
+                        (bool) (
+                            $contract->is_invoice_approved ?? false
+                        ),
 
                     'invoice_approved_at' =>
-                    $contract->invoice_approved_at,
+                        $contract->invoice_approved_at,
 
                     'invoice_approved_by' =>
-                    $contract->invoice_approved_by,
-
-                    'days_until_expiry' =>
-                    $daysUntilExpiry,
-
-                    'daysUntilExpiry' =>
-                    $daysUntilExpiry,
-
-                    'expiry_status' =>
-                    $expiryStatus,
-
-                    'status' =>
-                    $status,
-
-                    'workflow_status' =>
-                    $contract->workflow_status ?: 'Pending',
-
-                    'workflowStatus' =>
-                    $contract->workflow_status ?: 'Pending',
-
-                    'contract_file_path' =>
-                    $contract->contract_file_path,
-
-                    'contract_file_name' =>
-                    $contract->contract_file_name,
-
-                    'signed_contract_path' =>
-                    $contract->signed_contract_path,
-
-                    'signed_contract_file_name' =>
-                    $contract->signed_contract_file_name,
-
-                    'contract_file_url' =>
-                    $this->fileUrl($contract->contract_file_path),
-
-                    'signed_contract_url' =>
-                    $this->fileUrl($contract->signed_contract_path),
-
-                    'sent_at' =>
-                    $contract->sent_at
-                        ? $contract->sent_at->format('Y-m-d H:i:s')
-                        : null,
-
-                    'submitted_at' =>
-                    $contract->submitted_at
-                        ? $contract->submitted_at->format('Y-m-d H:i:s')
-                        : null,
-
-                    'reviewed_at' =>
-                    $contract->reviewed_at
-                        ? $contract->reviewed_at->format('Y-m-d H:i:s')
-                        : null,
-
-                    'submitted_by' =>
-                    $contract->submitted_by,
-
-                    'submitted_by_user' =>
-                    $contract->submittedBy
-                        ? [
-                            'id' => $contract->submittedBy->id,
-                            'name' => $contract->submittedBy->name,
-                            'email' => $contract->submittedBy->email,
-                        ]
-                        : null,
-
-                    'reviewed_by' =>
-                    $contract->reviewed_by,
-
-                    'reviewed_by_user' =>
-                    $contract->reviewedBy
-                        ? [
-                            'id' => $contract->reviewedBy->id,
-                            'name' => $contract->reviewedBy->name,
-                            'email' => $contract->reviewedBy->email,
-                        ]
-                        : null,
-
-                    'rejection_reason' =>
-                    $contract->rejection_reason,
-
-                    'rejectionReason' =>
-                    $contract->rejection_reason,
-
-                    'correction_reason' =>
-                    $contract->rejection_reason,
-
-                    'correctionReason' =>
-                    $contract->rejection_reason,
+                        $contract->invoice_approved_by,
 
                     'invoice' =>
-                    $contract->invoice,
+                        $contract->invoice,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | EXPIRY
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'days_until_expiry' =>
+                        $daysUntilExpiry,
+
+                    'daysUntilExpiry' =>
+                        $daysUntilExpiry,
+
+                    'expiry_status' =>
+                        $expiryStatus,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | STATUS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'status' =>
+                        $status,
+
+                    'workflow_status' =>
+                        $contract->workflow_status ?: 'Pending',
+
+                    'workflowStatus' =>
+                        $contract->workflow_status ?: 'Pending',
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | LEGACY PRIMARY FILES
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'contract_file_path' =>
+                        $contract->contract_file_path,
+
+                    'contract_file_name' =>
+                        $contract->contract_file_name,
+
+                    'signed_contract_path' =>
+                        $contract->signed_contract_path,
+
+                    'signed_contract_file_name' =>
+                        $contract->signed_contract_file_name,
+
+                    'contract_file_url' =>
+                        $this->fileUrl(
+                            $contract->contract_file_path
+                        ),
+
+                    'signed_contract_url' =>
+                        $this->fileUrl(
+                            $contract->signed_contract_path
+                        ),
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | MULTIPLE FILES
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'files' =>
+                        $files,
+
+                    'contract_files' =>
+                        $contractFiles,
+
+                    'signed_files' =>
+                        $signedFiles,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | WORKFLOW
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'sent_at' =>
+                        $contract->sent_at
+                            ? $contract->sent_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
+
+                    'submitted_at' =>
+                        $contract->submitted_at
+                            ? $contract->submitted_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
+
+                    'reviewed_at' =>
+                        $contract->reviewed_at
+                            ? $contract->reviewed_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
+
+                    'submitted_by' =>
+                        $contract->submitted_by,
+
+                    'submitted_by_user' =>
+                        $contract->submittedBy
+                            ? [
+                                'id' =>
+                                    $contract->submittedBy->id,
+
+                                'name' =>
+                                    $contract->submittedBy->name,
+
+                                'email' =>
+                                    $contract->submittedBy->email,
+                            ]
+                            : null,
+
+                    'reviewed_by' =>
+                        $contract->reviewed_by,
+
+                    'reviewed_by_user' =>
+                        $contract->reviewedBy
+                            ? [
+                                'id' =>
+                                    $contract->reviewedBy->id,
+
+                                'name' =>
+                                    $contract->reviewedBy->name,
+
+                                'email' =>
+                                    $contract->reviewedBy->email,
+                            ]
+                            : null,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CORRECTION
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'rejection_reason' =>
+                        $contract->rejection_reason,
+
+                    'rejectionReason' =>
+                        $contract->rejection_reason,
+
+                    'correction_reason' =>
+                        $contract->rejection_reason,
+
+                    'correctionReason' =>
+                        $contract->rejection_reason,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | RELATED DATA
+                    |--------------------------------------------------------------------------
+                    */
 
                     'equipment' =>
-                    $contract->equipment,
+                        $contract->equipment,
 
                     'documents' =>
-                    (int) ($contract->documents ?? 0),
+                        (int) (
+                            $contract->documents ?? 0
+                        ),
 
                     'description' =>
-                    $contract->description,
+                        $contract->description,
 
                     'notes' =>
-                    $contract->description,
+                        $contract->description,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ARCHIVE
+                    |--------------------------------------------------------------------------
+                    */
 
                     'archived' =>
-                    (bool) $contract->archived,
+                        (bool) $contract->archived,
 
                     'is_archived' =>
-                    (bool) $contract->archived,
+                        (bool) $contract->archived,
 
                     'isArchived' =>
-                    (bool) $contract->archived,
+                        (bool) $contract->archived,
 
                     'archived_at' =>
-                    $contract->archived_at,
+                        $contract->archived_at,
 
                     'archive_expires_at' =>
-                    $contract->archive_expires_at,
+                        $contract->archive_expires_at,
 
                     'retention_delete_at' =>
-                    $contract->retention_delete_at,
+                        $contract->retention_delete_at,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | STAFF
+                    |--------------------------------------------------------------------------
+                    */
 
                     'assigned_to' =>
-                    $contract->assigned_to,
+                        $contract->assigned_to,
 
                     'assigned_staff' =>
-                    $assignedStaff
-                        ? [
-                            'id' => $assignedStaff->id,
-                            'name' => $assignedStaff->name,
-                            'email' => $assignedStaff->email,
-                        ]
-                        : null,
+                        $assignedStaff
+                            ? [
+                                'id' =>
+                                    $assignedStaff->id,
+
+                                'name' =>
+                                    $assignedStaff->name,
+
+                                'email' =>
+                                    $assignedStaff->email,
+                            ]
+                            : null,
 
                     'staff' =>
-                    $assignedStaff
-                        ? [
-                            'id' => $assignedStaff->id,
-                            'name' => $assignedStaff->name,
-                            'email' => $assignedStaff->email,
-                        ]
-                        : null,
+                        $assignedStaff
+                            ? [
+                                'id' =>
+                                    $assignedStaff->id,
+
+                                'name' =>
+                                    $assignedStaff->name,
+
+                                'email' =>
+                                    $assignedStaff->email,
+                            ]
+                            : null,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CREATOR
+                    |--------------------------------------------------------------------------
+                    */
 
                     'created_by' =>
-                    $contract->created_by,
+                        $contract->created_by,
 
                     'creator' =>
-                    $creator
-                        ? [
-                            'id' => $creator->id,
-                            'name' => $creator->name,
-                            'email' => $creator->email,
-                        ]
-                        : null,
+                        $creator
+                            ? [
+                                'id' =>
+                                    $creator->id,
+
+                                'name' =>
+                                    $creator->name,
+
+                                'email' =>
+                                    $creator->email,
+                            ]
+                            : null,
 
                     'created_by_name' =>
-                    $creator?->name,
+                        $creator?->name,
 
                     'created_by_email' =>
-                    $creator?->email,
+                        $creator?->email,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | TIMESTAMPS
+                    |--------------------------------------------------------------------------
+                    */
 
                     'created_at' =>
-                    $contract->created_at
-                        ? $contract->created_at->format('Y-m-d H:i:s')
-                        : null,
+                        $contract->created_at
+                            ? $contract->created_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
 
                     'updated_at' =>
-                    $contract->updated_at
-                        ? $contract->updated_at->format('Y-m-d H:i:s')
-                        : null,
+                        $contract->updated_at
+                            ? $contract->updated_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
 
                     'createdAt' =>
-                    $contract->created_at
-                        ? $contract->created_at->format('Y-m-d H:i:s')
-                        : null,
+                        $contract->created_at
+                            ? $contract->created_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
 
                     'updatedAt' =>
-                    $contract->updated_at
-                        ? $contract->updated_at->format('Y-m-d H:i:s')
-                        : null,
+                        $contract->updated_at
+                            ? $contract->updated_at->format(
+                                'Y-m-d H:i:s'
+                            )
+                            : null,
                 ];
             })
             ->values();
 
+        /*
+        |--------------------------------------------------------------------------
+        | APPROVED INVOICES
+        |--------------------------------------------------------------------------
+        */
+
         $approvedInvoices = Invoice::query()
-            ->whereIn('status', ['Approved', 'Paid', 'Partial'])
-            ->whereDoesntHave('contractPermits')
+            ->whereIn(
+                'status',
+                [
+                    'Approved',
+                    'Paid',
+                    'Partial',
+                ]
+            )
+            ->whereDoesntHave(
+                'contractPermits'
+            )
             ->orderByDesc('created_at')
             ->get()
             ->map(function (Invoice $invoice) {
                 return [
-                    'id' => $invoice->id,
-                    'number' => $invoice->number,
-                    'client' => $invoice->client,
-                    'client_email' => $invoice->client_email,
-                    'project' => $invoice->project,
-                    'amount' => (float) $invoice->amount,
-                    'status' => $invoice->status,
-                    'due_date' => $invoice->due_date
-                        ? $invoice->due_date->format('Y-m-d')
-                        : null,
-                    'has_contract' => false,
+                    'id' =>
+                        $invoice->id,
+
+                    'number' =>
+                        $invoice->number,
+
+                    'client' =>
+                        $invoice->client,
+
+                    'client_email' =>
+                        $invoice->client_email,
+
+                    'project' =>
+                        $invoice->project,
+
+                    'amount' =>
+                        (float) $invoice->amount,
+
+                    'status' =>
+                        $invoice->status,
+
+                    'due_date' =>
+                        $invoice->due_date
+                            ? $invoice->due_date->format(
+                                'Y-m-d'
+                            )
+                            : null,
+
+                    'has_contract' =>
+                        false,
                 ];
             })
             ->values();
 
+        /*
+        |--------------------------------------------------------------------------
+        | STAFF
+        |--------------------------------------------------------------------------
+        */
+
         $staff = User::query()
-            ->where('role', 'staff')
+            ->where(
+                'role',
+                'staff'
+            )
             ->orderBy('name')
-            ->get(['id', 'name', 'email'])
+            ->get([
+                'id',
+                'name',
+                'email',
+            ])
             ->values();
 
         return Inertia::render(
             'Admin/ContractPermitManagement',
             [
-                'contracts' => $contracts,
-                'contractPermits' => $contracts,
-                'permits' => $contracts,
-                'staff' => $staff,
-                'approvedInvoices' => $approvedInvoices,
+                'contracts' =>
+                    $contracts,
+
+                'contractPermits' =>
+                    $contracts,
+
+                'permits' =>
+                    $contracts,
+
+                'staff' =>
+                    $staff,
+
+                'approvedInvoices' =>
+                    $approvedInvoices,
             ]
         );
     }
@@ -408,14 +750,10 @@ class AdminContractController extends Controller
             );
         }
 
-        if (!$contract->is_invoice_approved) {
-            return back()->with(
-                'error',
-                'Cannot edit this record. Invoice must be approved first.'
-            );
-        }
-
-        if ($contract->workflow_status === 'Submitted for Review') {
+        if (
+            $contract->workflow_status ===
+            'Submitted for Review'
+        ) {
             return back()->with(
                 'error',
                 'This contract is currently submitted for Admin review and cannot be edited.'
@@ -423,35 +761,120 @@ class AdminContractController extends Controller
         }
 
         $validated = $request->validate([
-            'title' => ['nullable', 'string', 'max:255'],
-            'type' => ['required', 'string', 'max:255'],
-            'contract_type' => ['nullable', 'string', 'max:255'],
-            'client' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'project' => ['required', 'string', 'max:255'],
+            'title' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'type' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'contract_type' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'client' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+            ],
+
+            'project' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
             'contract_number' => [
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('contracts', 'contract_no')->ignore($contract->id),
+                Rule::unique(
+                    'contracts',
+                    'contract_no'
+                )->ignore(
+                    $contract->id
+                ),
             ],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
-            'description' => ['nullable', 'string'],
-            'invoice' => ['nullable', 'string', 'max:255'],
-            'equipment' => ['nullable', 'string', 'max:255'],
-            'documents' => ['nullable', 'integer', 'min:0'],
+
+            'start_date' => [
+                'nullable',
+                'date',
+            ],
+
+            'end_date' => [
+                'nullable',
+                'date',
+                'after_or_equal:start_date',
+            ],
+
+            'location' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'assigned_to' => [
+                'nullable',
+                'integer',
+                'exists:users,id',
+            ],
+
+            'description' => [
+                'nullable',
+                'string',
+            ],
+
+            'invoice' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'equipment' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'documents' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
         ]);
 
-        if (array_key_exists('assigned_to', $validated)) {
-            $assignedTo = $validated['assigned_to'];
+        if (
+            array_key_exists(
+                'assigned_to',
+                $validated
+            )
+        ) {
+            $assignedTo =
+                $validated['assigned_to'];
 
             if ($assignedTo !== null) {
                 $staffExists = User::query()
-                    ->where('id', $assignedTo)
-                    ->where('role', 'staff')
+                    ->where(
+                        'id',
+                        $assignedTo
+                    )
+                    ->where(
+                        'role',
+                        'staff'
+                    )
                     ->exists();
 
                 if (!$staffExists) {
@@ -463,78 +886,184 @@ class AdminContractController extends Controller
             }
         }
 
-        DB::transaction(function () use ($contract, $validated) {
-            if (array_key_exists('contract_number', $validated)) {
-                $contract->contract_no = $validated['contract_number'];
-            }
-
-            if (array_key_exists('type', $validated)) {
-                $contract->type = $validated['type'];
-            }
-
-            if (array_key_exists('contract_type', $validated)) {
-                $contract->contract_type = $validated['contract_type'];
-            }
-
-            if (array_key_exists('client', $validated)) {
-                $contract->client = $validated['client'];
-            }
-
-            if (array_key_exists('email', $validated)) {
-                $contract->email = $validated['email'];
-            }
-
-            if (array_key_exists('project', $validated)) {
-                $contract->project = $validated['project'];
-            }
-
-            if (array_key_exists('location', $validated)) {
-                $contract->location = $validated['location'];
-            }
-
-            if ($contract->approved_at) {
-                if (array_key_exists('start_date', $validated)) {
-                    $contract->start_date = $validated['start_date'];
+        DB::transaction(
+            function () use (
+                $contract,
+                $validated
+            ) {
+                if (
+                    array_key_exists(
+                        'contract_number',
+                        $validated
+                    )
+                ) {
+                    $contract->contract_no =
+                        $validated['contract_number'];
                 }
 
-                if (array_key_exists('end_date', $validated)) {
-                    $contract->end_date = $validated['end_date'];
+                if (
+                    array_key_exists(
+                        'type',
+                        $validated
+                    )
+                ) {
+                    $contract->type =
+                        $validated['type'];
                 }
-            } else {
-                $contract->start_date = null;
-                $contract->end_date = null;
-            }
 
-            if (array_key_exists('description', $validated)) {
-                $contract->description = $validated['description'];
-            }
+                if (
+                    array_key_exists(
+                        'contract_type',
+                        $validated
+                    )
+                ) {
+                    $contract->contract_type =
+                        $validated['contract_type'];
+                }
 
-            if (array_key_exists('invoice', $validated)) {
-                $contract->invoice = $validated['invoice'];
-            }
+                if (
+                    array_key_exists(
+                        'client',
+                        $validated
+                    )
+                ) {
+                    $contract->client =
+                        $validated['client'];
+                }
 
-            if (array_key_exists('equipment', $validated)) {
-                $contract->equipment = $validated['equipment'];
-            }
+                if (
+                    array_key_exists(
+                        'email',
+                        $validated
+                    )
+                ) {
+                    $contract->email =
+                        $validated['email'];
+                }
 
-            if (array_key_exists('documents', $validated)) {
-                $contract->documents = $validated['documents'];
-            }
+                if (
+                    array_key_exists(
+                        'project',
+                        $validated
+                    )
+                ) {
+                    $contract->project =
+                        $validated['project'];
+                }
 
-            if (array_key_exists('assigned_to', $validated)) {
-                $contract->assigned_to = $validated['assigned_to'];
-            }
+                if (
+                    array_key_exists(
+                        'location',
+                        $validated
+                    )
+                ) {
+                    $contract->location =
+                        $validated['location'];
+                }
 
-            if (!$contract->status) {
-                $contract->status = 'Pending';
-            }
+                /*
+                |--------------------------------------------------------------------------
+                | DATES
+                |--------------------------------------------------------------------------
+                */
 
-            if (!$contract->workflow_status) {
-                $contract->workflow_status = 'Pending';
-            }
+                if ($contract->approved_at) {
+                    if (
+                        array_key_exists(
+                            'start_date',
+                            $validated
+                        )
+                    ) {
+                        $contract->start_date =
+                            $validated['start_date'];
+                    }
 
-            $contract->save();
-        });
+                    if (
+                        array_key_exists(
+                            'end_date',
+                            $validated
+                        )
+                    ) {
+                        $contract->end_date =
+                            $validated['end_date'];
+                    }
+                } else {
+                    $contract->start_date =
+                        null;
+
+                    $contract->end_date =
+                        null;
+                }
+
+                if (
+                    array_key_exists(
+                        'description',
+                        $validated
+                    )
+                ) {
+                    $contract->description =
+                        $validated['description'];
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | INVOICE TEXT / LEGACY FIELD
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    array_key_exists(
+                        'invoice',
+                        $validated
+                    )
+                ) {
+                    $contract->invoice =
+                        $validated['invoice'];
+                }
+
+                if (
+                    array_key_exists(
+                        'equipment',
+                        $validated
+                    )
+                ) {
+                    $contract->equipment =
+                        $validated['equipment'];
+                }
+
+                if (
+                    array_key_exists(
+                        'documents',
+                        $validated
+                    )
+                ) {
+                    $contract->documents =
+                        $validated['documents'];
+                }
+
+                if (
+                    array_key_exists(
+                        'assigned_to',
+                        $validated
+                    )
+                ) {
+                    $contract->assigned_to =
+                        $validated['assigned_to'];
+                }
+
+                if (!$contract->status) {
+                    $contract->status =
+                        'Pending';
+                }
+
+                if (!$contract->workflow_status) {
+                    $contract->workflow_status =
+                        'Pending';
+                }
+
+                $contract->save();
+            }
+        );
 
         return back()->with(
             'success',
@@ -567,29 +1096,43 @@ class AdminContractController extends Controller
         }
 
         if ($contract->invoice_id) {
-            $invoice = Invoice::find($contract->invoice_id);
+            $invoice = Invoice::find(
+                $contract->invoice_id
+            );
 
             if (
                 $invoice &&
                 !in_array(
                     $invoice->status,
-                    ['Approved', 'Paid', 'Partial'],
+                    [
+                        'Approved',
+                        'Paid',
+                        'Partial',
+                    ],
                     true
                 )
             ) {
-                $invoice->status = 'Approved';
+                $invoice->status =
+                    'Approved';
+
                 $invoice->save();
             }
         }
 
-        $contract->is_invoice_approved = true;
-        $contract->invoice_approved_at = now();
-        $contract->invoice_approved_by = $request->user()->id;
+        $contract->is_invoice_approved =
+            true;
+
+        $contract->invoice_approved_at =
+            now();
+
+        $contract->invoice_approved_by =
+            $request->user()->id;
+
         $contract->save();
 
         return back()->with(
             'success',
-            'Invoice approved successfully! The contract can now proceed through the Staff review workflow.'
+            'Invoice approved successfully. Invoice approval is recorded separately from Contract / Permit activation.'
         );
     }
 
@@ -625,12 +1168,25 @@ class AdminContractController extends Controller
             ],
         ]);
 
-        if ($validated['status'] === 'Needs Correction') {
-            $contract->workflow_status = 'Needs Correction';
-            $contract->status = 'Pending';
-            $contract->approved_at = null;
-            $contract->start_date = null;
-            $contract->end_date = null;
+        if (
+            $validated['status'] ===
+            'Needs Correction'
+        ) {
+            $contract->workflow_status =
+                'Needs Correction';
+
+            $contract->status =
+                'Pending';
+
+            $contract->approved_at =
+                null;
+
+            $contract->start_date =
+                null;
+
+            $contract->end_date =
+                null;
+
             $contract->save();
 
             return back()->with(
@@ -639,8 +1195,13 @@ class AdminContractController extends Controller
             );
         }
 
-        if ($validated['status'] === 'Pending') {
-            $contract->status = 'Pending';
+        if (
+            $validated['status'] ===
+            'Pending'
+        ) {
+            $contract->status =
+                'Pending';
+
             $contract->save();
 
             return back()->with(
@@ -653,7 +1214,12 @@ class AdminContractController extends Controller
             !$contract->approved_at &&
             in_array(
                 $validated['status'],
-                ['Active', 'Expiring', 'Expiring Soon', 'Expired'],
+                [
+                    'Active',
+                    'Expiring',
+                    'Expiring Soon',
+                    'Expired',
+                ],
                 true
             )
         ) {
@@ -663,7 +1229,11 @@ class AdminContractController extends Controller
             );
         }
 
-        $contract->status = $this->calculateStatus($contract);
+        $contract->status =
+            $this->calculateStatus(
+                $contract
+            );
+
         $contract->save();
 
         return back()->with(
@@ -679,9 +1249,15 @@ class AdminContractController extends Controller
     */
 
     public function approve(
-        Contract $contract,
-        Request $request
+        Request $request,
+        Contract $contract
     ): RedirectResponse {
+        /*
+        |--------------------------------------------------------------------------
+        | ARCHIVED CHECK
+        |--------------------------------------------------------------------------
+        */
+
         if ($contract->archived) {
             return back()->with(
                 'error',
@@ -689,26 +1265,112 @@ class AdminContractController extends Controller
             );
         }
 
-        if ($contract->workflow_status !== 'Submitted for Review') {
+        /*
+        |--------------------------------------------------------------------------
+        | WORKFLOW CHECK
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            trim(
+                (string) $contract->workflow_status
+            ) !== 'Submitted for Review'
+        ) {
             return back()->with(
                 'error',
                 'Only records submitted for review can be approved.'
             );
         }
 
-        if (!$contract->is_invoice_approved) {
-            return back()->with(
-                'error',
-                'The invoice must be approved before this record can be activated.'
+        /*
+        |--------------------------------------------------------------------------
+        | LOAD FILE RELATIONSHIPS
+        |--------------------------------------------------------------------------
+        */
+
+        $contract->load([
+            'contractFiles',
+            'signedFiles',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | DETECT CONTRACT / PERMIT
+        |--------------------------------------------------------------------------
+        */
+
+        $typeRaw = strtolower(
+            trim(
+                (string) (
+                    $contract->type ?? 'Contract'
+                )
+            )
+        );
+
+        $isPermit =
+            $typeRaw === 'permit' ||
+            str_contains(
+                $typeRaw,
+                'permit'
             );
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRIMARY DOCUMENTS
+        |--------------------------------------------------------------------------
+        |
+        | New system:
+        | contract_files
+        |
+        | Legacy fallback:
+        | contract_file_path
+        |
+        */
+
+        $primaryFiles =
+            $contract->contractFiles;
+
+        $hasPrimaryFiles =
+            $primaryFiles->isNotEmpty();
+
+        /*
+        |--------------------------------------------------------------------------
+        | LEGACY FALLBACK
+        |--------------------------------------------------------------------------
+        */
+
+        if (!$hasPrimaryFiles) {
+            $legacyPrimaryPath =
+                $contract->contract_file_path;
+
+            if (
+                $legacyPrimaryPath &&
+                trim(
+                    (string) $legacyPrimaryPath
+                ) !== ''
+            ) {
+                $primaryFiles = collect([
+                    (object) [
+                        'file_path' =>
+                            $legacyPrimaryPath,
+
+                        'file_name' =>
+                            $contract->contract_file_name,
+                    ],
+                ]);
+
+                $hasPrimaryFiles =
+                    true;
+            }
         }
 
-        // ✅ Detect if Permit (existing document, no signature needed)
-        $typeRaw = strtolower(trim((string) ($contract->type ?? 'Contract')));
-        $isPermit = $typeRaw === 'permit';
+        /*
+        |--------------------------------------------------------------------------
+        | PRIMARY DOCUMENT REQUIRED
+        |--------------------------------------------------------------------------
+        */
 
-        // ✅ Document file required for BOTH Contract and Permit
-        if (!$contract->contract_file_path) {
+        if (!$hasPrimaryFiles) {
             return back()->with(
                 'error',
                 $isPermit
@@ -717,56 +1379,205 @@ class AdminContractController extends Controller
             );
         }
 
-        if (
-            !Storage::disk('public')->exists(
-                $contract->contract_file_path
-            )
-        ) {
-            return back()->with(
-                'error',
-                $isPermit
-                    ? 'The permit document could not be found.'
-                    : 'The actual contract file could not be found.'
-            );
+        /*
+        |--------------------------------------------------------------------------
+        | VERIFY ALL PRIMARY FILES EXIST
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($primaryFiles as $file) {
+            $path =
+                ltrim(
+                    (string) $file->file_path,
+                    '/'
+                );
+
+            $path =
+                preg_replace(
+                    '#^storage/#i',
+                    '',
+                    $path
+                );
+
+            if (
+                !$path ||
+                !Storage::disk('public')->exists(
+                    $path
+                )
+            ) {
+                return back()->with(
+                    'error',
+                    $isPermit
+                        ? 'One or more permit documents could not be found on the server.'
+                        : 'One or more contract documents could not be found on the server.'
+                );
+            }
         }
 
-        // ✅ Signed document ONLY required for CONTRACT
-        // Permits are existing documents — no signature needed
+        /*
+        |--------------------------------------------------------------------------
+        | SIGNED CONTRACT
+        |--------------------------------------------------------------------------
+        |
+        | Contracts require signed files.
+        |
+        | Permits do NOT require signed contracts.
+        |
+        */
+
         if (!$isPermit) {
-            if (!$contract->signed_contract_path) {
+            $signedFiles =
+                $contract->signedFiles;
+
+            /*
+            |--------------------------------------------------------------------------
+            | LEGACY SIGNED FILE FALLBACK
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $signedFiles->isEmpty() &&
+                $contract->signed_contract_path
+            ) {
+                $signedFiles = collect([
+                    (object) [
+                        'file_path' =>
+                            $contract->signed_contract_path,
+
+                        'file_name' =>
+                            $contract->signed_contract_file_name,
+                    ],
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | SIGNED FILE REQUIRED
+            |--------------------------------------------------------------------------
+            */
+
+            if ($signedFiles->isEmpty()) {
                 return back()->with(
                     'error',
                     'A signed contract file is required before approval.'
                 );
             }
 
-            if (
-                !Storage::disk('public')->exists(
-                    $contract->signed_contract_path
-                )
-            ) {
-                return back()->with(
-                    'error',
-                    'The signed contract file could not be found.'
-                );
+            /*
+            |--------------------------------------------------------------------------
+            | VERIFY SIGNED FILES
+            |--------------------------------------------------------------------------
+            */
+
+            foreach ($signedFiles as $file) {
+                $path =
+                    ltrim(
+                        (string) $file->file_path,
+                        '/'
+                    );
+
+                $path =
+                    preg_replace(
+                        '#^storage/#i',
+                        '',
+                        $path
+                    );
+
+                if (
+                    !$path ||
+                    !Storage::disk('public')->exists(
+                        $path
+                    )
+                ) {
+                    return back()->with(
+                        'error',
+                        'One or more signed contract files could not be found on the server.'
+                    );
+                }
             }
         }
 
-        $approvedAt = now();
+        /*
+        |--------------------------------------------------------------------------
+        | FINAL APPROVAL DATE
+        |--------------------------------------------------------------------------
+        */
 
-        $startDate = $approvedAt->copy()->startOfDay();
-        $endDate = $startDate->copy()->addDays(
-            self::CONTRACT_VALIDITY_DAYS
-        );
+        $approvedAt =
+            now();
 
-        $contract->approved_at = $approvedAt;
-        $contract->start_date = $startDate->toDateString();
-        $contract->end_date = $endDate->toDateString();
-        $contract->workflow_status = 'Active';
-        $contract->status = 'Active';
-        $contract->reviewed_at = $approvedAt;
-        $contract->reviewed_by = $request->user()->id;
-        $contract->rejection_reason = null;
+        /*
+        |--------------------------------------------------------------------------
+        | 90-DAY VALIDITY
+        |--------------------------------------------------------------------------
+        */
+
+        $startDate =
+            $approvedAt
+                ->copy()
+                ->startOfDay();
+
+        $endDate =
+            $startDate
+                ->copy()
+                ->addDays(
+                    self::CONTRACT_VALIDITY_DAYS
+                );
+
+        /*
+        |--------------------------------------------------------------------------
+        | ACTIVATE RECORD
+        |--------------------------------------------------------------------------
+        */
+
+        $contract->approved_at =
+            $approvedAt;
+
+        $contract->start_date =
+            $startDate->toDateString();
+
+        $contract->end_date =
+            $endDate->toDateString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | WORKFLOW + STATUS
+        |--------------------------------------------------------------------------
+        */
+
+        $contract->workflow_status =
+            'Active';
+
+        $contract->status =
+            'Active';
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN REVIEW
+        |--------------------------------------------------------------------------
+        */
+
+        $contract->reviewed_at =
+            $approvedAt;
+
+        $contract->reviewed_by =
+            $request->user()->id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | CLEAR CORRECTION MESSAGE
+        |--------------------------------------------------------------------------
+        */
+
+        $contract->rejection_reason =
+            null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | SAVE
+        |--------------------------------------------------------------------------
+        */
+
         $contract->save();
 
         return back()->with(
@@ -794,7 +1605,10 @@ class AdminContractController extends Controller
             );
         }
 
-        if ($contract->workflow_status !== 'Submitted for Review') {
+        if (
+            $contract->workflow_status !==
+            'Submitted for Review'
+        ) {
             return back()->with(
                 'error',
                 'Only records submitted for review can be returned for correction.'
@@ -809,31 +1623,87 @@ class AdminContractController extends Controller
             ],
         ]);
 
-        $contract->workflow_status = 'Needs Correction';
-        $contract->status = 'Pending';
-        $contract->rejection_reason = $validated['correction_reason'];
+        $contract->workflow_status =
+            'Needs Correction';
 
-        $contract->submitted_at = null;
-        $contract->submitted_by = null;
+        $contract->status =
+            'Pending';
 
-        $contract->reviewed_at = null;
-        $contract->reviewed_by = null;
+        $contract->rejection_reason =
+            $validated['correction_reason'];
 
-        $contract->approved_at = null;
-        $contract->start_date = null;
-        $contract->end_date = null;
+        /*
+        |--------------------------------------------------------------------------
+        | RESET REVIEW
+        |--------------------------------------------------------------------------
+        */
 
-        // ✅ Detect if Permit (existing document, no signature needed)
-        $typeRaw = strtolower(trim((string) ($contract->type ?? 'Contract')));
-        $isPermit = $typeRaw === 'permit';
+        $contract->submitted_at =
+            null;
 
-        // ✅ For Permit: keep the existing document (no need to re-upload)
-        // ✅ For Contract: clear files so Staff uploads corrected versions
+        $contract->submitted_by =
+            null;
+
+        $contract->reviewed_at =
+            null;
+
+        $contract->reviewed_by =
+            null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESET APPROVAL
+        |--------------------------------------------------------------------------
+        */
+
+        $contract->approved_at =
+            null;
+
+        $contract->start_date =
+            null;
+
+        $contract->end_date =
+            null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | DETECT PERMIT
+        |--------------------------------------------------------------------------
+        */
+
+        $typeRaw = strtolower(
+            trim(
+                (string) (
+                    $contract->type ?? 'Contract'
+                )
+            )
+        );
+
+        $isPermit =
+            $typeRaw === 'permit' ||
+            str_contains(
+                $typeRaw,
+                'permit'
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILE HANDLING
+        |--------------------------------------------------------------------------
+        */
+
         if (!$isPermit) {
-            $contract->contract_file_path = null;
-            $contract->contract_file_name = null;
-            $contract->signed_contract_path = null;
-            $contract->signed_contract_file_name = null;
+            $contract->contract_file_path =
+                null;
+
+            $contract->contract_file_name =
+                null;
+
+            $contract->signed_contract_path =
+                null;
+
+            $contract->signed_contract_file_name =
+                null;
         }
 
         $contract->save();
@@ -852,8 +1722,9 @@ class AdminContractController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function archive(Contract $contract): RedirectResponse
-    {
+    public function archive(
+        Contract $contract
+    ): RedirectResponse {
         if ($contract->archived) {
             return back()->with(
                 'error',
@@ -861,14 +1732,25 @@ class AdminContractController extends Controller
             );
         }
 
-        $archivedAt = now();
+        $archivedAt =
+            now();
 
-        $contract->archived = true;
-        $contract->archived_at = $archivedAt;
-        $contract->archive_expires_at = $archivedAt->copy()->addDays(
-            self::ARCHIVE_RETENTION_DAYS
-        );
-        $contract->retention_delete_at = $contract->archive_expires_at;
+        $contract->archived =
+            true;
+
+        $contract->archived_at =
+            $archivedAt;
+
+        $contract->archive_expires_at =
+            $archivedAt
+                ->copy()
+                ->addDays(
+                    self::ARCHIVE_RETENTION_DAYS
+                );
+
+        $contract->retention_delete_at =
+            $contract->archive_expires_at;
+
         $contract->save();
 
         return back()->with(
@@ -883,8 +1765,9 @@ class AdminContractController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function restore(Contract $contract): RedirectResponse
-    {
+    public function restore(
+        Contract $contract
+    ): RedirectResponse {
         if (!$contract->archived) {
             return back()->with(
                 'error',
@@ -892,11 +1775,23 @@ class AdminContractController extends Controller
             );
         }
 
-        $contract->archived = false;
-        $contract->archived_at = null;
-        $contract->archive_expires_at = null;
-        $contract->retention_delete_at = null;
-        $contract->status = $this->calculateStatus($contract);
+        $contract->archived =
+            false;
+
+        $contract->archived_at =
+            null;
+
+        $contract->archive_expires_at =
+            null;
+
+        $contract->retention_delete_at =
+            null;
+
+        $contract->status =
+            $this->calculateStatus(
+                $contract
+            );
+
         $contract->save();
 
         return back()->with(
@@ -911,8 +1806,9 @@ class AdminContractController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function destroy(Contract $contract): RedirectResponse
-    {
+    public function destroy(
+        Contract $contract
+    ): RedirectResponse {
         if (!$contract->archived) {
             return back()->with(
                 'error',
@@ -920,13 +1816,42 @@ class AdminContractController extends Controller
             );
         }
 
-        if ($contract->contract_file_path) {
+        /*
+        |--------------------------------------------------------------------------
+        | DELETE MULTIPLE FILES
+        |--------------------------------------------------------------------------
+        */
+
+        $contract->load('files');
+
+        foreach (
+            $contract->files
+            as $file
+        ) {
+            if ($file->file_path) {
+                Storage::disk('public')->delete(
+                    $file->file_path
+                );
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DELETE LEGACY FILES
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $contract->contract_file_path
+        ) {
             Storage::disk('public')->delete(
                 $contract->contract_file_path
             );
         }
 
-        if ($contract->signed_contract_path) {
+        if (
+            $contract->signed_contract_path
+        ) {
             Storage::disk('public')->delete(
                 $contract->signed_contract_path
             );
@@ -950,25 +1875,40 @@ class AdminContractController extends Controller
         Request $request,
         Contract $contract
     ): RedirectResponse {
-        if (!$contract->is_invoice_approved) {
-            return back()->with(
-                'error',
-                'Cannot send email. Invoice must be approved first.'
-            );
-        }
-
         $validated = $request->validate([
-            'email' => ['nullable', 'email', 'max:255'],
-            'subject' => ['required', 'string', 'max:255'],
-            'message' => ['required', 'string'],
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+            ],
+
+            'subject' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'message' => [
+                'required',
+                'string',
+            ],
         ]);
 
-        $recipient = $validated['email'] ?? $contract->email;
-        $recipient = trim((string) $recipient);
+        $recipient =
+            $validated['email']
+            ?? $contract->email;
+
+        $recipient =
+            trim(
+                (string) $recipient
+            );
 
         if (
             $recipient === '' ||
-            !filter_var($recipient, FILTER_VALIDATE_EMAIL)
+            !filter_var(
+                $recipient,
+                FILTER_VALIDATE_EMAIL
+            )
         ) {
             return back()->with(
                 'error',
@@ -979,10 +1919,15 @@ class AdminContractController extends Controller
         try {
             Mail::raw(
                 $validated['message'],
-                function ($mail) use ($recipient, $validated) {
+                function ($mail) use (
+                    $recipient,
+                    $validated
+                ) {
                     $mail
                         ->to($recipient)
-                        ->subject($validated['subject']);
+                        ->subject(
+                            $validated['subject']
+                        );
                 }
             );
         } catch (\Throwable $e) {
@@ -1004,45 +1949,59 @@ class AdminContractController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | ✅ DOWNLOAD CONTRACT FILE (ADMIN)
+    | DOWNLOAD CONTRACT FILE
     |--------------------------------------------------------------------------
     */
 
-    public function downloadContract(Contract $contract): StreamedResponse
-    {
+    public function downloadContract(
+        Contract $contract
+    ): StreamedResponse {
         if (!$contract->contract_file_path) {
-            abort(404, 'Contract file not found.');
+            abort(
+                404,
+                'Contract file not found.'
+            );
         }
 
         return $this->streamDownload(
             $contract->contract_file_path,
             $contract->contract_file_name,
-            $contract->contract_no ?? "contract-{$contract->id}"
+            $contract->contract_no
+                ?? "contract-{$contract->id}"
         );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | ✅ DOWNLOAD SIGNED CONTRACT FILE (ADMIN)
+    | DOWNLOAD SIGNED CONTRACT FILE
     |--------------------------------------------------------------------------
     */
 
-    public function downloadSignedContract(Contract $contract): StreamedResponse
-    {
-        if (!$contract->signed_contract_path) {
-            abort(404, 'Signed contract file not found.');
+    public function downloadSignedContract(
+        Contract $contract
+    ): StreamedResponse {
+        if (
+            !$contract->signed_contract_path
+        ) {
+            abort(
+                404,
+                'Signed contract file not found.'
+            );
         }
 
         return $this->streamDownload(
             $contract->signed_contract_path,
             $contract->signed_contract_file_name,
-            ($contract->contract_no ?? "contract-{$contract->id}") . '-SIGNED'
+            (
+                $contract->contract_no
+                ?? "contract-{$contract->id}"
+            ) . '-SIGNED'
         );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | ✅ STREAM DOWNLOAD HELPER
+    | STREAM DOWNLOAD
     |--------------------------------------------------------------------------
     */
 
@@ -1051,26 +2010,61 @@ class AdminContractController extends Controller
         ?string $originalName = null,
         ?string $fallbackName = null
     ): StreamedResponse {
-        $cleanPath = ltrim($path, '/');
-        $cleanPath = preg_replace('#^storage/#i', '', $cleanPath);
+        $cleanPath =
+            ltrim(
+                $path,
+                '/'
+            );
+
+        $cleanPath =
+            preg_replace(
+                '#^storage/#i',
+                '',
+                $cleanPath
+            );
 
         /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
-        $disk = Storage::disk('public');
+        $disk =
+            Storage::disk('public');
 
-        if (!$disk->exists($cleanPath)) {
-            abort(404, 'File does not exist on the server.');
+        if (
+            !$disk->exists(
+                $cleanPath
+            )
+        ) {
+            abort(
+                404,
+                'File does not exist on the server.'
+            );
         }
 
-        $fileName = $originalName ?: basename($cleanPath);
+        $fileName =
+            $originalName
+            ?: $fallbackName
+            ?: basename($cleanPath);
 
-        if (!pathinfo($fileName, PATHINFO_EXTENSION)) {
-            $ext = pathinfo($cleanPath, PATHINFO_EXTENSION);
+        if (
+            !pathinfo(
+                $fileName,
+                PATHINFO_EXTENSION
+            )
+        ) {
+            $ext =
+                pathinfo(
+                    $cleanPath,
+                    PATHINFO_EXTENSION
+                );
+
             if ($ext) {
-                $fileName .= '.' . $ext;
+                $fileName .=
+                    '.' . $ext;
             }
         }
 
-        return $disk->download($cleanPath, $fileName);
+        return $disk->download(
+            $cleanPath,
+            $fileName
+        );
     }
 
     /*
@@ -1079,8 +2073,9 @@ class AdminContractController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function calculateStatus(Contract $contract): string
-    {
+    private function calculateStatus(
+        Contract $contract
+    ): string {
         if ($contract->archived) {
             return 'Archived';
         }
@@ -1093,16 +2088,31 @@ class AdminContractController extends Controller
             return 'Active';
         }
 
-        $today = now()->startOfDay();
-        $endDate = Carbon::parse($contract->end_date)->startOfDay();
+        $today =
+            now()->startOfDay();
 
-        if ($endDate->lt($today)) {
+        $endDate =
+            Carbon::parse(
+                $contract->end_date
+            )->startOfDay();
+
+        if (
+            $endDate->lt(
+                $today
+            )
+        ) {
             return 'Expired';
         }
 
-        $daysUntilExpiry = $today->diffInDays($endDate, false);
+        $daysUntilExpiry =
+            $today->diffInDays(
+                $endDate,
+                false
+            );
 
-        if ($daysUntilExpiry <= 30) {
+        if (
+            $daysUntilExpiry <= 30
+        ) {
             return 'Expiring Soon';
         }
 
@@ -1115,15 +2125,19 @@ class AdminContractController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function fileUrl(?string $path): ?string
-    {
+    private function fileUrl(
+        ?string $path
+    ): ?string {
         if (!$path) {
             return null;
         }
 
         return asset(
             'storage/' .
-                ltrim($path, '/')
+                ltrim(
+                    $path,
+                    '/'
+                )
         );
     }
 }
