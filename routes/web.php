@@ -1509,16 +1509,29 @@ Route::post('/logout', [
         |--------------------------------------------------------------------------
         */
 
-        Route::get('/forecasting', [
-            AdminForecastingController::class,
-            'index',
-        ])->name('forecasting');
-
-        Route::get('/forecasting/data', [
+               Route::get('/forecasting/data', [
             AdminForecastingController::class,
             'data',
         ])->name('forecasting.data');
+
+      /*
+        |--------------------------------------------------------------------------
+        | ADMIN JOB ORDER APPROVAL
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/job-orders/{jobOrder}/approve', [
+            \App\Http\Controllers\JobOrderController::class,
+            'approve',
+        ])->name('job-orders.approve');
+
+        Route::post('/job-orders/{jobOrder}/reject', [
+            \App\Http\Controllers\JobOrderController::class,
+            'reject',
+        ])->name('job-orders.reject');
     });
+
+
 
 /*
 |--------------------------------------------------------------------------

@@ -52,14 +52,6 @@ class JobOrderController extends Controller
     |--------------------------------------------------------------------------
     | STORE / RECEIVE JOB ORDER
     |--------------------------------------------------------------------------
-    |
-    | A Job Order can be received/imported from another system such as Core 1.
-    |
-    | New Job Orders start as Pending/Received.
-    |
-    | IMPORTANT:
-    | Creating/receiving a Job Order DOES NOT create an invoice.
-    |
     */
 
     public function store(Request $request): RedirectResponse
@@ -79,150 +71,47 @@ class JobOrderController extends Controller
                 'max:100',
                 Rule::unique('job_orders', 'number'),
             ],
-
-            'client' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'client_email' => [
-                'nullable',
-                'email',
-                'max:255',
-            ],
-
-            'client_contact' => [
-                'nullable',
-                'string',
-                'max:100',
-            ],
-
-            'client_address' => [
-                'nullable',
-                'string',
-                'max:1000',
-            ],
-
-            'project' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'location' => [
-                'nullable',
-                'string',
-                'max:500',
-            ],
-
-            'equipment' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'operator' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'start_date' => [
-                'nullable',
-                'date',
-            ],
-
-            'end_date' => [
-                'nullable',
-                'date',
-                'after_or_equal:start_date',
-            ],
-
-            'amount' => [
-                'required',
-                'numeric',
-                'min:0',
-            ],
-
-            'description' => [
-                'nullable',
-                'string',
-                'max:5000',
-            ],
-
-            'notes' => [
-                'nullable',
-                'string',
-                'max:5000',
-            ],
+            'client' => ['required', 'string', 'max:255'],
+            'client_email' => ['nullable', 'email', 'max:255'],
+            'client_contact' => ['nullable', 'string', 'max:100'],
+            'client_address' => ['nullable', 'string', 'max:1000'],
+            'project' => ['required', 'string', 'max:255'],
+            'location' => ['nullable', 'string', 'max:500'],
+            'equipment' => ['nullable', 'string', 'max:255'],
+            'operator' => ['nullable', 'string', 'max:255'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'amount' => ['required', 'numeric', 'min:0'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Generate Job Order Number
-        |--------------------------------------------------------------------------
-        */
-
-        $number = $validated['number']
-            ?? $this->generateJobOrderNumber();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Create / Receive Job Order
-        |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        |
-        | No invoice is created here.
-        |
-        */
+        $number = $validated['number'] ?? $this->generateJobOrderNumber();
 
         JobOrder::create([
             'number' => $number,
-
             'user_id' => $user->id,
-
             'client' => $validated['client'],
             'client_email' => $validated['client_email'] ?? null,
             'client_contact' => $validated['client_contact'] ?? null,
             'client_address' => $validated['client_address'] ?? null,
-
             'project' => $validated['project'],
             'location' => $validated['location'] ?? null,
-
             'equipment' => $validated['equipment'] ?? null,
             'operator' => $validated['operator'] ?? null,
-
             'start_date' => $validated['start_date'] ?? null,
             'end_date' => $validated['end_date'] ?? null,
-
             'amount' => $validated['amount'],
-
             'description' => $validated['description'] ?? null,
             'notes' => $validated['notes'] ?? null,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Initial Status
-            |--------------------------------------------------------------------------
-            |
-            | Pending means the Job Order has been received but not yet generated.
-            |
-            */
-
             'status' => 'Pending',
-
             'generated_at' => null,
             'generated_by' => null,
         ]);
 
         return redirect()
             ->route('job-orders.index')
-            ->with(
-                'success',
-                "Job Order {$number} was successfully received."
-            );
+            ->with('success', "Job Order {$number} was successfully received.");
     }
 
     /*
@@ -244,14 +133,8 @@ class JobOrderController extends Controller
         $record = $this->transformJobOrder($jobOrder);
 
         return Inertia::render('User/JobOrders', [
-            'jobOrders' => [
-                $record,
-            ],
-
-            'records' => [
-                $record,
-            ],
-
+            'jobOrders' => [$record],
+            'records' => [$record],
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),
@@ -263,24 +146,11 @@ class JobOrderController extends Controller
     |--------------------------------------------------------------------------
     | UPDATE
     |--------------------------------------------------------------------------
-    |
-    | Pending/Received Job Orders can be edited.
-    |
-    | Once generated or pending admin approval, the Job Order is locked.
-    |
     */
 
-    public function update(
-        Request $request,
-        JobOrder $jobOrder
-    ): RedirectResponse {
+    public function update(Request $request, JobOrder $jobOrder): RedirectResponse
+    {
         $this->authorizeJobOrder($jobOrder);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Cannot edit if invoice already exists
-        |--------------------------------------------------------------------------
-        */
 
         if ($jobOrder->invoice()->exists()) {
             return back()->with(
@@ -289,17 +159,8 @@ class JobOrderController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Generated or Pending Approval Job Orders are locked
-        |--------------------------------------------------------------------------
-        */
-
         if (in_array($jobOrder->status, ['Generated', 'Pending Admin Approval'], true)) {
-            return back()->with(
-                'error',
-                'This Job Order can no longer be edited.'
-            );
+            return back()->with('error', 'This Job Order can no longer be edited.');
         }
 
         $validated = $request->validate([
@@ -307,147 +168,54 @@ class JobOrderController extends Controller
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('job_orders', 'number')
-                    ->ignore($jobOrder->id),
+                Rule::unique('job_orders', 'number')->ignore($jobOrder->id),
             ],
-
-            'client' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'client_email' => [
-                'nullable',
-                'email',
-                'max:255',
-            ],
-
-            'client_contact' => [
-                'nullable',
-                'string',
-                'max:100',
-            ],
-
-            'client_address' => [
-                'nullable',
-                'string',
-                'max:1000',
-            ],
-
-            'project' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'location' => [
-                'nullable',
-                'string',
-                'max:500',
-            ],
-
-            'equipment' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'operator' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'start_date' => [
-                'nullable',
-                'date',
-            ],
-
-            'end_date' => [
-                'nullable',
-                'date',
-                'after_or_equal:start_date',
-            ],
-
-            'amount' => [
-                'required',
-                'numeric',
-                'min:0',
-            ],
-
-            'description' => [
-                'nullable',
-                'string',
-                'max:5000',
-            ],
-
-            'notes' => [
-                'nullable',
-                'string',
-                'max:5000',
-            ],
+            'client' => ['required', 'string', 'max:255'],
+            'client_email' => ['nullable', 'email', 'max:255'],
+            'client_contact' => ['nullable', 'string', 'max:100'],
+            'client_address' => ['nullable', 'string', 'max:1000'],
+            'project' => ['required', 'string', 'max:255'],
+            'location' => ['nullable', 'string', 'max:500'],
+            'equipment' => ['nullable', 'string', 'max:255'],
+            'operator' => ['nullable', 'string', 'max:255'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'amount' => ['required', 'numeric', 'min:0'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $jobOrder->update([
             'number' => $validated['number'],
-
             'client' => $validated['client'],
             'client_email' => $validated['client_email'] ?? null,
             'client_contact' => $validated['client_contact'] ?? null,
             'client_address' => $validated['client_address'] ?? null,
-
             'project' => $validated['project'],
             'location' => $validated['location'] ?? null,
-
             'equipment' => $validated['equipment'] ?? null,
             'operator' => $validated['operator'] ?? null,
-
             'start_date' => $validated['start_date'] ?? null,
             'end_date' => $validated['end_date'] ?? null,
-
             'amount' => $validated['amount'],
-
             'description' => $validated['description'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ]);
 
         return redirect()
             ->route('job-orders.index')
-            ->with(
-                'success',
-                "Job Order {$jobOrder->number} updated successfully."
-            );
+            ->with('success', "Job Order {$jobOrder->number} updated successfully.");
     }
 
     /*
     |--------------------------------------------------------------------------
     | GENERATE JOB ORDER → SUBMIT FOR ADMIN APPROVAL
     |--------------------------------------------------------------------------
-    |
-    | NEW WORKFLOW:
-    |
-    | Pending/Received
-    |       ↓
-    |     Generate
-    |       ↓
-    |   Pending Admin Approval   ← HINDI pa gumagawa ng invoice
-    |       ↓
-    |   (Admin approves)
-    |       ↓
-    |   Generated + Invoice Created
-    |
     */
 
     public function generate(Request $request, JobOrder $jobOrder): RedirectResponse
     {
         $this->authorizeJobOrder($jobOrder);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Prevent duplicate invoice
-        |--------------------------------------------------------------------------
-        */
 
         $existingInvoice = $jobOrder->invoice()->first();
 
@@ -458,24 +226,12 @@ class JobOrderController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Already Generated or Pending Approval
-        |--------------------------------------------------------------------------
-        */
-
         if (in_array($jobOrder->status, ['Generated', 'Pending Admin Approval'], true)) {
             return back()->with(
                 'error',
                 "Job Order {$jobOrder->number} has already been submitted for approval."
             );
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Only Pending / Received Job Orders can be generated
-        |--------------------------------------------------------------------------
-        */
 
         if (! in_array($jobOrder->status, ['Pending', 'Received'], true)) {
             return back()->with(
@@ -484,23 +240,11 @@ class JobOrderController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | ✅ Mark as Pending Admin Approval — HUWAG muna gumawa ng invoice
-        |--------------------------------------------------------------------------
-        */
-
         $jobOrder->update([
             'status' => 'Pending Admin Approval',
             'generated_at' => now(),
             'generated_by' => Auth::id(),
         ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | ✅ Notify all admins via email
-        |--------------------------------------------------------------------------
-        */
 
         try {
             $admins = \App\Models\User::query()
@@ -511,14 +255,14 @@ class JobOrderController extends Controller
                 try {
                     \Illuminate\Support\Facades\Mail::raw(
                         "A Job Order is ready for your approval.\n\n" .
-                        "Job Order No: {$jobOrder->number}\n" .
-                        "Client: " . ($jobOrder->client ?? '—') . "\n" .
-                        "Project: " . ($jobOrder->project ?? '—') . "\n" .
-                        "Amount: ₱" . number_format((float) $jobOrder->amount, 2) . "\n" .
-                        "Generated by: " . (Auth::user()->name ?? 'Staff') . "\n" .
-                        "Generated at: " . now()->format('M d, Y h:i A') . "\n\n" .
-                        "Please review and approve it in the admin panel:\n" .
-                        url('/admin/job-orders'),
+                            "Job Order No: {$jobOrder->number}\n" .
+                            "Client: " . ($jobOrder->client ?? '—') . "\n" .
+                            "Project: " . ($jobOrder->project ?? '—') . "\n" .
+                            "Amount: ₱" . number_format((float) $jobOrder->amount, 2) . "\n" .
+                            "Generated by: " . (Auth::user()->name ?? 'Staff') . "\n" .
+                            "Generated at: " . now()->format('M d, Y h:i A') . "\n\n" .
+                            "Please review and approve it in the admin panel:\n" .
+                            url('/admin/job-orders'),
                         function ($mail) use ($admin) {
                             $mail->to($admin->email)
                                 ->subject("Job Order Ready for Approval — Action Required");
@@ -535,7 +279,7 @@ class JobOrderController extends Controller
         return back()->with(
             'success',
             "Job Order {$jobOrder->number} has been submitted for Admin approval. " .
-            "The invoice will be created once Admin approves it."
+                "The invoice will be created once Admin approves it."
         );
     }
 
@@ -543,9 +287,6 @@ class JobOrderController extends Controller
     |--------------------------------------------------------------------------
     | ADMIN APPROVE JOB ORDER → CREATE INVOICE
     |--------------------------------------------------------------------------
-    |
-    | Ito ang TANGING lugar kung saan gumagawa ng invoice.
-    |
     */
 
     public function approve(Request $request, JobOrder $jobOrder): RedirectResponse
@@ -617,22 +358,53 @@ class JobOrderController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | ADMIN REJECT JOB ORDER
+    |--------------------------------------------------------------------------
+    */
+
+    public function reject(Request $request, JobOrder $jobOrder): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! $user || strtolower((string) $user->role) !== 'admin') {
+            abort(403, 'Only admins can reject Job Orders.');
+        }
+
+        if ($jobOrder->status !== 'Pending Admin Approval') {
+            return back()->with(
+                'error',
+                "Job Order {$jobOrder->number} is not pending admin approval."
+            );
+        }
+
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $jobOrder->update([
+            'status' => 'Pending',
+            'generated_at' => null,
+            'generated_by' => null,
+            'approved_at' => null,
+            'approved_by' => null,
+        ]);
+
+        return back()->with(
+            'success',
+            "Job Order {$jobOrder->number} was rejected and returned to Pending. " .
+                "Reason: {$validated['rejection_reason']}"
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | DELETE
     |--------------------------------------------------------------------------
-    |
-    | A Job Order cannot be deleted once it has generated an invoice.
-    |
     */
 
     public function destroy(JobOrder $jobOrder): RedirectResponse
     {
         $this->authorizeJobOrder($jobOrder);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Cannot delete if invoice exists
-        |--------------------------------------------------------------------------
-        */
 
         if ($jobOrder->invoice()->exists()) {
             return back()->with(
@@ -641,17 +413,8 @@ class JobOrderController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Generated or Pending Approval Job Orders are locked
-        |--------------------------------------------------------------------------
-        */
-
         if (in_array($jobOrder->status, ['Generated', 'Pending Admin Approval'], true)) {
-            return back()->with(
-                'error',
-                'This Job Order cannot be deleted.'
-            );
+            return back()->with('error', 'This Job Order cannot be deleted.');
         }
 
         $number = $jobOrder->number;
@@ -660,10 +423,7 @@ class JobOrderController extends Controller
 
         return redirect()
             ->route('job-orders.index')
-            ->with(
-                'success',
-                "Job Order {$number} deleted successfully."
-            );
+            ->with('success', "Job Order {$number} deleted successfully.");
     }
 
     /*
@@ -672,59 +432,36 @@ class JobOrderController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function transformJobOrder(
-        JobOrder $jobOrder
-    ): array {
+    private function transformJobOrder(JobOrder $jobOrder): array
+    {
         return [
             'id' => $jobOrder->id,
-
             'number' => $jobOrder->number,
-
             'userId' => $jobOrder->user_id,
-
             'staffId' => $jobOrder->user_id,
-
-            'staffName' => $jobOrder->user?->name
-                ?? 'Unassigned',
-
+            'staffName' => $jobOrder->user?->name ?? 'Unassigned',
             'staffEmail' => $jobOrder->user?->email,
-
             'client' => $jobOrder->client,
-
             'clientEmail' => $jobOrder->client_email,
-
             'clientContact' => $jobOrder->client_contact,
-
             'clientAddress' => $jobOrder->client_address,
-
             'project' => $jobOrder->project,
-
             'location' => $jobOrder->location,
-
             'equipment' => $jobOrder->equipment,
-
             'operator' => $jobOrder->operator,
-
             'startDate' => $jobOrder->start_date
                 ? $jobOrder->start_date->format('Y-m-d')
                 : null,
-
             'endDate' => $jobOrder->end_date
                 ? $jobOrder->end_date->format('Y-m-d')
                 : null,
-
             'amount' => (float) $jobOrder->amount,
-
             'description' => $jobOrder->description,
-
             'notes' => $jobOrder->notes,
-
             'status' => $jobOrder->status,
-
             'generatedAt' => $jobOrder->generated_at
                 ? $jobOrder->generated_at->format('Y-m-d H:i:s')
                 : null,
-
             'generatedBy' => $jobOrder->generatedBy
                 ? [
                     'id' => $jobOrder->generatedBy->id,
@@ -732,47 +469,23 @@ class JobOrderController extends Controller
                     'email' => $jobOrder->generatedBy->email,
                 ]
                 : null,
-
-            /*
-            |--------------------------------------------------------------------------
-            | ✅ Approval info
-            |--------------------------------------------------------------------------
-            */
-
-            'approvedAt' => $jobOrder->approved_at ?? null
+            'approvedAt' => $jobOrder->approved_at
                 ? $jobOrder->approved_at->format('Y-m-d H:i:s')
                 : null,
-
             'approvedBy' => $jobOrder->approved_by,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Invoice Information
-            |--------------------------------------------------------------------------
-            */
-
             'hasInvoice' => $jobOrder->invoice !== null,
-
             'invoiceId' => $jobOrder->invoice?->id,
-
             'invoiceNumber' => $jobOrder->invoice?->number,
-
             'invoice' => $jobOrder->invoice
                 ? [
                     'id' => $jobOrder->invoice->id,
-
                     'jobOrderId' => $jobOrder->invoice->job_order_id,
-
                     'number' => $jobOrder->invoice->number,
-
                     'status' => $jobOrder->invoice->status,
-
                     'amount' => (float) $jobOrder->invoice->amount,
-
                     'dueDate' => $jobOrder->invoice->due_date
                         ? $jobOrder->invoice->due_date->format('Y-m-d')
                         : null,
-
                     'paymentMethod' => $jobOrder->invoice->payment_method ?? 'Bank Transfer',
                 ]
                 : null,
@@ -796,28 +509,13 @@ class JobOrderController extends Controller
 
         $next = 1;
 
-        if (
-            $lastNumber &&
-            preg_match(
-                "/^JO-{$year}-(\d+)$/",
-                $lastNumber,
-                $matches
-            )
-        ) {
+        if ($lastNumber && preg_match("/^JO-{$year}-(\d+)$/", $lastNumber, $matches)) {
             $next = ((int) $matches[1]) + 1;
         }
 
         do {
-            $number = sprintf(
-                'JO-%d-%03d',
-                $year,
-                $next
-            );
-
-            $exists = JobOrder::query()
-                ->where('number', $number)
-                ->exists();
-
+            $number = sprintf('JO-%d-%03d', $year, $next);
+            $exists = JobOrder::query()->where('number', $number)->exists();
             if ($exists) {
                 $next++;
             }
@@ -843,28 +541,13 @@ class JobOrderController extends Controller
 
         $next = 1;
 
-        if (
-            $lastNumber &&
-            preg_match(
-                "/^INV-{$year}-(\d+)$/",
-                $lastNumber,
-                $matches
-            )
-        ) {
+        if ($lastNumber && preg_match("/^INV-{$year}-(\d+)$/", $lastNumber, $matches)) {
             $next = ((int) $matches[1]) + 1;
         }
 
         do {
-            $number = sprintf(
-                'INV-%d-%03d',
-                $year,
-                $next
-            );
-
-            $exists = Invoice::query()
-                ->where('number', $number)
-                ->exists();
-
+            $number = sprintf('INV-%d-%03d', $year, $next);
+            $exists = Invoice::query()->where('number', $number)->exists();
             if ($exists) {
                 $next++;
             }
@@ -884,25 +567,14 @@ class JobOrderController extends Controller
         $user = Auth::user();
 
         abort_unless(
-            $user && in_array(
-                $user->role,
-                ['staff', 'admin'],
-                true
-            ),
+            $user && in_array($user->role, ['staff', 'admin'], true),
             403,
             'You are not authorized to access Job Orders.'
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | JOB ORDER AUTHORIZATION
-    |--------------------------------------------------------------------------
-    */
-
-    private function authorizeJobOrder(
-        JobOrder $jobOrder
-    ): void {
+    private function authorizeJobOrder(JobOrder $jobOrder): void
+    {
         $this->authorizeStaffOrAdmin();
     }
 }
