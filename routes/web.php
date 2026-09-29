@@ -232,6 +232,8 @@ Route::middleware(['auth'])->group(function () {
 
 
 
+
+
     /*
     |--------------------------------------------------------------------------
     | BILLING
@@ -1299,6 +1301,22 @@ Route::delete('/documents/{document}', [
             AdminBillingController::class,
             'markAllNotificationsAsRead',
         ])->name('notifications.mark-all-read');
+
+        /*
+|--------------------------------------------------------------------------
+| ✅ ADMIN JOB ORDER APPROVAL (BAGO — IDAGDAG ITO)
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/job-orders/{id}/approve', [
+    AdminBillingController::class,
+    'approveJobOrder',
+])->name('job-orders.approve');
+
+Route::post('/job-orders/{id}/reject', [
+    AdminBillingController::class,
+    'rejectJobOrder',
+])->name('job-orders.reject');
 
 
         /*

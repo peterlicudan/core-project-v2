@@ -33,7 +33,6 @@ import {
     StickyNote,
     Percent,
     Calculator,
-    CreditCard,
 } from "lucide-react";
 
 /*
@@ -92,13 +91,37 @@ type Invoice = {
     };
 };
 
-type Notification = {
+// ✅ BAGO — Job Order type para sa admin approval
+type PendingJobOrder = {
     id: number;
+    number: string;
+    client: string;
+    clientEmail?: string | null;
+    clientContact?: string | null;
+    clientAddress?: string | null;
+    project: string;
+    location?: string | null;
+    equipment?: string | null;
+    operator?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    amount: number;
+    description?: string | null;
+    notes?: string | null;
+    status: string;
+    generatedAt?: string | null;
+    generatedByName?: string | null;
+    staffName?: string | null;
+};
+
+type Notification = {
+    id: number | string;
     type: "info" | "success" | "warning" | "error";
     title: string;
     message: string;
     read: boolean;
-    createdAt: string;
+    createdAt?: string;
+    created_at?: string;
     link?: string;
     invoiceId?: number;
 };
@@ -110,12 +133,15 @@ type AdminStats = {
     paid: number;
     overdue: number;
     partial: number;
+    total?: number;
+    pendingJobOrders?: number;
 };
 
 type PageProps = {
     invoices?: Invoice[];
     pendingInvoices?: Invoice[];
     allInvoices?: Invoice[];
+    pendingJobOrders?: PendingJobOrder[];   // ✅ BAGO
     stats?: AdminStats;
     notifications?: Notification[];
     flash?: { success?: string; error?: string };
@@ -268,6 +294,17 @@ const normalizeInvoice = (raw: any): Invoice => {
     };
 };
 
+const normalizeNotification = (raw: any): Notification => ({
+    id: raw?.id ?? 0,
+    type: raw?.type ?? "info",
+    title: raw?.title ?? "Notification",
+    message: raw?.message ?? "",
+    read: Boolean(raw?.read),
+    createdAt: raw?.createdAt ?? raw?.created_at ?? "",
+    link: raw?.link,
+    invoiceId: raw?.invoiceId,
+});
+
 /*
 |--------------------------------------------------------------------------
 | MAIN COMPONENT
@@ -279,6 +316,7 @@ export default function BillingManagement() {
 
     const backendInvoices = page.props.invoices ?? page.props.allInvoices ?? [];
     const backendPendingInvoices = page.props.pendingInvoices ?? [];
+    const backendPendingJobOrders = page.props.pendingJobOrders ?? [];
     const backendStats = page.props.stats ?? {
         pending: 0,
         approved: 0,
@@ -286,14 +324,21 @@ export default function BillingManagement() {
         paid: 0,
         overdue: 0,
         partial: 0,
+        total: 0,
+        pendingJobOrders: 0,
     };
-    const backendNotifications = page.props.notifications ?? [];
+    const backendNotifications = (page.props.notifications ?? []).map(
+        normalizeNotification,
+    );
 
     const [invoices, setInvoices] = useState<Invoice[]>(
         backendInvoices.map(normalizeInvoice),
     );
     const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>(
         backendPendingInvoices.map(normalizeInvoice),
+    );
+    const [pendingJobOrders, setPendingJobOrders] = useState<PendingJobOrder[]>(
+        backendPendingJobOrders,
     );
     const [stats, setStats] = useState<AdminStats>(backendStats);
     const [notifications, setNotifications] =
@@ -302,7 +347,10 @@ export default function BillingManagement() {
         backendNotifications.filter((n) => !n.read).length,
     );
 
-    const [activeTab, setActiveTab] = useState<"pending" | "all">("pending");
+    // ✅ DEFAULT = "job-orders" — para ito agad ang makita ng admin
+    const [activeTab, setActiveTab] = useState<
+        "pending" | "all" | "job-orders"
+    >("job-orders");
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<"All" | InvoiceStatus>(
         "All",
@@ -351,11 +399,13 @@ export default function BillingManagement() {
     useEffect(() => {
         setInvoices(backendInvoices.map(normalizeInvoice));
         setPendingInvoices(backendPendingInvoices.map(normalizeInvoice));
+        setPendingJobOrders(backendPendingJobOrders);
         setStats(backendStats);
     }, [
         page.props.invoices,
         page.props.allInvoices,
         page.props.pendingInvoices,
+        page.props.pendingJobOrders,
         page.props.stats,
     ]);
 
@@ -363,6 +413,65 @@ export default function BillingManagement() {
         setNotifications(backendNotifications);
         setUnreadCount(backendNotifications.filter((n) => !n.read).length);
     }, [page.props.notifications]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ AUTO-REFRESH — Every 15 seconds (with guards)
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        const interval = window.setInterval(() => {
+            const hasOpenModal =
+                showInvoiceView ||
+                showInvoiceEdit ||
+                showApproveModal ||
+                showRejectModal ||
+                showNotificationPanel;
+
+            const isBusy =
+                isProcessing ||
+                isSavingInvoice ||
+                isSendingEmail ||
+                isRefreshing;
+
+            if (hasOpenModal || isBusy || document.hidden) return;
+
+            const scrollY = window.scrollY;
+
+            router.reload({
+                only: [
+                    "invoices",
+                    "pendingInvoices",
+                    "allInvoices",
+                    "pendingJobOrders",
+                    "stats",
+                    "notifications",
+                    "flash",
+                ],
+                onSuccess: () => {
+                    window.requestAnimationFrame(() => {
+                        window.scrollTo({
+                            top: scrollY,
+                            behavior: "instant" as ScrollBehavior,
+                        });
+                    });
+                },
+            });
+        }, 15000);
+
+        return () => window.clearInterval(interval);
+    }, [
+        showInvoiceView,
+        showInvoiceEdit,
+        showApproveModal,
+        showRejectModal,
+        showNotificationPanel,
+        isProcessing,
+        isSavingInvoice,
+        isSendingEmail,
+        isRefreshing,
+    ]);
 
     /*
     |--------------------------------------------------------------------------
@@ -422,6 +531,16 @@ export default function BillingManagement() {
         );
     }, [pendingInvoices, search]);
 
+    const filteredPendingJobOrders = useMemo(() => {
+        const keyword = search.trim().toLowerCase();
+        if (!keyword) return pendingJobOrders;
+        return pendingJobOrders.filter((jobOrder) =>
+            [jobOrder.number, jobOrder.client, jobOrder.project]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(keyword)),
+        );
+    }, [pendingJobOrders, search]);
+
     /*
     |--------------------------------------------------------------------------
     | REFRESH
@@ -430,22 +549,33 @@ export default function BillingManagement() {
 
     const refreshData = () => {
         setIsRefreshing(true);
+        const scrollY = window.scrollY;
+
         router.reload({
             only: [
                 "invoices",
                 "pendingInvoices",
                 "allInvoices",
+                "pendingJobOrders",
                 "stats",
                 "notifications",
                 "flash",
             ],
+            onSuccess: () => {
+                window.requestAnimationFrame(() => {
+                    window.scrollTo({
+                        top: scrollY,
+                        behavior: "instant" as ScrollBehavior,
+                    });
+                });
+            },
             onFinish: () => setIsRefreshing(false),
         });
     };
 
     /*
     |--------------------------------------------------------------------------
-    | VIEW INVOICE
+    | VIEW / EDIT INVOICE
     |--------------------------------------------------------------------------
     */
 
@@ -453,12 +583,6 @@ export default function BillingManagement() {
         setSelectedInvoice(invoice);
         setShowInvoiceView(true);
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | EDIT INVOICE
-    |--------------------------------------------------------------------------
-    */
 
     const openEditInvoice = (invoice: Invoice) => {
         setSelectedInvoice(invoice);
@@ -531,12 +655,11 @@ export default function BillingManagement() {
                 },
                 onError: (errors) => {
                     setIsSavingInvoice(false);
-                    console.error("EDIT INVOICE ERROR:", errors);
                     const firstError = Object.values(errors ?? {})[0];
                     alert(
                         firstError
                             ? String(firstError)
-                            : "Failed to update the invoice. Please check the form and try again.",
+                            : "Failed to update the invoice.",
                     );
                 },
                 onFinish: () => setIsSavingInvoice(false),
@@ -546,7 +669,7 @@ export default function BillingManagement() {
 
     /*
     |--------------------------------------------------------------------------
-    | APPROVE INVOICE
+    | APPROVE / REJECT INVOICE
     |--------------------------------------------------------------------------
     */
 
@@ -564,9 +687,7 @@ export default function BillingManagement() {
 
         router.post(
             `/admin/billing/${selectedInvoice.id}/approve`,
-            {
-                notes: approvalNotes.trim() || null,
-            },
+            { notes: approvalNotes.trim() || null },
             {
                 preserveScroll: true,
                 onStart: () => setIsProcessing(true),
@@ -580,24 +701,17 @@ export default function BillingManagement() {
                 },
                 onError: (errors) => {
                     setIsProcessing(false);
-                    console.error("APPROVE ERROR:", errors);
                     const firstError = Object.values(errors ?? {})[0];
                     alert(
                         firstError
                             ? String(firstError)
-                            : "Failed to approve invoice. Please try again.",
+                            : "Failed to approve invoice.",
                     );
                 },
                 onFinish: () => setIsProcessing(false),
             },
         );
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | REJECT INVOICE
-    |--------------------------------------------------------------------------
-    */
 
     const openRejectModal = (invoice: Invoice) => {
         setSelectedInvoice(invoice);
@@ -618,9 +732,7 @@ export default function BillingManagement() {
 
         router.post(
             `/admin/billing/${selectedInvoice.id}/reject`,
-            {
-                reason: rejectionReason.trim(),
-            },
+            { reason: rejectionReason.trim() },
             {
                 preserveScroll: true,
                 onStart: () => setIsProcessing(true),
@@ -628,18 +740,99 @@ export default function BillingManagement() {
                     setIsProcessing(false);
                     setShowRejectModal(false);
                     setSuccessMessage(
-                        `Invoice ${selectedInvoice.number} has been REJECTED. Staff will be notified.`,
+                        `Invoice ${selectedInvoice.number} has been REJECTED.`,
                     );
                     refreshData();
                 },
                 onError: (errors) => {
                     setIsProcessing(false);
-                    console.error("REJECT ERROR:", errors);
                     const firstError = Object.values(errors ?? {})[0];
                     alert(
                         firstError
                             ? String(firstError)
-                            : "Failed to reject invoice. Please try again.",
+                            : "Failed to reject invoice.",
+                    );
+                },
+                onFinish: () => setIsProcessing(false),
+            },
+        );
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ APPROVE / REJECT JOB ORDER
+    |--------------------------------------------------------------------------
+    */
+
+    const approveJobOrder = (jobOrder: PendingJobOrder) => {
+        if (isProcessing) return;
+
+        const confirmed = window.confirm(
+            `Approve Job Order ${jobOrder.number}?\n\nAn invoice will be automatically created.`,
+        );
+        if (!confirmed) return;
+
+        setIsProcessing(true);
+        setSuccessMessage("");
+
+        router.post(
+            `/admin/job-orders/${jobOrder.id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setIsProcessing(true),
+                onSuccess: () => {
+                    setIsProcessing(false);
+                    setSuccessMessage(
+                        `Job Order ${jobOrder.number} approved. Invoice has been created.`,
+                    );
+                    refreshData();
+                },
+                onError: (errors) => {
+                    setIsProcessing(false);
+                    const firstError = Object.values(errors ?? {})[0];
+                    alert(
+                        firstError
+                            ? String(firstError)
+                            : "Failed to approve Job Order.",
+                    );
+                },
+                onFinish: () => setIsProcessing(false),
+            },
+        );
+    };
+
+    const rejectJobOrder = (jobOrder: PendingJobOrder) => {
+        if (isProcessing) return;
+
+        const reason = window.prompt(
+            `Reject Job Order ${jobOrder.number}?\n\nPlease provide a reason:`,
+        );
+        if (!reason || !reason.trim()) return;
+
+        setIsProcessing(true);
+        setSuccessMessage("");
+
+        router.post(
+            `/admin/job-orders/${jobOrder.id}/reject`,
+            { reason: reason.trim() },
+            {
+                preserveScroll: true,
+                onStart: () => setIsProcessing(true),
+                onSuccess: () => {
+                    setIsProcessing(false);
+                    setSuccessMessage(
+                        `Job Order ${jobOrder.number} rejected. Staff has been notified.`,
+                    );
+                    refreshData();
+                },
+                onError: (errors) => {
+                    setIsProcessing(false);
+                    const firstError = Object.values(errors ?? {})[0];
+                    alert(
+                        firstError
+                            ? String(firstError)
+                            : "Failed to reject Job Order.",
                     );
                 },
                 onFinish: () => setIsProcessing(false),
@@ -677,12 +870,11 @@ export default function BillingManagement() {
                 },
                 onError: (errors) => {
                     setIsSendingEmail(false);
-                    console.error("SEND EMAIL ERROR:", errors);
                     const firstError = Object.values(errors ?? {})[0];
                     alert(
                         firstError
                             ? String(firstError)
-                            : "Failed to send invoice email. Please try again.",
+                            : "Failed to send invoice email.",
                     );
                 },
                 onFinish: () => setIsSendingEmail(false),
@@ -692,11 +884,11 @@ export default function BillingManagement() {
 
     /*
     |--------------------------------------------------------------------------
-    | MARK NOTIFICATION AS READ
+    | NOTIFICATIONS
     |--------------------------------------------------------------------------
     */
 
-    const markAsRead = (notificationId: number) => {
+    const markAsRead = (notificationId: number | string) => {
         router.post(
             `/admin/notifications/${notificationId}/read`,
             {},
@@ -738,7 +930,6 @@ export default function BillingManagement() {
 
     return (
         <AdminLayout title="Admin - Billing & Invoicing">
-            {/* ✅ PURE BLACK BACKGROUND */}
             <div className="min-h-screen bg-black text-white">
                 <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
                     {/* HEADER */}
@@ -757,6 +948,64 @@ export default function BillingManagement() {
                                     </p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* NOTIFICATION BELL + REFRESH */}
+                        <div className="flex items-center gap-3">
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setShowNotificationPanel((v) => !v)
+                                    }
+                                    className={[
+                                        "relative inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-black text-slate-400 transition",
+                                        showNotificationPanel
+                                            ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
+                                            : "border-slate-700 hover:border-yellow-400/40 hover:text-yellow-400",
+                                    ].join(" ")}
+                                    aria-label="Notifications"
+                                >
+                                    {unreadCount > 0 ? (
+                                        <BellRing size={18} />
+                                    ) : (
+                                        <Bell size={18} />
+                                    )}
+                                    {unreadCount > 0 && (
+                                        <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">
+                                            {unreadCount > 99
+                                                ? "99+"
+                                                : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+
+                                {showNotificationPanel && (
+                                    <NotificationPanel
+                                        notifications={notifications}
+                                        onClose={() =>
+                                            setShowNotificationPanel(false)
+                                        }
+                                        onMarkAllRead={markAllAsRead}
+                                        onMarkAsRead={markAsRead}
+                                    />
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={refreshData}
+                                disabled={isRefreshing}
+                                className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-700 bg-black px-4 text-sm font-bold text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <RefreshCw
+                                    size={16}
+                                    className={
+                                        isRefreshing ? "animate-spin" : ""
+                                    }
+                                />
+                                {isRefreshing ? "Refreshing..." : "Refresh"}
+                            </button>
                         </div>
                     </div>
 
@@ -796,7 +1045,7 @@ export default function BillingManagement() {
                         </div>
                     )}
 
-                    {/* ✅ STATS - 6 SEPARATE CARDS (NO MOVEMENT ON CLICK) */}
+                    {/* STATS */}
                     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                         <StatCard
                             icon={<Clock size={18} />}
@@ -856,7 +1105,6 @@ export default function BillingManagement() {
                                 );
                             }}
                         />
-                        {/* ✅ SEPARATE: Overdue card */}
                         <StatCard
                             icon={<AlertTriangle size={18} />}
                             label="Overdue"
@@ -872,7 +1120,6 @@ export default function BillingManagement() {
                                 );
                             }}
                         />
-                        {/* ✅ SEPARATE: Rejected card */}
                         <StatCard
                             icon={<Ban size={18} />}
                             label="Rejected"
@@ -892,7 +1139,19 @@ export default function BillingManagement() {
 
                     {/* TABS */}
                     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            {/* ✅ JOB ORDERS TAB */}
+                            <TabButton
+                                active={activeTab === "job-orders"}
+                                onClick={() => {
+                                    setActiveTab("job-orders");
+                                    setSearch("");
+                                    setStatusFilter("All");
+                                }}
+                                icon={<BriefcaseBusiness size={18} />}
+                                label="Pending Job Orders"
+                                count={pendingJobOrders.length}
+                            />
                             <TabButton
                                 active={activeTab === "pending"}
                                 onClick={() => {
@@ -901,7 +1160,7 @@ export default function BillingManagement() {
                                     setStatusFilter("All");
                                 }}
                                 icon={<Clock size={18} />}
-                                label="Pending Approval"
+                                label="Pending Invoices"
                                 count={stats.pending}
                             />
                             <TabButton
@@ -925,8 +1184,14 @@ export default function BillingManagement() {
                                 <input
                                     type="text"
                                     value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search invoices..."
+                                    onChange={(e) =>
+                                        setSearch(e.target.value)
+                                    }
+                                    placeholder={
+                                        activeTab === "job-orders"
+                                            ? "Search job orders..."
+                                            : "Search invoices..."
+                                    }
                                     className="w-48 rounded-xl border border-slate-700 bg-black py-2.5 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-yellow-400/50 sm:w-60"
                                 />
                             </div>
@@ -957,10 +1222,9 @@ export default function BillingManagement() {
                                 type="button"
                                 onClick={() => setHideAmount((v) => !v)}
                                 aria-label={
-                                    hideAmount ? "Show amounts" : "Hide amounts"
-                                }
-                                title={
-                                    hideAmount ? "Show amounts" : "Hide amounts"
+                                    hideAmount
+                                        ? "Show amounts"
+                                        : "Hide amounts"
                                 }
                                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-black text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400"
                             >
@@ -990,7 +1254,15 @@ export default function BillingManagement() {
                     </div>
 
                     {/* CONTENT */}
-                    {activeTab === "pending" ? (
+                    {activeTab === "job-orders" ? (
+                        <PendingJobOrdersList
+                            jobOrders={filteredPendingJobOrders}
+                            onApprove={approveJobOrder}
+                            onReject={rejectJobOrder}
+                            isProcessing={isProcessing}
+                            hideAmount={hideAmount}
+                        />
+                    ) : activeTab === "pending" ? (
                         <PendingInvoicesList
                             invoices={filteredPending}
                             onView={openInvoice}
@@ -1097,7 +1369,6 @@ export default function BillingManagement() {
                             />
                         </div>
 
-                        {/* Invoice Number */}
                         <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
@@ -1127,7 +1398,6 @@ export default function BillingManagement() {
                             />
                         </div>
 
-                        {/* Client & Project */}
                         <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
@@ -1184,7 +1454,6 @@ export default function BillingManagement() {
                             </div>
                         </div>
 
-                        {/* Payment Details */}
                         <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
@@ -1228,17 +1497,6 @@ export default function BillingManagement() {
                                             disabled={isSavingInvoice}
                                         />
                                     </div>
-                                    <p className="mt-2 text-[11px] text-slate-600">
-                                        Current amount:{" "}
-                                        <span className="font-bold text-slate-400">
-                                            {money(
-                                                Number(
-                                                    editingInvoice.amount || 0,
-                                                ),
-                                                hideAmount,
-                                            )}
-                                        </span>
-                                    </p>
                                 </BeautifulFormField>
                                 <BeautifulFormField
                                     label="Due Date"
@@ -1269,7 +1527,6 @@ export default function BillingManagement() {
                             </div>
                         </div>
 
-                        {/* Description */}
                         <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
@@ -1284,28 +1541,22 @@ export default function BillingManagement() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="relative">
-                                <textarea
-                                    rows={5}
-                                    maxLength={2000}
-                                    value={editingInvoice.description}
-                                    onChange={(event) =>
-                                        setEditingInvoice((current) => ({
-                                            ...current,
-                                            description: event.target.value,
-                                        }))
-                                    }
-                                    placeholder="Describe the equipment, service, work performed, or other invoice details..."
-                                    className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
-                                    disabled={isSavingInvoice}
-                                />
-                                <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border border-slate-800 bg-black/90 px-2 py-1 text-[10px] font-bold text-slate-600">
-                                    {editingInvoice.description.length} / 2000
-                                </div>
-                            </div>
+                            <textarea
+                                rows={5}
+                                maxLength={2000}
+                                value={editingInvoice.description}
+                                onChange={(event) =>
+                                    setEditingInvoice((current) => ({
+                                        ...current,
+                                        description: event.target.value,
+                                    }))
+                                }
+                                placeholder="Describe the equipment, service, work performed, or other invoice details..."
+                                className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
+                                disabled={isSavingInvoice}
+                            />
                         </div>
 
-                        {/* Notes */}
                         <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
@@ -1320,46 +1571,22 @@ export default function BillingManagement() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="relative">
-                                <textarea
-                                    rows={4}
-                                    maxLength={2000}
-                                    value={editingInvoice.notes}
-                                    onChange={(event) =>
-                                        setEditingInvoice((current) => ({
-                                            ...current,
-                                            notes: event.target.value,
-                                        }))
-                                    }
-                                    placeholder="Add notes, reminders, payment instructions, or other internal information..."
-                                    className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
-                                    disabled={isSavingInvoice}
-                                />
-                                <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border border-slate-800 bg-black/90 px-2 py-1 text-[10px] font-bold text-slate-600">
-                                    {editingInvoice.notes.length} / 2000
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Warning */}
-                        <div className="flex items-start gap-3 rounded-2xl border border-yellow-400/10 bg-yellow-400/[0.04] px-4 py-4">
-                            <AlertCircle
-                                size={18}
-                                className="mt-0.5 shrink-0 text-yellow-400"
+                            <textarea
+                                rows={4}
+                                maxLength={2000}
+                                value={editingInvoice.notes}
+                                onChange={(event) =>
+                                    setEditingInvoice((current) => ({
+                                        ...current,
+                                        notes: event.target.value,
+                                    }))
+                                }
+                                placeholder="Add notes, reminders, payment instructions..."
+                                className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
+                                disabled={isSavingInvoice}
                             />
-                            <div>
-                                <p className="text-xs font-black uppercase tracking-wider text-yellow-400">
-                                    Before Saving
-                                </p>
-                                <p className="mt-1 text-xs leading-5 text-slate-500">
-                                    Please make sure the client, project,
-                                    amount, and due date are correct. Invoice
-                                    changes will be saved to the billing record.
-                                </p>
-                            </div>
                         </div>
 
-                        {/* Buttons */}
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
@@ -1424,7 +1651,287 @@ export default function BillingManagement() {
 
 /*
 |--------------------------------------------------------------------------
-| STAT CARD — ✅ NO MOVEMENT / NO TRANSFORM
+| ✅ PENDING JOB ORDERS LIST (BAGO)
+|--------------------------------------------------------------------------
+*/
+
+function PendingJobOrdersList({
+    jobOrders,
+    onApprove,
+    onReject,
+    isProcessing,
+    hideAmount,
+}: {
+    jobOrders: PendingJobOrder[];
+    onApprove: (jobOrder: PendingJobOrder) => void;
+    onReject: (jobOrder: PendingJobOrder) => void;
+    isProcessing: boolean;
+    hideAmount: boolean;
+}) {
+    if (jobOrders.length === 0) {
+        return (
+            <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-slate-800 bg-black/50">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-700 bg-black text-slate-600">
+                    <BriefcaseBusiness size={40} />
+                </div>
+                <h3 className="mt-5 text-xl font-black text-white">
+                    No Pending Job Orders
+                </h3>
+                <p className="mt-2 text-sm text-slate-500">
+                    All Job Orders have been reviewed. Great job!
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-black shadow-2xl shadow-black/30">
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[1200px]">
+                    <thead>
+                        <tr className="border-b border-slate-800 bg-black/70">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                                Job Order
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                                Client
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                                Project
+                            </th>
+                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-slate-500">
+                                Amount
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                                Staff
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                                Submitted
+                            </th>
+                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-500">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {jobOrders.map((jobOrder) => (
+                            <tr
+                                key={jobOrder.id}
+                                className="border-b border-slate-800/70 transition-colors hover:bg-yellow-400/[0.025]"
+                            >
+                                <td className="px-5 py-5">
+                                    <p className="font-black text-white">
+                                        {jobOrder.number}
+                                    </p>
+                                    <p className="mt-1 text-xs text-yellow-400">
+                                        Pending Approval
+                                    </p>
+                                </td>
+                                <td className="px-5 py-5">
+                                    <p className="font-semibold text-slate-200">
+                                        {jobOrder.client}
+                                    </p>
+                                    {jobOrder.clientEmail && (
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            {jobOrder.clientEmail}
+                                        </p>
+                                    )}
+                                </td>
+                                <td className="px-5 py-5">
+                                    <p className="text-sm text-slate-300">
+                                        {jobOrder.project}
+                                    </p>
+                                    {jobOrder.location && (
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            {jobOrder.location}
+                                        </p>
+                                    )}
+                                </td>
+                                <td className="px-5 py-5 text-right">
+                                    <p className="font-black text-yellow-400">
+                                        {money(jobOrder.amount, hideAmount)}
+                                    </p>
+                                </td>
+                                <td className="px-5 py-5">
+                                    <p className="text-sm text-slate-300">
+                                        {jobOrder.staffName || "—"}
+                                    </p>
+                                </td>
+                                <td className="px-5 py-5">
+                                    <p className="text-sm text-slate-300">
+                                        {formatDateTime(jobOrder.generatedAt)}
+                                    </p>
+                                    {jobOrder.generatedByName && (
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            by {jobOrder.generatedByName}
+                                        </p>
+                                    )}
+                                </td>
+                                <td className="px-5 py-5">
+                                    <div className="flex items-center justify-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => onApprove(jobOrder)}
+                                            disabled={isProcessing}
+                                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/20 px-3 text-xs font-black text-emerald-400 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <Check size={14} /> Approve
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onReject(jobOrder)}
+                                            disabled={isProcessing}
+                                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-red-500/20 px-3 text-xs font-black text-red-400 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <Ban size={14} /> Reject
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| NOTIFICATION PANEL
+|--------------------------------------------------------------------------
+*/
+
+function NotificationPanel({
+    notifications,
+    onClose,
+    onMarkAllRead,
+    onMarkAsRead,
+}: {
+    notifications: Notification[];
+    onClose: () => void;
+    onMarkAllRead: () => void;
+    onMarkAsRead: (id: number | string) => void;
+}) {
+    const unreadCount = notifications.filter((n) => !n.read).length;
+
+    return (
+        <div className="absolute right-0 top-full z-[80] mt-3 w-80 overflow-hidden rounded-2xl border border-slate-700 bg-black/95 shadow-2xl backdrop-blur-md sm:w-96">
+            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+                <div className="flex items-center gap-2">
+                    <Bell size={16} className="text-yellow-400" />
+                    <p className="text-sm font-black uppercase tracking-wide text-white">
+                        Notifications
+                    </p>
+                    {unreadCount > 0 && (
+                        <span className="rounded-full bg-yellow-400/15 px-2 py-0.5 text-[10px] font-black text-yellow-400">
+                            {unreadCount} new
+                        </span>
+                    )}
+                </div>
+                <div className="flex items-center gap-1">
+                    {unreadCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={onMarkAllRead}
+                            className="rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-yellow-400 transition hover:bg-yellow-400/10"
+                        >
+                            Mark all read
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                    >
+                        <X size={15} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+                        <Bell size={28} className="text-slate-700" />
+                        <p className="mt-3 text-sm font-bold text-slate-400">
+                            No notifications
+                        </p>
+                        <p className="mt-1 text-xs text-slate-600">
+                            You're all caught up.
+                        </p>
+                    </div>
+                ) : (
+                    notifications.map((notification) => (
+                        <button
+                            key={notification.id}
+                            type="button"
+                            onClick={() => {
+                                if (!notification.read) {
+                                    onMarkAsRead(notification.id);
+                                }
+                                if (notification.link) {
+                                    router.visit(notification.link);
+                                }
+                            }}
+                            className={[
+                                "flex w-full items-start gap-3 border-b border-slate-800/70 px-4 py-3 text-left transition hover:bg-slate-800/40",
+                                !notification.read
+                                    ? "bg-yellow-400/[0.04]"
+                                    : "",
+                            ].join(" ")}
+                        >
+                            <div
+                                className={[
+                                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                                    notification.type === "success"
+                                        ? "bg-emerald-400/10 text-emerald-400"
+                                        : notification.type === "error"
+                                          ? "bg-red-400/10 text-red-400"
+                                          : notification.type === "warning"
+                                            ? "bg-yellow-400/10 text-yellow-400"
+                                            : "bg-blue-400/10 text-blue-400",
+                                ].join(" ")}
+                            >
+                                {notification.type === "success" ? (
+                                    <CheckCircle2 size={16} />
+                                ) : notification.type === "error" ? (
+                                    <AlertCircle size={16} />
+                                ) : notification.type === "warning" ? (
+                                    <AlertTriangle size={16} />
+                                ) : (
+                                    <Bell size={16} />
+                                )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                    <p className="truncate text-sm font-bold text-white">
+                                        {notification.title}
+                                    </p>
+                                    {!notification.read && (
+                                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-yellow-400" />
+                                    )}
+                                </div>
+                                <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-400">
+                                    {notification.message}
+                                </p>
+                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                                    {formatDateTime(
+                                        notification.createdAt ??
+                                            notification.created_at,
+                                    )}
+                                </p>
+                            </div>
+                        </button>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| STAT CARD
 |--------------------------------------------------------------------------
 */
 
@@ -1463,7 +1970,6 @@ function StatCard({
         <div
             onClick={onClick}
             className={[
-                // ✅ NO transform, NO translate, NO scale — pure static
                 "rounded-2xl border p-4 cursor-pointer transition-colors duration-150 shadow-md",
                 colorMap[color],
                 active ? activeRingMap[color] : "",

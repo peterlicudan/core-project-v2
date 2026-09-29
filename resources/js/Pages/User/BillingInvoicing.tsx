@@ -175,7 +175,6 @@ const maskEmail = (email: string | null | undefined) => {
     return `${maskedName}@${domain}`;
 };
 
-// 👇 BAGO — full email kapag Approved, masked otherwise
 const displayClientEmail = (
     email: string | null | undefined,
     status?: string | null,
@@ -296,11 +295,21 @@ const normalizeInvoice = (raw: any): Invoice => {
 const getJobOrderNumber = (jobOrder: JobOrder) =>
     jobOrder.number ?? `JO-${jobOrder.id}`;
 const getJobOrderAmount = (jobOrder: JobOrder) => Number(jobOrder.amount ?? 0);
-const isJobOrderGenerated = (jobOrder: JobOrder) =>
-    String(jobOrder.status ?? "").toLowerCase() === "generated" ||
-    Boolean(jobOrder.hasInvoice) ||
-    Boolean(jobOrder.invoiceId) ||
-    Boolean(jobOrder.invoice);
+
+/**
+ * ✅ UPDATED: Treats both "Generated" AND "Pending Admin Approval" as generated
+ * from the user's perspective. They can no longer click "Generate" once submitted.
+ */
+const isJobOrderGenerated = (jobOrder: JobOrder) => {
+    const status = String(jobOrder.status ?? "").toLowerCase();
+    return (
+        status === "generated" ||
+        status === "pending admin approval" ||
+        Boolean(jobOrder.hasInvoice) ||
+        Boolean(jobOrder.invoiceId) ||
+        Boolean(jobOrder.invoice)
+    );
+};
 
 const SCROLL_THRESHOLD = 5;
 const ROW_HEIGHT = 64;
@@ -350,7 +359,6 @@ export default function BillingInvoicing() {
     const [showNotificationPanel, setShowNotificationPanel] = useState(false);
     const [showSendEmailModal, setShowSendEmailModal] = useState(false);
 
-    // Custom Confirm Modal state
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
         title: string;
@@ -493,7 +501,6 @@ export default function BillingInvoicing() {
         });
     };
 
-    // Helper para sa confirm dialog
     const openConfirm = (options: {
         title: string;
         message: string;
@@ -517,12 +524,24 @@ export default function BillingInvoicing() {
         setConfirmDialog((prev) => ({ ...prev, open: false }));
     };
 
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ GENERATE JOB ORDER (FIXED)
+    |--------------------------------------------------------------------------
+    |
+    | Changes:
+    | - Removed setActiveTab("invoices") — hindi na lumilipat sa Service Invoice
+    | - Updated success message — hindi na nagsasabing "invoice created"
+    | - Manatili sa job-orders tab
+    |
+    */
+
     const generateJobOrder = (jobOrder: JobOrder) => {
         const number = getJobOrderNumber(jobOrder);
         if (isGenerating) return;
         if (isJobOrderGenerated(jobOrder)) {
             alert(
-                `Job Order ${number} has already been generated or already has an invoice.`,
+                `Job Order ${number} has already been submitted for admin approval.`,
             );
             return;
         }
@@ -535,9 +554,9 @@ export default function BillingInvoicing() {
         }
 
         openConfirm({
-            title: "Generate Job Order",
-            message: `Are you sure you want to generate Job Order ${number}?\n\nThis will mark the Job Order as Generated and automatically create its invoice.`,
-            confirmLabel: "Generate Now",
+            title: "Submit Job Order for Approval",
+            message: `Are you sure you want to submit Job Order ${number} for Admin approval?\n\nThe invoice will be created once Admin approves it.`,
+            confirmLabel: "Submit Now",
             cancelLabel: "Cancel",
             variant: "warning",
             onConfirm: () => {
@@ -556,13 +575,16 @@ export default function BillingInvoicing() {
                         onSuccess: () => {
                             setIsGenerating(false);
                             setSuccessMessage(
-                                `Job Order ${number} was successfully generated and its invoice was created automatically.`,
+                                `Job Order ${number} has been submitted for Admin approval. The invoice will appear in Service Invoices once approved.`,
                             );
-                            setActiveTab("invoices");
+                            // ✅ HUWAG lumipat sa invoices tab — manatili sa Job Orders
+                            setActiveTab("job-orders");
                             setSearch("");
                             setInvoiceStatusFilter("All");
                             setSelectedJobOrder(null);
                             setShowJobOrderView(false);
+                            // ✅ Refresh para makita agad ang bagong status
+                            refreshData();
                         },
                         onError: (errors) => {
                             setIsGenerating(false);
@@ -571,7 +593,7 @@ export default function BillingInvoicing() {
                             alert(
                                 firstError
                                     ? String(firstError)
-                                    : `Failed to generate Job Order ${number}. Please try again.`,
+                                    : `Failed to submit Job Order ${number}. Please try again.`,
                             );
                         },
                         onFinish: () => setIsGenerating(false),
@@ -1026,9 +1048,9 @@ export default function BillingInvoicing() {
                                                 </h2>
                                             </div>
                                             <p className="mt-1 text-sm text-slate-500">
-                                                Generate a Job Order to
-                                                automatically create its
-                                                invoice.
+                                                Submit a Job Order to Admin for
+                                                approval. Invoice will be created
+                                                once approved.
                                             </p>
                                         </div>
                                         <div className="relative w-full lg:w-96">
@@ -1167,7 +1189,7 @@ export default function BillingInvoicing() {
                                                 </div>
                                                 <p className="mt-1 text-sm text-slate-500">
                                                     Invoices automatically
-                                                    created from generated Job
+                                                    created from approved Job
                                                     Orders. Includes 12% VAT.
                                                     {invoiceShouldScroll && (
                                                         <span className="ml-2 text-yellow-400/60">
@@ -1304,11 +1326,12 @@ export default function BillingInvoicing() {
                                                 size={17}
                                                 className="animate-spin"
                                             />{" "}
-                                            Generating...
+                                            Submitting...
                                         </>
                                     ) : (
                                         <>
-                                            <Receipt size={17} /> Generate
+                                            <Receipt size={17} /> Submit for
+                                            Approval
                                         </>
                                     )}
                                 </button>
@@ -1542,7 +1565,6 @@ export default function BillingInvoicing() {
                         className="confirm-card w-full max-w-md overflow-hidden rounded-3xl border border-yellow-400/20 bg-slate-900 shadow-[0_25px_80px_-20px_rgba(250,204,21,0.25)]"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* HEADER */}
                         <div
                             className={[
                                 "relative flex items-start gap-4 border-b p-6",
@@ -1600,14 +1622,12 @@ export default function BillingInvoicing() {
                             </button>
                         </div>
 
-                        {/* BODY */}
                         <div className="p-6">
                             <p className="whitespace-pre-line text-sm leading-6 text-slate-300">
                                 {confirmDialog.message}
                             </p>
                         </div>
 
-                        {/* FOOTER */}
                         <div className="flex flex-col-reverse gap-3 border-t border-slate-800 bg-slate-950/50 p-6 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
@@ -2059,11 +2079,13 @@ function JobOrderTable({
             <tbody>
                 {jobOrders.map((jobOrder) => {
                     const generated = isJobOrderGenerated(jobOrder);
+                    const status = String(jobOrder.status ?? "");
                     const canGenerate =
                         !generated &&
-                        ["Pending", "Received"].includes(
-                            String(jobOrder.status ?? ""),
-                        );
+                        !["Generated", "Pending Admin Approval"].includes(
+                            status,
+                        ) &&
+                        ["Pending", "Received"].includes(status);
                     return (
                         <tr
                             key={jobOrder.id}
@@ -2185,7 +2207,9 @@ function JobOrderTable({
                             <td className="px-3 py-3 text-center align-top">
                                 <StatusBadge
                                     status={
-                                        generated
+                                        generated ||
+                                        String(jobOrder.status ?? "").toLowerCase() ===
+                                            "pending admin approval"
                                             ? "Generated"
                                             : (jobOrder.status ?? "Pending")
                                     }
@@ -2220,7 +2244,7 @@ function JobOrderTable({
                                             ) : (
                                                 <>
                                                     <Receipt size={12} />
-                                                    Generate
+                                                    Submit
                                                 </>
                                             )}
                                         </button>
@@ -2264,7 +2288,7 @@ function InvoiceTable({
             <EmptyState
                 icon={<FileText size={28} />}
                 title="No Invoices Found"
-                description="Generate a Job Order to automatically create its invoice."
+                description="Invoices will appear here once Admin approves your Job Orders."
             />
         );
     }
@@ -2607,9 +2631,18 @@ function StatusBadge({ status }: { status: string }) {
         rejected: "border-red-400/20 bg-red-400/10 text-red-400",
         approved: "border-blue-400/20 bg-blue-400/10 text-blue-400",
         generated: "border-emerald-400/20 bg-emerald-400/10 text-emerald-400",
+        // ✅ Ituring na Generated ang "Pending Admin Approval"
+        "pending admin approval":
+            "border-emerald-400/20 bg-emerald-400/10 text-emerald-400",
     };
 
     classes = statusMap[normalized] || classes;
+
+    // ✅ Ipakita as "Generated" kapag "Pending Admin Approval"
+    const displayStatus =
+        normalized === "pending admin approval"
+            ? "Generated"
+            : status || "Pending";
 
     return (
         <span
@@ -2618,7 +2651,7 @@ function StatusBadge({ status }: { status: string }) {
                 classes,
             ].join(" ")}
         >
-            {status || "Pending"}
+            {displayStatus}
         </span>
     );
 }
@@ -2646,7 +2679,9 @@ function JobOrderDetails({
                     </div>
                     <StatusBadge
                         status={
-                            generated
+                            generated ||
+                            String(jobOrder.status ?? "").toLowerCase() ===
+                                "pending admin approval"
                                 ? "Generated"
                                 : (jobOrder.status ?? "Pending")
                         }
@@ -2748,10 +2783,10 @@ function JobOrderDetails({
                         />
                         <div>
                             <p className="font-bold text-emerald-400">
-                                Job Order Generated
+                                Job Order Submitted
                             </p>
                             <p className="mt-1 text-sm text-slate-400">
-                                Generated on{" "}
+                                Submitted on{" "}
                                 {formatDateTime(jobOrder.generatedAt)}
                             </p>
                             {jobOrder.generatedBy?.name && (
@@ -2879,8 +2914,7 @@ function InvoiceDetails({
             {invoice.status === "Approved" && invoice.approvedAt && (
                 <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5">
                     <div className="flex items-start gap-3">
-                        <CheckCircle2
-                            size={20}
+                        <CheckCircle2                            size={20}
                             className="mt-0.5 text-blue-400"
                         />
                         <div>

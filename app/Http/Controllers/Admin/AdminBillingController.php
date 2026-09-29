@@ -10,17 +10,64 @@ use App\Models\JobOrder;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AdminBillingController extends Controller
 {
-    /**
-     * Display the billing management page
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | INDEX — Billing Management Page
+    |--------------------------------------------------------------------------
+    |
+    | ✅ Loads:
+    | - Invoices (for billing approval)
+    | - Pending Invoices
+    | - ✅ Pending Job Orders (for Job Order approval)
+    | - Stats
+    | - Notifications
+    |
+    */
+
     public function index()
     {
         $invoices = Invoice::with(['user', 'jobOrder'])->get();
-        $pendingInvoices = Invoice::where('status', 'Pending')->with(['user', 'jobOrder'])->get();
+        $pendingInvoices = Invoice::where('status', 'Pending')
+            ->with(['user', 'jobOrder'])
+            ->get();
+
+        // ✅ PENDING JOB ORDERS — para sa admin approval
+        $pendingJobOrders = JobOrder::where('status', 'Pending Admin Approval')
+            ->with(['user:id,name,email', 'generatedBy:id,name,email'])
+            ->latest()
+            ->get()
+            ->map(function (JobOrder $jobOrder) {
+                return [
+                    'id' => $jobOrder->id,
+                    'number' => $jobOrder->number,
+                    'client' => $jobOrder->client,
+                    'clientEmail' => $jobOrder->client_email,
+                    'clientContact' => $jobOrder->client_contact,
+                    'clientAddress' => $jobOrder->client_address,
+                    'project' => $jobOrder->project,
+                    'location' => $jobOrder->location,
+                    'equipment' => $jobOrder->equipment,
+                    'operator' => $jobOrder->operator,
+                    'startDate' => $jobOrder->start_date?->format('Y-m-d'),
+                    'endDate' => $jobOrder->end_date?->format('Y-m-d'),
+                    'amount' => (float) $jobOrder->amount,
+                    'description' => $jobOrder->description,
+                    'notes' => $jobOrder->notes,
+                    'status' => $jobOrder->status,
+                    'generatedAt' => $jobOrder->generated_at?->format('Y-m-d H:i:s'),
+                    'generatedByName' => $jobOrder->generatedBy?->name ?? 'Staff',
+                    'staffName' => $jobOrder->user?->name ?? 'Unassigned',
+                    'hasInvoice' => false,
+                    'invoiceId' => null,
+                    'invoiceNumber' => null,
+                ];
+            })
+            ->values();
 
         $stats = [
             'pending' => Invoice::where('status', 'Pending')->count(),
@@ -29,16 +76,20 @@ class AdminBillingController extends Controller
             'paid' => Invoice::where('status', 'Paid')->count(),
             'overdue' => Invoice::where('status', 'Overdue')->count(),
             'total' => Invoice::count(),
+            // ✅ BAGO — Pending Job Orders count
+            'pendingJobOrders' => $pendingJobOrders->count(),
         ];
 
-        // ✅ I-ADAPT PARA SA EXISTING NOTIFICATIONS TABLE (polymorphic)
+        // ✅ NOTIFICATIONS (polymorphic)
         $notifications = Notification::where('notifiable_type', 'App\\Models\\User')
             ->where('notifiable_id', Auth::id())
             ->orderBy('created_at', 'desc')
+            ->take(30)
             ->get()
             ->map(function ($notification) {
-                // I-extract ang data from JSON
-                $data = is_array($notification->data) ? $notification->data : json_decode($notification->data, true);
+                $data = is_array($notification->data)
+                    ? $notification->data
+                    : json_decode($notification->data, true);
 
                 return [
                     'id' => $notification->id,
@@ -47,21 +98,25 @@ class AdminBillingController extends Controller
                     'type' => $data['type'] ?? 'info',
                     'link' => $data['link'] ?? null,
                     'read' => !is_null($notification->read_at),
-                    'created_at' => $notification->created_at,
+                    'createdAt' => $notification->created_at?->toIso8601String(),
                 ];
             });
 
         return Inertia::render('Admin/BillingManagement', [
             'invoices' => $invoices,
             'pendingInvoices' => $pendingInvoices,
+            'pendingJobOrders' => $pendingJobOrders,   // ✅ BAGO
             'stats' => $stats,
             'notifications' => $notifications,
         ]);
     }
 
-    /**
-     * Store a newly created invoice
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | STORE
+    |--------------------------------------------------------------------------
+    */
+
     public function store(Request $request)
     {
         $request->validate([
@@ -89,9 +144,12 @@ class AdminBillingController extends Controller
         return redirect()->back()->with('success', "Invoice {$invoice->number} has been created.");
     }
 
-    /**
-     * Update an invoice
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE
+    |--------------------------------------------------------------------------
+    */
+
     public function update(Request $request, $id)
     {
         $invoice = Invoice::findOrFail($id);
@@ -118,9 +176,12 @@ class AdminBillingController extends Controller
         return redirect()->back()->with('success', "Invoice {$invoice->number} has been updated.");
     }
 
-    /**
-     * Update invoice status
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE STATUS
+    |--------------------------------------------------------------------------
+    */
+
     public function updateStatus(Request $request, $id)
     {
         $invoice = Invoice::findOrFail($id);
@@ -135,9 +196,12 @@ class AdminBillingController extends Controller
         return redirect()->back()->with('success', "Invoice {$invoice->number} status updated to {$request->status}.");
     }
 
-    /**
-     * Delete an invoice
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | DESTROY
+    |--------------------------------------------------------------------------
+    */
+
     public function destroy($id)
     {
         $invoice = Invoice::findOrFail($id);
@@ -148,7 +212,127 @@ class AdminBillingController extends Controller
     }
 
     // ============================================================
-    // APPROVE & REJECT METHODS
+    // ✅ JOB ORDER APPROVAL (BAGO)
+    // ============================================================
+
+    /**
+     * ✅ APPROVE JOB ORDER → Create Invoice
+     *
+     * Flow:
+     * - Job Order status: "Pending Admin Approval" → "Generated"
+     * - Invoice AUTO-CREATED (status = "Pending")
+     * - Staff notified
+     */
+    public function approveJobOrder(Request $request, $id)
+    {
+        $jobOrder = JobOrder::findOrFail($id);
+
+        if ($jobOrder->status !== 'Pending Admin Approval') {
+            return redirect()->back()->with('error', "Job Order {$jobOrder->number} is not pending admin approval.");
+        }
+
+        if ($jobOrder->invoice()->exists()) {
+            return redirect()->back()->with('error', "Job Order {$jobOrder->number} already has an invoice.");
+        }
+
+        $result = DB::transaction(function () use ($jobOrder, $request) {
+            // 1. Update Job Order
+            $jobOrder->update([
+                'status' => 'Generated',
+                'approved_at' => now(),
+                'approved_by' => Auth::id(),
+            ]);
+
+            // 2. Create Invoice
+            $invoiceNumber = $this->generateInvoiceNumber();
+
+            $invoice = Invoice::create([
+                'number' => $invoiceNumber,
+                'job_order_id' => $jobOrder->id,
+                'user_id' => $jobOrder->user_id,
+                'staff_id' => $jobOrder->user_id,
+                'client' => $jobOrder->client,
+                'client_email' => $jobOrder->client_email,
+                'client_address' => $jobOrder->client_address,
+                'client_contact' => $jobOrder->client_contact,
+                'project' => $jobOrder->project,
+                'amount' => $jobOrder->amount,
+                'status' => 'Pending',   // ✅ Invoice status = Pending (billing approval next)
+                'due_date' => now()->addDays(30),
+                'description' => $jobOrder->description ?? 'Heavy Equipment & Logistics Service',
+                'notes' => $jobOrder->notes,
+                'payment_method' => $request->input('payment_method', 'Bank Transfer'),
+            ]);
+
+            // 3. Notify staff
+            if ($jobOrder->user_id) {
+                $this->createNotification(
+                    Auth::id(),
+                    $jobOrder->user_id,
+                    'Job Order Approved ✅',
+                    "Your Job Order {$jobOrder->number} has been approved. Invoice {$invoiceNumber} has been created and awaits payment.",
+                    'success',
+                    '/billing-invoicing'
+                );
+            }
+
+            return ['jobOrder' => $jobOrder, 'invoice' => $invoice];
+        });
+
+        return redirect()->back()->with(
+            'success',
+            "Job Order {$result['jobOrder']->number} approved. Invoice {$result['invoice']->number} has been created."
+        );
+    }
+
+    /**
+     * ✅ REJECT JOB ORDER
+     *
+     * Flow:
+     * - Job Order status: "Pending Admin Approval" → "Pending"
+     * - No invoice created
+     * - Staff notified
+     */
+    public function rejectJobOrder(Request $request, $id)
+    {
+        $request->validate([
+            'reason' => 'required|string|min:3|max:500',
+        ]);
+
+        $jobOrder = JobOrder::findOrFail($id);
+
+        if ($jobOrder->status !== 'Pending Admin Approval') {
+            return redirect()->back()->with('error', "Job Order {$jobOrder->number} is not pending admin approval.");
+        }
+
+        $jobOrder->update([
+            'status' => 'Pending',
+            'generated_at' => null,
+            'generated_by' => null,
+            'approved_at' => null,
+            'approved_by' => null,
+        ]);
+
+        // Notify staff
+        if ($jobOrder->user_id) {
+            $this->createNotification(
+                Auth::id(),
+                $jobOrder->user_id,
+                'Job Order Rejected ❌',
+                "Your Job Order {$jobOrder->number} was rejected. Reason: {$request->reason}",
+                'error',
+                '/job-orders'
+            );
+        }
+
+        return redirect()->back()->with(
+            'success',
+            "Job Order {$jobOrder->number} was rejected. Staff has been notified."
+        );
+    }
+
+    // ============================================================
+    // INVOICE APPROVAL (EXISTING)
     // ============================================================
 
     /**
@@ -158,12 +342,10 @@ class AdminBillingController extends Controller
     {
         $invoice = Invoice::findOrFail($id);
 
-        // Check if invoice is pending
         if ($invoice->status !== 'Pending') {
             return redirect()->back()->with('error', 'Only pending invoices can be approved.');
         }
 
-        // Update invoice status
         $invoice->status = 'Approved';
         $invoice->approved_at = now();
         $invoice->approved_by = Auth::user()->name ?? Auth::user()->email;
@@ -176,13 +358,12 @@ class AdminBillingController extends Controller
             $invoice->jobOrder->save();
         }
 
-        // ✅ CREATE PAYMENT RECORD
+        // Create payment record
         $this->createPaymentRecord($invoice);
 
-        // Get staff user ID
+        // Notify staff
         $staffId = $invoice->staff_id ?? $invoice->user_id ?? 1;
 
-        // Create notification for staff
         $this->createNotification(
             Auth::id(),
             $staffId,
@@ -206,29 +387,24 @@ class AdminBillingController extends Controller
 
         $invoice = Invoice::findOrFail($id);
 
-        // Check if invoice is pending
         if ($invoice->status !== 'Pending') {
             return redirect()->back()->with('error', 'Only pending invoices can be rejected.');
         }
 
-        // Update invoice status
         $invoice->status = 'Rejected';
         $invoice->rejected_at = now();
         $invoice->rejected_by = Auth::user()->name ?? Auth::user()->email;
         $invoice->rejection_reason = $request->reason;
         $invoice->save();
 
-        // Update related job order if exists
         if ($invoice->jobOrder) {
             $invoice->jobOrder->status = 'Rejected';
             $invoice->jobOrder->rejection_reason = $request->reason;
             $invoice->jobOrder->save();
         }
 
-        // Get staff user ID
         $staffId = $invoice->staff_id ?? $invoice->user_id ?? 1;
 
-        // Create notification for staff
         $this->createNotification(
             Auth::id(),
             $staffId,
@@ -241,9 +417,12 @@ class AdminBillingController extends Controller
         return redirect()->back()->with('success', "Invoice {$invoice->number} has been rejected.");
     }
 
-    /**
-     * Send invoice email to client
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | SEND EMAIL
+    |--------------------------------------------------------------------------
+    */
+
     public function sendEmail($id)
     {
         $invoice = Invoice::findOrFail($id);
@@ -252,9 +431,6 @@ class AdminBillingController extends Controller
             return redirect()->back()->with('error', 'Only approved invoices can be sent to the client.');
         }
 
-        // TODO: Add actual email sending logic here
-        // Mail::to($invoice->client_email)->send(new \App\Mail\InvoiceMail($invoice));
-
         $invoice->sent_at = now();
         $invoice->sent_by = Auth::user()->name ?? Auth::user()->email;
         $invoice->save();
@@ -262,9 +438,12 @@ class AdminBillingController extends Controller
         return redirect()->back()->with('success', "Invoice {$invoice->number} has been sent to {$invoice->client}.");
     }
 
-    /**
-     * Mark notification as read
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | NOTIFICATIONS
+    |--------------------------------------------------------------------------
+    */
+
     public function markNotificationAsRead($id)
     {
         $notification = Notification::where('notifiable_type', 'App\\Models\\User')
@@ -278,20 +457,21 @@ class AdminBillingController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Mark all notifications as read
-     */
     public function markAllNotificationsAsRead()
     {
         Notification::where('notifiable_type', 'App\\Models\\User')
             ->where('notifiable_id', Auth::id())
             ->whereNull('read_at')
-            ->update([
-                'read_at' => now(),
-            ]);
+            ->update(['read_at' => now()]);
 
         return response()->json(['success' => true]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HELPERS
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * Generate unique invoice number
@@ -299,12 +479,13 @@ class AdminBillingController extends Controller
     private function generateInvoiceNumber()
     {
         $year = date('Y');
+
         $lastInvoice = Invoice::whereYear('created_at', $year)
             ->orderBy('id', 'desc')
             ->first();
 
-        if ($lastInvoice) {
-            $lastNumber = intval(substr($lastInvoice->number, -4));
+        if ($lastInvoice && preg_match('/-(\d+)$/', $lastInvoice->number, $matches)) {
+            $lastNumber = (int) $matches[1];
             $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
         } else {
             $newNumber = '0001';
@@ -314,7 +495,7 @@ class AdminBillingController extends Controller
     }
 
     /**
-     * Create a notification
+     * Create a notification (polymorphic)
      */
     private function createNotification($fromUserId, $toUserId, $title, $message, $type = 'info', $link = null)
     {
@@ -352,7 +533,6 @@ class AdminBillingController extends Controller
      */
     private function createPaymentRecord(Invoice $invoice)
     {
-        // Check if payment already exists for this invoice
         $existingPayment = Payment::where('invoice_id', $invoice->id)->first();
         if ($existingPayment) {
             return;
