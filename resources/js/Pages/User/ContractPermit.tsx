@@ -655,7 +655,7 @@ export default function ContractPermit({
                 createForm.reset();
                 showSuccess(
                     "Contract Created Successfully",
-                    `Contract created with ${count} document(s). You can now upload the signed contract and submit for Admin review.`,
+                    `Contract created with ${count} document(s). You can now email the template to the client, then upload the signed contract.`,
                 );
                 reloadContracts();
             },
@@ -704,7 +704,9 @@ export default function ContractPermit({
     const openUploadSigned = (contract: ContractPermit) => {
         if (!contract?.id) return;
         if (!isContractRecord(contract)) {
-            alert("Signed contract upload is only available for Contract records.");
+            alert(
+                "Signed contract upload is only available for Contract records.",
+            );
             return;
         }
         if (isArchivedRecord(contract)) {
@@ -725,8 +727,8 @@ export default function ContractPermit({
             return;
         }
 
-       uploadSignedForm.post(
-    `/contract-permit/${uploadSignedContract.id}/upload-signed-files`,
+        uploadSignedForm.post(
+            `/contract-permit/${uploadSignedContract.id}/upload-signed-files`,
             {
                 forceFormData: true,
                 preserveScroll: true,
@@ -735,7 +737,7 @@ export default function ContractPermit({
                     uploadSignedForm.reset();
                     showSuccess(
                         "Signed Contract Uploaded",
-                        "The signed contract has been uploaded. You can now email the client or submit for Admin review.",
+                        "The signed contract has been uploaded. You can now submit for Admin review or email the client.",
                     );
                     reloadContracts();
                 },
@@ -744,7 +746,7 @@ export default function ContractPermit({
     };
 
     /* =====================================================
-       ACTION HANDLERS
+       ✅ EMAIL CLIENT — FIXED (template o signed)
     ===================================================== */
 
     const openEmail = (contract: ContractPermit) => {
@@ -760,32 +762,44 @@ export default function ContractPermit({
             return;
         }
 
+        // ✅ Kailangan lang may contract file (template)
         if (getContractFileCount(contract) === 0) {
-            alert("Upload the Contract document first.");
-            return;
-        }
-
-        if (getSignedFileCount(contract) === 0) {
             alert(
-                "Upload the signed Contract first. Use the 'Upload Signed Contract' action in the 3-dot menu.",
+                "Upload the Contract document first. Use 'Create Contract' to upload the template.",
             );
             return;
         }
 
         const recipient = contract.client_email || contract.email || "";
+        const hasSigned = getSignedFileCount(contract) > 0;
+
         emailForm.clearErrors();
+
+        // ✅ DYNAMIC MESSAGE — kung may signed, signed ang message;
+        // kung wala, template ang message
+        const subject = hasSigned
+            ? `Signed Contract Agreement - ${getReference(contract)}`
+            : `Contract Agreement for Review - ${getReference(contract)}`;
+
+        const messageBody = hasSigned
+            ? `Dear ${getClient(contract)},\n\n` +
+              `Please find the signed Contract Agreement for ${getProject(contract)} attached to this email.\n\n` +
+              `Reference: ${getReference(contract)}\n\n` +
+              `Thank you.\n\n` +
+              `ALIBATON\nHeavy Equipment & Logistics`
+            : `Dear ${getClient(contract)},\n\n` +
+              `Please find the Contract Agreement for ${getProject(contract)} attached to this email.\n\n` +
+              `Kindly review the document and sign it. Once signed, please reply to this email with the signed copy attached.\n\n` +
+              `Reference: ${getReference(contract)}\n\n` +
+              `Thank you.\n\n` +
+              `ALIBATON\nHeavy Equipment & Logistics`;
+
         emailForm.setData({
             recipient_email: recipient,
-            subject: `Contract Agreement - ${getReference(contract)}`,
-            message:
-                `Dear ${getClient(contract)},\n\n` +
-                `Please find the signed Contract Agreement for ${getProject(
-                    contract,
-                )} attached to this email.\n\n` +
-                `Reference: ${getReference(contract)}\n\n` +
-                `Thank you.\n\n` +
-                `ALIBATON\nHeavy Equipment & Logistics`,
+            subject,
+            message: messageBody,
         });
+
         setEmailContract(contract);
     };
 
@@ -800,7 +814,7 @@ export default function ContractPermit({
                 emailForm.clearErrors();
                 showSuccess(
                     "Email Sent Successfully",
-                    "The signed Contract Agreement has been sent to the client.",
+                    "The Contract Agreement has been sent to the client.",
                 );
                 reloadContracts();
             },
@@ -844,7 +858,7 @@ export default function ContractPermit({
             );
             return;
         }
-           const message =
+        const message =
             workflow === "Needs Correction"
                 ? "The corrected record will be submitted to Admin for final review. Continue?"
                 : "Submit this record to Admin for final review?";
@@ -1702,9 +1716,8 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
 
                     const isContract = isContractRecord(contract);
 
-                    // ✅ Upload Signed — only for non-archived contracts WITHOUT signed file yet
-                    const canUploadSigned =
-                        isContract && !isArchived;
+                    // ✅ Upload Signed — only for non-archived contracts
+                    const canUploadSigned = isContract && !isArchived;
 
                     const canSubmitReview =
                         !isArchived &&
@@ -1713,9 +1726,10 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                         (workflow === "Pending" ||
                             workflow === "Needs Correction");
 
-                    // ✅ Email Client — only if signed file uploaded
+                    // ✅ Email Client — pwede kahit walang signed file,
+                    // kailangan lang may contract template
                     const canEmailClient =
-                        isContract && !isArchived && signedFileCount > 0;
+                        isContract && !isArchived && contractFileCount > 0;
 
                     const allContractFiles = contract.contract_files ?? [];
                     const allSignedFiles = contract.signed_files ?? [];
@@ -1761,6 +1775,27 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                             printContract(contract);
                                         }}
                                     />
+
+                                    {/* ✅ EMAIL CLIENT — pwede kahit walang signed file */}
+                                    {canEmailClient && (
+                                        <>
+                                            <div className="my-1 border-t border-slate-800" />
+                                            <MenuItem
+                                                icon={<Mail size={14} />}
+                                                label={
+                                                    signedFileCount > 0
+                                                        ? "Email Signed Contract"
+                                                        : "Email Template to Client"
+                                                }
+                                                onClick={() => {
+                                                    setOpenMenuId(null);
+                                                    setMenuPosition(null);
+                                                    openEmail(contract);
+                                                }}
+                                                highlight={signedFileCount === 0}
+                                            />
+                                        </>
+                                    )}
 
                                     {/* ✅ UPLOAD SIGNED CONTRACT — for Contract records */}
                                     {canUploadSigned && (
@@ -1850,23 +1885,6 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                 ))}
                                             </>
                                         )}
-
-                                    {/* ✅ EMAIL CLIENT — needs signed file */}
-                                    {canEmailClient && (
-                                        <>
-                                            <div className="my-1 border-t border-slate-800" />
-                                            <MenuItem
-                                                icon={<Mail size={14} />}
-                                                label="Email Client"
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    openEmail(contract);
-                                                }}
-                                                highlight
-                                            />
-                                        </>
-                                    )}
 
                                     {/* SUBMIT FOR REVIEW */}
                                     {canSubmitReview && (
@@ -2102,10 +2120,11 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 </strong>
                                 . After creation, use the 3-dot menu to{" "}
                                 <strong className="text-yellow-400">
-                                    Upload Signed Contract
+                                    Email the Template to Client
                                 </strong>
-                                , then submit for Admin review. The 90-day
-                                validity starts only when Admin approves.
+                                , then upload the signed contract and submit
+                                for Admin review. The 90-day validity starts
+                                only when Admin approves.
                             </p>
                         </div>
 
@@ -2360,8 +2379,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     <p className="mt-1 text-[11px] leading-5 text-zinc-400">
                                         Attach the contract that has been signed
                                         and returned by the client. This will
-                                        be attached when you email the client
-                                        and will be reviewed by Admin.
+                                        be reviewed by Admin.
                                     </p>
                                 </div>
                             </div>
@@ -2435,9 +2453,9 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             <p className="text-xs leading-5 text-zinc-500">
                                 After upload, you can{" "}
                                 <strong className="text-yellow-400">
-                                    Email Client
+                                    Email Signed Contract
                                 </strong>{" "}
-                                with the signed contract attached, or{" "}
+                                to the client, or{" "}
                                 <strong className="text-blue-400">
                                     Submit for Review
                                 </strong>{" "}
@@ -2801,11 +2819,19 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                 </Modal>
             )}
 
-            {/* EMAIL MODAL */}
+            {/* ✅ EMAIL MODAL — DYNAMIC */}
             {emailContract && isContractRecord(emailContract) && (
                 <Modal
-                    title="Send Contract Agreement"
-                    subtitle={`Send signed Contract Agreement for ${getReference(emailContract)}`}
+                    title={
+                        getSignedFileCount(emailContract) > 0
+                            ? "Send Signed Contract Agreement"
+                            : "Send Contract Template to Client"
+                    }
+                    subtitle={`${
+                        getSignedFileCount(emailContract) > 0
+                            ? "Send signed Contract Agreement"
+                            : "Send Contract Template for review and signature"
+                    } for ${getReference(emailContract)}`}
                     icon={<Mail size={20} />}
                     onClose={() => {
                         if (emailForm.processing) return;
@@ -2815,26 +2841,65 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                     }}
                 >
                     <form onSubmit={submitEmail} className="space-y-5">
-                        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.05] p-4">
+                        <div
+                            className={`rounded-2xl border p-4 ${
+                                getSignedFileCount(emailContract) > 0
+                                    ? "border-emerald-400/20 bg-emerald-400/[0.05]"
+                                    : "border-yellow-400/20 bg-yellow-400/[0.05]"
+                            }`}
+                        >
                             <div className="flex items-start gap-3">
                                 <Mail
                                     size={18}
-                                    className="mt-0.5 shrink-0 text-emerald-400"
+                                    className={`mt-0.5 shrink-0 ${
+                                        getSignedFileCount(emailContract) > 0
+                                            ? "text-emerald-400"
+                                            : "text-yellow-400"
+                                    }`}
                                 />
                                 <div>
-                                    <p className="text-xs font-black uppercase tracking-wider text-emerald-300">
-                                        Attached: Signed Contract
-                                    </p>
-                                    <p className="mt-1 text-[11px] leading-5 text-zinc-400">
-                                        The uploaded signed contract (
-                                        {getSignedFileCount(emailContract)}{" "}
-                                        file
-                                        {getSignedFileCount(emailContract) > 1
-                                            ? "s"
-                                            : ""}
-                                        ) will be attached to this email
-                                        automatically.
-                                    </p>
+                                    {getSignedFileCount(emailContract) > 0 ? (
+                                        <>
+                                            <p className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                                                Attached: Signed Contract
+                                            </p>
+                                            <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                                                The uploaded signed contract (
+                                                {getSignedFileCount(
+                                                    emailContract,
+                                                )}{" "}
+                                                file
+                                                {getSignedFileCount(
+                                                    emailContract,
+                                                ) > 1
+                                                    ? "s"
+                                                    : ""}
+                                                ) will be attached to this
+                                                email automatically.
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-xs font-black uppercase tracking-wider text-yellow-300">
+                                                Attached: Contract Template
+                                            </p>
+                                            <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                                                The contract template (
+                                                {getContractFileCount(
+                                                    emailContract,
+                                                )}{" "}
+                                                file
+                                                {getContractFileCount(
+                                                    emailContract,
+                                                ) > 1
+                                                    ? "s"
+                                                    : ""}
+                                                ) will be attached. The client
+                                                will review, sign, and send it
+                                                back via email.
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -2905,7 +2970,9 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 ) : (
                                     <>
                                         <Send size={16} />
-                                        Send with Signed Contract
+                                        {getSignedFileCount(emailContract) > 0
+                                            ? "Send Signed Contract"
+                                            : "Send Template to Client"}
                                     </>
                                 )}
                             </button>
