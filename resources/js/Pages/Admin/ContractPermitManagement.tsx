@@ -180,7 +180,6 @@ const getTitle = (record: ContractPermit): string =>
     record.type ||
     "Contract & Permit";
 
-/* ✅ UPDATED: Priority sa specific type */
 const getType = (record: ContractPermit): string => {
     if (
         record.contract_type &&
@@ -237,7 +236,6 @@ const isArchivedRecord = (record: ContractPermit): boolean =>
         String(record.status || "").toLowerCase() === "archived",
     );
 
-/* ✅ UPDATED: includes() check para sa specific types */
 const isContractRecord = (record: ContractPermit): boolean => {
     const type = String(getType(record)).toLowerCase();
     return type === "contract" || type.includes("contract");
@@ -247,9 +245,6 @@ const isPermitRecord = (record: ContractPermit): boolean => {
     const type = String(getType(record)).toLowerCase();
     return type === "permit" || type.includes("permit");
 };
-
-const requiresInvoiceApproval = (record: ContractPermit): boolean =>
-    isContractRecord(record);
 
 const getCorrectionReason = (record: ContractPermit): string =>
     record.correction_reason ||
@@ -271,6 +266,7 @@ const getSignedFileCount = (record: ContractPermit): number => {
     return record.signed_contract_path ? 1 : 0;
 };
 
+// ✅ UPDATED: Alisin ang invoice check
 const canApproveDirectly = (record: ContractPermit): boolean => {
     if (calculateStatus(record) !== "Submitted for Review") {
         return false;
@@ -285,7 +281,8 @@ const canApproveDirectly = (record: ContractPermit): boolean => {
     }
 
     if (isContractRecord(record)) {
-        if (!isInvoiceApproved(record)) return false;
+        // ✅ Alisin ang invoice check
+        // if (!isInvoiceApproved(record)) return false;
         if (getSignedFileCount(record) === 0) return false;
     }
 
@@ -382,11 +379,6 @@ const statusShortLabel = (status: ContractStatus): string => {
     }
 };
 
-const invoiceBadgeClasses = (approved: boolean): string =>
-    approved
-        ? "border-emerald-400/20 bg-emerald-400/[0.05] text-emerald-400"
-        : "border-yellow-400/20 bg-yellow-400/[0.05] text-yellow-400";
-
 const statusIcon = (status: ContractStatus): React.ReactNode => {
     switch (status) {
         case "Active":
@@ -460,7 +452,6 @@ export default function ContractPermit({
         null,
     );
 
-    // ✅ Custom confirm modal state
     const [confirmDialog, setConfirmDialog] = useState<{
         title: string;
         message: string;
@@ -475,9 +466,6 @@ export default function ContractPermit({
         description: string;
     } | null>(null);
 
-    const [approvingInvoice, setApprovingInvoice] = useState<number | null>(
-        null,
-    );
     const [reviewProcessing, setReviewProcessing] = useState<number | null>(
         null,
     );
@@ -543,8 +531,22 @@ export default function ContractPermit({
         };
     }, []);
 
+    // ✅ Auto-refresh with guards
     useEffect(() => {
         const interval = window.setInterval(() => {
+            const hasOpenModal =
+                selectedContract ||
+                editingRecord ||
+                deleteRecord ||
+                emailContract ||
+                confirmDialog;
+
+            const isBusy = reviewProcessing !== null;
+
+            if (hasOpenModal || isBusy || document.hidden) return;
+
+            const scrollY = window.scrollY;
+
             router.reload({
                 only: [
                     "contracts",
@@ -553,12 +555,25 @@ export default function ContractPermit({
                     "approvedInvoices",
                     "staff",
                 ],
-                preserveScroll: true,
-                preserveState: true,
-            } as any);
+                onSuccess: () => {
+                    window.requestAnimationFrame(() => {
+                        window.scrollTo({
+                            top: scrollY,
+                            behavior: "instant" as ScrollBehavior,
+                        });
+                    });
+                },
+            });
         }, 30000);
         return () => window.clearInterval(interval);
-    }, []);
+    }, [
+        selectedContract,
+        editingRecord,
+        deleteRecord,
+        emailContract,
+        confirmDialog,
+        reviewProcessing,
+    ]);
 
     const normalizedRecords = useMemo(() => {
         return records.map((record) => ({
@@ -683,7 +698,7 @@ export default function ContractPermit({
 
         const rect = button.getBoundingClientRect();
         const menuWidth = 240;
-        const menuHeight = 360;
+        const menuHeight = 420;
         const gap = 6;
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
@@ -709,8 +724,6 @@ export default function ContractPermit({
 
     const openEdit = (record: ContractPermit) => {
         if (isArchivedRecord(record)) return;
-        if (requiresInvoiceApproval(record) && !isInvoiceApproved(record))
-            return;
         if (calculateStatus(record) === "Submitted for Review") return;
 
         editForm.setData({
@@ -745,33 +758,11 @@ export default function ContractPermit({
         });
     };
 
-    const approveInvoice = (record: ContractPermit) => {
-        if (approvingInvoice === record.id) return;
-        setApprovingInvoice(record.id);
-        router.put(
-            `/admin/contracts/${record.id}/approve-invoice`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    showSuccess(
-                        "Invoice Approved Successfully",
-                        "The invoice is now approved. Staff can now upload the contract and signed contract.",
-                    );
-                    reloadContracts();
-                },
-                onFinish: () => {
-                    setApprovingInvoice(null);
-                },
-            },
-        );
-    };
-
+    // ✅ UPDATED: Alisin ang invoice check sa approveContract
     const approveContract = (record: ContractPermit) => {
         const isPermit = isPermitRecord(record);
 
         if (
-            (isContractRecord(record) && !isInvoiceApproved(record)) ||
             getContractFileCount(record) === 0 ||
             (!isPermit && getSignedFileCount(record) === 0)
         )
@@ -803,7 +794,7 @@ export default function ContractPermit({
                                 isPermit
                                     ? "Permit Approved Successfully"
                                     : "Contract Approved Successfully",
-                                `The ${isPermit ? "permit" : "contract"} is now Active for 90 days from today. Staff will now see it as APPROVED.`,
+                                `The ${isPermit ? "permit" : "contract"} is now Active for 90 days from today.`,
                             );
                             reloadContracts();
                         },
@@ -847,23 +838,18 @@ export default function ContractPermit({
         });
     };
 
-        /* =====================================================
-       RETURN FOR CORRECTION (ADMIN)
-    ===================================================== */
-
     const returnForCorrection = (record: ContractPermit) => {
         if (!record?.id) return;
 
         const isPermit = isPermitRecord(record);
         const recordType = isPermit ? "Permit" : "Contract";
 
-        // Prompt for correction reason
         const reason = window.prompt(
             `Return this ${recordType} for correction?\n\nPlease enter the reason (the staff will see this):`,
             "",
         );
 
-        if (reason === null) return; // user cancelled
+        if (reason === null) return;
 
         if (!reason.trim() || reason.trim().length < 5) {
             alert(
@@ -894,7 +880,7 @@ export default function ContractPermit({
                             setSelectedContract(null);
                             showSuccess(
                                 "Returned for Correction",
-                                `The ${recordType.toLowerCase()} has been returned to staff. They will be notified to make the corrections.`,
+                                `The ${recordType.toLowerCase()} has been returned to staff.`,
                             );
                             reloadContracts();
                         },
@@ -983,12 +969,13 @@ export default function ContractPermit({
             alert("Cannot email an archived contract.");
             return;
         }
-        if (!isInvoiceApproved(contract)) {
-            alert(
-                "Invoice must be approved by Admin before sending the Contract Agreement.",
-            );
-            return;
-        }
+
+        // ✅ Alisin ang invoice check
+        // if (!isInvoiceApproved(contract)) {
+        //     alert("Invoice must be approved...");
+        //     return;
+        // }
+
         const recipient = getClientEmail(contract);
         emailForm.clearErrors();
         emailForm.setData({
@@ -1045,10 +1032,6 @@ export default function ContractPermit({
         window.location.href = `/admin/contracts/files/${fileId}/download`;
     };
 
-    /* =====================================================
-       RENDER
-    ===================================================== */
-
     return (
         <AdminLayout>
             <Head title="Contract & Permit Management" />
@@ -1093,8 +1076,8 @@ export default function ContractPermit({
                             </h1>
                             <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
                                 Admin reviews and manages Contract and Permit
-                                records. Permits: verify + approve directly.
-                                Contracts: invoice + signed documents required.
+                                records. Approve to activate with 90-day
+                                validity.
                             </p>
                         </div>
                     </div>
@@ -1269,8 +1252,6 @@ export default function ContractPermit({
                                             const expiry =
                                                 getExpiryDate(contract);
                                             const remaining = daysUntil(expiry);
-                                            const invoiceApproved =
-                                                contract.invoiceApproved;
                                             const contractFileCount =
                                                 getContractFileCount(contract);
                                             const signedFileCount =
@@ -1425,29 +1406,6 @@ export default function ContractPermit({
                                                     </td>
 
                                                     <td className="px-3 py-4 text-center align-top">
-                                                        <span
-                                                            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${invoiceBadgeClasses(invoiceApproved)}`}
-                                                        >
-                                                            {invoiceApproved ? (
-                                                                <>
-                                                                    <CheckCircle2
-                                                                        size={
-                                                                            10
-                                                                        }
-                                                                    />
-                                                                    OK
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Clock3
-                                                                        size={
-                                                                            10
-                                                                        }
-                                                                    />
-                                                                    Pending
-                                                                </>
-                                                            )}
-                                                        </span>
                                                         <div className="mt-1.5 flex flex-col items-center gap-1">
                                                             <span
                                                                 className={`inline-flex items-center gap-1 text-[9px] font-bold ${
@@ -1573,7 +1531,6 @@ export default function ContractPermit({
 
                     const status = contract.calculatedStatus;
                     const isArchived = status === "Archived";
-                    const invoiceApproved = contract.invoiceApproved;
 
                     const isContract = isContractRecord(contract);
                     const isPermit = isPermitRecord(contract);
@@ -1619,6 +1576,52 @@ export default function ContractPermit({
                                             setSelectedContract(contract);
                                         }}
                                     />
+
+                                    {/* ✅ APPROVE — kung For Review */}
+                                    {!isArchived &&
+                                        status === "Submitted for Review" &&
+                                        canApproveDirectly(contract) && (
+                                            <>
+                                                <div className="my-1 border-t border-zinc-800" />
+                                                <MenuItem
+                                                    icon={
+                                                        <CheckCircle2
+                                                            size={14}
+                                                        />
+                                                    }
+                                                    label={
+                                                        isPermit
+                                                            ? "Approve Permit & Activate"
+                                                            : "Approve & Make Active"
+                                                    }
+                                                    highlight
+                                                    onClick={() => {
+                                                        setOpenMenuId(null);
+                                                        setMenuPosition(null);
+                                                        approveContract(
+                                                            contract,
+                                                        );
+                                                    }}
+                                                />
+                                            </>
+                                        )}
+
+                                    {/* ✅ RETURN FOR CORRECTION — kung For Review */}
+                                    {!isArchived &&
+                                        status === "Submitted for Review" && (
+                                            <MenuItem
+                                                icon={<XCircle size={14} />}
+                                                label="Return for Correction"
+                                                danger
+                                                onClick={() => {
+                                                    setOpenMenuId(null);
+                                                    setMenuPosition(null);
+                                                    returnForCorrection(
+                                                        contract,
+                                                    );
+                                                }}
+                                            />
+                                        )}
 
                                     {contract.contract_file_path &&
                                         contractFiles.length === 0 && (
@@ -1708,38 +1711,8 @@ export default function ContractPermit({
                                     )}
 
                                     {!isArchived &&
-                                        isContract &&
-                                        !invoiceApproved && (
-                                            <MenuItem
-                                                icon={
-                                                    <CheckCircle2 size={14} />
-                                                }
-                                                label="Approve Invoice"
-                                                highlight
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    approveInvoice(contract);
-                                                }}
-                                            />
-                                        )}
-
-                                        {!isArchived && status === "Submitted for Review" && (
-    <MenuItem
-        icon={<XCircle size={14} />}
-        label="Return for Correction"
-        danger
-        onClick={() => {
-            setOpenMenuId(null);
-            setMenuPosition(null);
-            returnForCorrection(contract);
-        }}
-    />
-)}
-
-                                    {!isArchived &&
-                                        (!isContract || invoiceApproved) &&
-                                        status !== "Submitted for Review" &&
+                                        (!isContract ||
+                                            status !== "Submitted for Review") &&
                                         status !== "Active" &&
                                         status !== "Expiring Soon" &&
                                         status !== "Expired" && (
@@ -1754,19 +1727,17 @@ export default function ContractPermit({
                                             />
                                         )}
 
-                                    {isContract &&
-                                        !isArchived &&
-                                        invoiceApproved && (
-                                            <MenuItem
-                                                icon={<Mail size={14} />}
-                                                label="Email Client"
-                                                onClick={() => {
-                                                    setOpenMenuId(null);
-                                                    setMenuPosition(null);
-                                                    openEmail(contract);
-                                                }}
-                                            />
-                                        )}
+                                    {isContract && !isArchived && (
+                                        <MenuItem
+                                            icon={<Mail size={14} />}
+                                            label="Email Client"
+                                            onClick={() => {
+                                                setOpenMenuId(null);
+                                                setMenuPosition(null);
+                                                openEmail(contract);
+                                            }}
+                                        />
+                                    )}
 
                                     <div className="my-1 border-t border-zinc-800" />
                                     {!isArchived ? (
@@ -1829,7 +1800,6 @@ export default function ContractPermit({
                                 }
                                 required
                             />
-                            {/* ✅ UPDATED: kumpletong options */}
                             <SelectInput
                                 label="Type"
                                 value={editForm.data.type}
@@ -1962,51 +1932,6 @@ export default function ContractPermit({
                             >
                                 {getType(selectedContract)}
                             </span>
-                            {isPermitRecord(selectedContract) ? (
-                                <span
-                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-wider ${
-                                        getContractFileCount(selectedContract) >
-                                        0
-                                            ? "border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-400"
-                                            : "border-red-400/20 bg-red-400/[0.06] text-red-400"
-                                    }`}
-                                >
-                                    {getContractFileCount(selectedContract) >
-                                    0 ? (
-                                        <>
-                                            <CheckCircle2 size={14} />
-                                            Permit Document
-                                            {getContractFileCount(
-                                                selectedContract,
-                                            ) > 1
-                                                ? "s"
-                                                : ""}{" "}
-                                            Attached
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Clock3 size={14} />
-                                            Permit Document Missing
-                                        </>
-                                    )}
-                                </span>
-                            ) : (
-                                <span
-                                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-wider ${invoiceBadgeClasses(isInvoiceApproved(selectedContract))}`}
-                                >
-                                    {isInvoiceApproved(selectedContract) ? (
-                                        <>
-                                            <CheckCircle2 size={14} />
-                                            Invoice Approved
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Clock3 size={14} />
-                                            Pending Invoice Approval
-                                        </>
-                                    )}
-                                </span>
-                            )}
                         </div>
 
                         {getCorrectionReason(selectedContract) && (
@@ -2051,27 +1976,6 @@ export default function ContractPermit({
                             </div>
                         )}
 
-                        {calculateStatus(selectedContract) === "Submitted for Review" && (
-    <button
-        type="button"
-        onClick={() => returnForCorrection(selectedContract)}
-        disabled={reviewProcessing === selectedContract.id}
-        className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-        {reviewProcessing === selectedContract.id ? (
-            <>
-                <RefreshCw size={16} className="animate-spin" />
-                Processing...
-            </>
-        ) : (
-            <>
-                <XCircle size={16} />
-                Return for Correction
-            </>
-        )}
-    </button>
-)}
-
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             <DetailBox
                                 label="Reference Number"
@@ -2081,16 +1985,6 @@ export default function ContractPermit({
                                 label="Status"
                                 value={calculateStatus(selectedContract)}
                             />
-                            {!isPermitRecord(selectedContract) && (
-                                <DetailBox
-                                    label="Invoice Status"
-                                    value={
-                                        isInvoiceApproved(selectedContract)
-                                            ? "Approved"
-                                            : "Pending Approval"
-                                    }
-                                />
-                            )}
                             <DetailBox
                                 label="Client"
                                 value={getClient(selectedContract)}
@@ -2270,16 +2164,6 @@ export default function ContractPermit({
                                     Admin Review Checklist
                                 </p>
                                 <div className="space-y-2">
-                                    {requiresInvoiceApproval(
-                                        selectedContract,
-                                    ) && (
-                                        <ReviewCheck
-                                            label="Invoice is approved"
-                                            passed={isInvoiceApproved(
-                                                selectedContract,
-                                            )}
-                                        />
-                                    )}
                                     {isPermitRecord(selectedContract) && (
                                         <ReviewCheck
                                             label={`Permit document attached (${getContractFileCount(selectedContract)} file${getContractFileCount(selectedContract) > 1 ? "s" : ""})`}
@@ -2330,29 +2214,6 @@ export default function ContractPermit({
                             </div>
                         )}
 
-                        {calculateStatus(selectedContract) ===
-                            "Submitted for Review" && (
-                            <div className="rounded-2xl border-2 border-emerald-400/30 bg-emerald-400/[0.05] p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-400">
-                                        <CheckCircle2 size={20} />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-black uppercase tracking-wider text-emerald-300">
-                                            {isPermitRecord(selectedContract)
-                                                ? "⚠️ Admin Verification Required"
-                                                : "⚠️ Admin Approval Required"}
-                                        </p>
-                                        <p className="mt-1 text-[11px] leading-5 text-zinc-400">
-                                            {isPermitRecord(selectedContract)
-                                                ? "Verify the attached permit document before approving it."
-                                                : "Check the invoice, contract documents, and signed contract before approving."}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         <div className="flex flex-wrap gap-2 border-t border-zinc-800 pt-5">
                             {calculateStatus(selectedContract) ===
                                 "Submitted for Review" &&
@@ -2390,40 +2251,38 @@ export default function ContractPermit({
                                     </button>
                                 )}
 
-                            {isContractRecord(selectedContract) &&
-                                !isInvoiceApproved(selectedContract) &&
-                                !isArchivedRecord(selectedContract) && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            approveInvoice(selectedContract)
-                                        }
-                                        disabled={
-                                            approvingInvoice ===
-                                            selectedContract.id
-                                        }
-                                        className="inline-flex items-center gap-2 rounded-xl border border-yellow-400/20 bg-yellow-400/[0.05] px-4 py-2.5 text-sm font-bold text-yellow-400 transition hover:bg-yellow-400/10 disabled:opacity-50"
-                                    >
-                                        {approvingInvoice ===
-                                        selectedContract.id ? (
-                                            <>
-                                                <RefreshCw
-                                                    size={16}
-                                                    className="animate-spin"
-                                                />
-                                                Approving...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CheckCircle2 size={16} />
-                                                Approve Invoice
-                                            </>
-                                        )}
-                                    </button>
-                                )}
+                            {calculateStatus(selectedContract) ===
+                                "Submitted for Review" && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        returnForCorrection(selectedContract)
+                                    }
+                                    disabled={
+                                        reviewProcessing ===
+                                        selectedContract.id
+                                    }
+                                    className="inline-flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {reviewProcessing ===
+                                    selectedContract.id ? (
+                                        <>
+                                            <RefreshCw
+                                                size={16}
+                                                className="animate-spin"
+                                            />
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <XCircle size={16} />
+                                            Return for Correction
+                                        </>
+                                    )}
+                                </button>
+                            )}
 
                             {isContractRecord(selectedContract) &&
-                                isInvoiceApproved(selectedContract) &&
                                 !isArchivedRecord(selectedContract) && (
                                     <button
                                         type="button"
@@ -2440,9 +2299,7 @@ export default function ContractPermit({
 
                             {!isArchivedRecord(selectedContract) &&
                                 calculateStatus(selectedContract) !==
-                                    "Submitted for Review" &&
-                                (!isContractRecord(selectedContract) ||
-                                    isInvoiceApproved(selectedContract)) && (
+                                    "Submitted for Review" && (
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -2643,7 +2500,7 @@ export default function ContractPermit({
                 </Modal>
             )}
 
-            {/* ✅ CUSTOM CONFIRM DIALOG */}
+            {/* CUSTOM CONFIRM DIALOG */}
             {confirmDialog && (
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
                     <div
@@ -2764,6 +2621,7 @@ export default function ContractPermit({
         </AdminLayout>
     );
 }
+
 // =========================================================
 // FILE ROW
 // =========================================================
