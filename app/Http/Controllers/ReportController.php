@@ -482,12 +482,17 @@ class ReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | VIEW SINGLE REPORT
+    | VIEW SINGLE REPORT — WITH OWNER CHECK
     |--------------------------------------------------------------------------
     */
 
     public function show(Report $report): JsonResponse
     {
+        // ✅ OWNER CHECK — sariling report lang pwedeng i-view
+        if ((int) $report->created_by !== (int) Auth::id()) {
+            abort(403, 'You can only view your own reports.');
+        }
+
         $content = $this->decodeContent($report->content);
 
         $client = $this->normalizeClient($report->client);
@@ -515,12 +520,17 @@ class ReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DOWNLOAD SAVED REPORT (JSON)
+    | DOWNLOAD SAVED REPORT — WITH OWNER CHECK
     |--------------------------------------------------------------------------
     */
 
     public function downloadSaved(Report $report)
     {
+        // ✅ OWNER CHECK — sariling report lang pwedeng i-download
+        if ((int) $report->created_by !== (int) Auth::id()) {
+            abort(403, 'You can only download your own reports.');
+        }
+
         $content = $this->decodeContent($report->content);
 
         $filename = $this->safeFilename($report->name) . '.json';
@@ -541,12 +551,17 @@ class ReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DELETE
+    | DELETE — WITH OWNER CHECK
     |--------------------------------------------------------------------------
     */
 
     public function destroy(Report $report): JsonResponse
     {
+        // ✅ OWNER CHECK — sariling report lang pwedeng i-delete
+        if ((int) $report->created_by !== (int) Auth::id()) {
+            abort(403, 'You can only delete your own reports.');
+        }
+
         $report->delete();
 
         return response()->json([
