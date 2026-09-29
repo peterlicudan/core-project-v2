@@ -796,7 +796,7 @@ export default function AdminSidebar({
                 >
                     <div className="space-y-1.5">
                         {/* ==================================================
-                            USER MANAGEMENT — SARADO SA SIMULA
+                            #1 — USER MANAGEMENT (dropdown)
                         ================================================== */}
 
                         <div>
@@ -936,7 +936,7 @@ export default function AdminSidebar({
                         </div>
 
                         {/* ==================================================
-                            DASHBOARD
+                            #2 — DASHBOARD
                         ================================================== */}
 
                         {renderMenuLink({
@@ -946,27 +946,17 @@ export default function AdminSidebar({
                         })}
 
                         {/* ==================================================
-                            DOCUMENTS & COMPLIANCE
+                            #3 — BILLING & INVOICING
                         ================================================== */}
 
                         {renderMenuLink({
-                            label: "Documents & Compliance",
-                            href: "/admin/documents-compliance",
-                            icon: FileText,
-                        })}
-
-                        {/* ==================================================
-                            BILLING MANAGEMENT
-                        ================================================== */}
-
-                        {renderMenuLink({
-                            label: "Billing Management",
+                            label: "Billing & Invoicing",
                             href: "/admin/billing",
                             icon: Receipt,
                         })}
 
                         {/* ==================================================
-                            PAYMENT MANAGEMENT
+                            #4 — PAYMENT MANAGEMENT
                         ================================================== */}
 
                         {renderMenuLink({
@@ -976,17 +966,27 @@ export default function AdminSidebar({
                         })}
 
                         {/* ==================================================
-                            CONTRACTS & PERMITS
+                            #5 — CONTRACT & PERMIT MANAGEMENT
                         ================================================== */}
 
                         {renderMenuLink({
-                            label: "Contracts & Permits",
+                            label: "Contract & Permit Management",
                             href: "/admin/contracts",
                             icon: FileCheck2,
                         })}
 
                         {/* ==================================================
-                            ANALYTICS — SARADO SA SIMULA
+                            #6 — DOCUMENTS & REGULATORY COMPLIANCE
+                        ================================================== */}
+
+                        {renderMenuLink({
+                            label: "Documents & Regulatory Compliance",
+                            href: "/admin/documents-compliance",
+                            icon: FileText,
+                        })}
+
+                        {/* ==================================================
+                            #7 — ANALYTICS (dropdown)
                         ================================================== */}
 
                         <div>
@@ -1128,7 +1128,7 @@ export default function AdminSidebar({
                         </div>
 
                         {/* ==================================================
-                            SETTINGS
+                            #8 — SETTINGS
                         ================================================== */}
 
                         {renderMenuLink({
