@@ -24,7 +24,7 @@ return Application::configure(
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
-            \App\Http\Middleware\CheckIdleSession::class,  // 👈 BAGO
+            // ✅ INALIS ang CheckIdleSession dito — hindi na global
         ]);
 
 
@@ -43,12 +43,19 @@ return Application::configure(
         | Requires staff users to successfully enter their
         | authentication PIN before accessing staff routes.
         |
+        | check.idle
+        | ----------
+        | Auto-logout after 10 minutes of inactivity.
+        | Applied only to authenticated route groups.
+        |
         */
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
 
             'login.pin' => \App\Http\Middleware\EnsureLoginPinVerified::class,
+
+            'check.idle' => \App\Http\Middleware\CheckIdleSession::class,
         ]);
     })
 

@@ -352,6 +352,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware([
     'auth',
+    'check.idle',
     'admin',
 ])
     ->prefix('admin')
@@ -1541,6 +1542,7 @@ Route::post('/logout', [
 
 Route::middleware([
     'auth',
+    'check.idle',
     'login.pin',
 ])->group(function () {
 
