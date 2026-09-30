@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { Head, router, useForm, usePage } from "@inertiajs/react";
 import {
     Mail,
@@ -60,6 +60,20 @@ export default function VerifyOtp() {
     const { data, setData, post, processing, reset } = useForm({
         otp: "",
     });
+
+    /*
+    |--------------------------------------------------------------------------
+    | OTP DIGITS — one input box per number
+    |--------------------------------------------------------------------------
+    */
+
+    const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
+
+    const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+    useEffect(() => {
+        inputRefs.current[0]?.focus();
+    }, []);
 
     /*
     |--------------------------------------------------------------------------
@@ -175,9 +189,68 @@ export default function VerifyOtp() {
     |--------------------------------------------------------------------------
     */
 
-    const handleOtpChange = (value: string) => {
-        const numericValue = value.replace(/\D/g, "").slice(0, 6);
-        setData("otp", numericValue);
+    const handleOtpChange = (index: number, value: string) => {
+        if (!/^\d*$/.test(value)) {
+            return;
+        }
+
+        const newDigits = [...digits];
+
+        if (value.length > 1) {
+            const chars = value.split("").slice(0, 6 - index);
+
+            chars.forEach((char, i) => {
+                if (index + i < 6) {
+                    newDigits[index + i] = char;
+                }
+            });
+
+            setDigits(newDigits);
+            setData("otp", newDigits.join(""));
+
+            inputRefs.current[Math.min(index + chars.length, 5)]?.focus();
+
+            return;
+        }
+
+        newDigits[index] = value;
+        setDigits(newDigits);
+        setData("otp", newDigits.join(""));
+
+        if (value && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleOtpKeyDown = (
+        index: number,
+        event: React.KeyboardEvent<HTMLInputElement>,
+    ) => {
+        if (event.key === "Backspace") {
+            event.preventDefault();
+
+            const newDigits = [...digits];
+
+            if (digits[index]) {
+                newDigits[index] = "";
+            } else if (index > 0) {
+                newDigits[index - 1] = "";
+                inputRefs.current[index - 1]?.focus();
+            }
+
+            setDigits(newDigits);
+            setData("otp", newDigits.join(""));
+
+            return;
+        }
+
+        if (event.key === "ArrowLeft" && index > 0) {
+            inputRefs.current[index - 1]?.focus();
+        }
+
+        if (event.key === "ArrowRight" && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
     };
 
     /*
@@ -223,7 +296,9 @@ export default function VerifyOtp() {
                 onSuccess: () => {
                     setTimeLeft(300);
                     setAttempts(3);
+                    setDigits(["", "", "", "", "", ""]);
                     reset("otp");
+                    inputRefs.current[0]?.focus();
 
                     const nextCount = resendCount + 1;
                     const nextCooldown = Math.min(30 * nextCount, 120);
@@ -405,24 +480,43 @@ export default function VerifyOtp() {
                                         Enter 6-digit verification code
                                     </label>
 
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        autoComplete="one-time-code"
-                                        value={data.otp}
-                                        onChange={(event) =>
-                                            handleOtpChange(event.target.value)
-                                        }
-                                        maxLength={6}
-                                        autoFocus
-                                        disabled={attempts === 0}
-                                        placeholder="000000"
-                                        className={`w-full rounded-2xl border bg-white/5 px-4 py-5 text-center text-3xl font-bold tracking-[0.5em] text-white outline-none transition placeholder:text-white/10 disabled:cursor-not-allowed disabled:opacity-50 ${
-                                            data.otp.length === 6
-                                                ? "border-green-400/50"
-                                                : "border-white/10 focus:border-yellow-400/50"
-                                        }`}
-                                    />
+                                    <div className="flex justify-between gap-2">
+                                        {digits.map((digit, index) => (
+                                            <input
+                                                key={index}
+                                                ref={(el) => {
+                                                    inputRefs.current[index] = el;
+                                                }}
+                                                type="text"
+                                                inputMode="numeric"
+                                                maxLength={6}
+                                                value={digit}
+                                                onChange={(event) =>
+                                                    handleOtpChange(
+                                                        index,
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                onKeyDown={(event) =>
+                                                    handleOtpKeyDown(index, event)
+                                                }
+                                                onFocus={(event) =>
+                                                    event.target.select()
+                                                }
+                                                autoComplete={
+                                                    index === 0
+                                                        ? "one-time-code"
+                                                        : "off"
+                                                }
+                                                disabled={attempts === 0}
+                                                className={`h-14 w-full rounded-xl border bg-black/40 text-center text-2xl font-black text-white outline-none transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                                    data.otp.length === 6
+                                                        ? "border-green-400/50"
+                                                        : "border-white/10 focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
+                                                }`}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
 
                                 {/* TIMER */}

@@ -64,14 +64,24 @@ class AdminAuthController extends Controller
         }
 
         // Generate OTP
-        $this->generateOtp($user);
+        if (config('admin_otp.enabled')) {
+            $this->generateOtp($user);
 
-        // Save user_id sa session para sa OTP verification step
-        $request->session()->put('otp_user_id', $user->id);
-        $request->session()->put('otp_remember', $request->boolean('remember'));
+            // Save user_id sa session para sa OTP verification step
+            $request->session()->put('otp_user_id', $user->id);
+            $request->session()->put('otp_remember', $request->boolean('remember'));
 
-        // Redirect sa OTP verification page
-        return redirect()->route('admin.otp.show');
+            // Redirect sa OTP verification page
+            return redirect()->route('admin.otp.show');
+        }
+
+        Auth::login($user, $request->boolean('remember'));
+
+        $request->session()->regenerate();
+
+        $user->update(['last_login_at' => now()]);
+
+        return redirect()->route('admin.dashboard');
     }
 
     /**
