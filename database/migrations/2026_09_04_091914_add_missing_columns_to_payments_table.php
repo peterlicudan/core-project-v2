@@ -59,19 +59,14 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('payments', function (Blueprint $table) {
-            $table->dropColumn([
-                'invoice_number',
-                'client',
-                'amount',
-                'status',
-                'due_date',
-                'payment_date',
-                'receipt_number',
-                'receipt',
-                'payment_method',
-                'notes',
-                'archived',
-            ]);
+            $columns = array_values(array_filter(
+                ['client', 'receipt'],
+                fn (string $column) => Schema::hasColumn('payments', $column)
+            ));
+
+            if ($columns !== []) {
+                $table->dropColumn($columns);
+            }
         });
     }
 };

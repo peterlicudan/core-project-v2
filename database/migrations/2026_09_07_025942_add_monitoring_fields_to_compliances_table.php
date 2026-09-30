@@ -82,6 +82,14 @@ return new class extends Migration
             $table->dropForeign(['reviewed_by']);
             $table->dropForeign(['archived_by']);
 
+            // Drop indexes before columns, otherwise PostgreSQL drops them
+            // implicitly and the explicit drops below fail.
+            $table->dropIndex(['priority']);
+            $table->dropIndex(['monitoring_status']);
+            $table->dropIndex(['last_reviewed_at']);
+            $table->dropIndex(['archived_at']);
+            $table->dropIndex(['reminder_sent_at']);
+
             // Drop columns
             $table->dropColumn([
                 // Regulatory
@@ -108,13 +116,6 @@ return new class extends Migration
                 'archived_at',
                 'archived_by',
             ]);
-
-            // Drop indexes
-            $table->dropIndex(['priority']);
-            $table->dropIndex(['monitoring_status']);
-            $table->dropIndex(['last_reviewed_at']);
-            $table->dropIndex(['archived_at']);
-            $table->dropIndex(['reminder_sent_at']);
         });
     }
 };

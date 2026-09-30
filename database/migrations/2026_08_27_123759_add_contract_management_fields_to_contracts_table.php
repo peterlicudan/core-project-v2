@@ -9,47 +9,39 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('contracts', function (Blueprint $table) {
-            $table->string('location')
-                ->nullable()
-                ->after('project');
+            if (! Schema::hasColumn('contracts', 'location')) {
+                $table->string('location')->nullable();
+            }
 
-            $table->string('type')
-                ->default('Contract')
-                ->after('location');
+            if (! Schema::hasColumn('contracts', 'type')) {
+                $table->string('type')->default('Contract');
+            }
 
-            $table->string('contract_type')
-                ->nullable()
-                ->after('type');
+            if (! Schema::hasColumn('contracts', 'contract_type')) {
+                $table->string('contract_type')->nullable();
+            }
 
-            $table->string('equipment')
-                ->nullable()
-                ->after('contract_type');
+            if (! Schema::hasColumn('contracts', 'equipment')) {
+                $table->string('equipment')->nullable();
+            }
 
-            $table->unsignedInteger('documents')
-                ->default(0)
-                ->after('status');
+            if (! Schema::hasColumn('contracts', 'documents')) {
+                $table->unsignedInteger('documents')->default(0);
+            }
 
-            $table->text('rejection_reason')
-                ->nullable()
-                ->after('description');
-
-            $table->index('type');
+            if (! Schema::hasColumn('contracts', 'rejection_reason')) {
+                $table->text('rejection_reason')->nullable();
+            }
         });
+
+        if (! Schema::hasIndex('contracts', ['type'])) {
+            Schema::table('contracts', function (Blueprint $table) {
+                $table->index('type');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('contracts', function (Blueprint $table) {
-            $table->dropIndex(['type']);
-
-            $table->dropColumn([
-                'location',
-                'type',
-                'contract_type',
-                'equipment',
-                'documents',
-                'rejection_reason',
-            ]);
-        });
     }
 };

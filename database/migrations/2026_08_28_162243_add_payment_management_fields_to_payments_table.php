@@ -72,48 +72,5 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('payments', function (Blueprint $table) {
-
-            /*
-            |--------------------------------------------------------------------------
-            | DROP FOREIGN KEYS FIRST
-            |--------------------------------------------------------------------------
-            */
-
-            if (Schema::hasColumn('payments', 'edited_by')) {
-                $table->dropForeign(['edited_by']);
-            }
-
-            if (Schema::hasColumn('payments', 'updated_by')) {
-                $table->dropForeign(['updated_by']);
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | DROP COLUMNS
-            |--------------------------------------------------------------------------
-            */
-
-            $columns = [];
-
-            foreach ([
-                'partial_date',
-                'archived',
-                'archived_at',
-                'archive_expires_at',
-                'delete_after',
-                'edited_by',
-                'edited_at',
-                'updated_by',
-            ] as $column) {
-                if (Schema::hasColumn('payments', $column)) {
-                    $columns[] = $column;
-                }
-            }
-
-            if (!empty($columns)) {
-                $table->dropColumn($columns);
-            }
-        });
     }
 };

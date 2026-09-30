@@ -18,6 +18,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasColumn('payments', 'invoice_number')) {
+            return;
+        }
+
         Schema::table('payments', function (Blueprint $table) {
             $table->dropColumn('invoice_number');
         });
