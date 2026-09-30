@@ -5,6 +5,7 @@ import IdleWarningModal from "../Components/IdleWarningModal";
 import AdminNotificationBell from "../Components/Admin/AdminNotificationBell";
 
 import { useIdleLogout } from "../Hooks/useIdleLogout";
+import useScreenActivity from "../Hooks/useScreenActivity";
 
 type AdminLayoutProps = {
     children: ReactNode;
@@ -19,25 +20,28 @@ export default function AdminLayout({
 
     /*
     |--------------------------------------------------------------------------
-    | IDLE LOGOUT — 5 MINUTES
+    | IDLE LOGOUT — 3 MINUTES
     |--------------------------------------------------------------------------
     |
-    | Admin will be logged out after 5 minutes of inactivity.
+    | Primary idle timer. Understands real typing and clicking.
     |
-    | Warning appears during the last 1 minute.
+    | 2:00  → Warning appears
+    | 2:00–3:00 → 60 second countdown
+    | 3:00 → Automatic logout
     |
-    | 4:00  → Warning appears
-    | 4:00–5:00 → 60 second countdown
-    | 5:00 → Automatic logout
+    | The server-side CheckIdleSession runs at 4 minutes as a backstop, so
+    | it never pre-empts this warning.
     |
     */
 
     const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
-        timeout: 5 * 60 * 1000,
+        timeout: 3 * 60 * 1000,
         warningDuration: 1 * 60 * 1000,
         logoutUrl: "/admin/logout",
         redirectUrl: "/admin/login",
     });
+
+    useScreenActivity();
 
     return (
         <>

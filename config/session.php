@@ -34,7 +34,37 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 120),
 
-    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
+    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Idle Timeout
+    |--------------------------------------------------------------------------
+    |
+    | Seconds of genuine user inactivity before the session is destroyed.
+    | Enforced by App\Http\Middleware\CheckIdleSession, which ignores
+    | background keep-alive requests such as the staff heartbeat.
+    |
+    | This is a backstop only. The primary idle timer is the client-side
+    | useIdleLogout hook, which understands real typing and clicking and
+    | shows a warning first. Keep this value higher than that timeout so the
+    | server never pre-empts the warning modal.
+    |
+    */
+
+    'idle_timeout' => (int) env('SESSION_IDLE_TIMEOUT', 240),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Maximum Session Lifetime
+    |--------------------------------------------------------------------------
+    |
+    | Hard cap on a single login, in seconds, regardless of activity.
+    | Set to 0 to disable the absolute limit.
+    |
+    */
+
+    'max_lifetime' => (int) env('SESSION_MAX_LIFETIME', 28800),
 
     /*
     |--------------------------------------------------------------------------

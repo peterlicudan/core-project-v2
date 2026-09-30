@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -507,6 +508,24 @@ class AuthenticatedSessionController extends Controller
             'success',
             'A new authentication PIN has been sent to your email address.'
         );
+    }
+
+    /**
+     * Refresh the idle timer after genuine on-screen interaction.
+     *
+     * The server cannot observe typing or mouse movement directly, so the
+     * client reports activity here. Without this, a user working inside a
+     * long form would be logged out while still actively working.
+     */
+    public function activity(Request $request): JsonResponse
+    {
+        if (! Auth::check()) {
+            abort(401);
+        }
+
+        $request->session()->put('last_activity_at', time());
+
+        return response()->json(['ok' => true]);
     }
 
     /**

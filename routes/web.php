@@ -2572,6 +2572,21 @@ Route::middleware([
         'heartbeat',
     ])->name('staff.heartbeat');
 
+    /*
+    |--------------------------------------------------------------------------
+    | SCREEN ACTIVITY
+    |--------------------------------------------------------------------------
+    |
+    | Reports genuine typing/clicking so the idle timer in
+    | CheckIdleSession does not expire while a user is still working.
+    |
+    */
+
+    Route::post('/session/activity', [
+        AuthenticatedSessionController::class,
+        'activity',
+    ])->name('session.activity');
+
 
     /*
     |--------------------------------------------------------------------------

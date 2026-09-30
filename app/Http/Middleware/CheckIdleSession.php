@@ -10,9 +10,13 @@ use Symfony\Component\HttpFoundation\Response;
 class CheckIdleSession
 {
     /**
-     * Idle timeout in seconds (10 minutes).
+     * Background keep-alive calls must not count as user activity,
+     * otherwise an idle tab with the page open never times out.
      */
-    protected int $timeout = 10 * 60;
+    private const NON_ACTIVITY_ROUTES = [
+        'staff.heartbeat',
+        'admin.notifications.list',
+    ];
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -32,12 +36,18 @@ class CheckIdleSession
                 return $next($request);
             }
 
-            $lastActivity = session('last_activity_at');
+            $now = time();
+            $startedAt = (int) session('session_started_at', $now);
 
-            if (
-                $lastActivity
-                && (time() - $lastActivity) > $this->timeout
-            ) {
+            session(['session_started_at' => $startedAt]);
+
+            $lastActivity = (int) session('last_activity_at', $startedAt);
+
+            $idleExpired = ($now - $lastActivity) > $this->idleTimeout();
+            $absoluteExpired = $this->maxLifetime() > 0
+                && ($now - $startedAt) > $this->maxLifetime();
+
+            if ($idleExpired || $absoluteExpired) {
                 /*
                 |--------------------------------------------------------------------------
                 | Determine login route based on user role
@@ -66,27 +76,46 @@ class CheckIdleSession
 
                 $loginRoute = $isAdmin ? 'admin.login' : 'login';
 
-                if ($request->header('X-Inertia')) {
-                    return redirect()->route($loginRoute);
-                }
+                $reason = $absoluteExpired
+                    ? 'Your session has reached its maximum length. Please sign in again.'
+                    : 'You have been logged out due to inactivity.';
 
                 return redirect()
                     ->route($loginRoute)
-                    ->with(
-                        'error',
-                        'You have been logged out due to inactivity.'
-                    );
+                    ->with('error', $reason);
             }
 
             /*
             |--------------------------------------------------------------------------
             | Update last activity timestamp
             |--------------------------------------------------------------------------
+            |
+            | Background keep-alive requests (e.g. the staff heartbeat) are
+            | deliberately excluded so an idle browser tab still times out.
+            |
             */
 
-            session(['last_activity_at' => time()]);
+            if (! in_array($request->route()?->getName(), self::NON_ACTIVITY_ROUTES, true)) {
+                session(['last_activity_at' => $now]);
+            }
         }
 
         return $next($request);
+    }
+
+    /**
+     * Idle timeout in seconds.
+     */
+    private function idleTimeout(): int
+    {
+        return (int) config('session.idle_timeout', 240);
+    }
+
+    /**
+     * Maximum session length in seconds, regardless of activity.
+     */
+    private function maxLifetime(): int
+    {
+        return (int) config('session.max_lifetime', 28800);
     }
 }

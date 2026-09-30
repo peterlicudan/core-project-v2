@@ -8,6 +8,7 @@ import UserHeader from "../Components/UserHeader";
 import IdleWarningModal from "../Components/IdleWarningModal";
 import PaymentNotification from "../Components/PaymentNotification";
 import { useIdleLogout } from "../Hooks/useIdleLogout";
+import useScreenActivity from "../Hooks/useScreenActivity";
 
 
 
@@ -39,16 +40,28 @@ export default function UserLayout({
 
     /*
     |--------------------------------------------------------------------------
-    | IDLE LOGOUT (5 minutes)
+    | IDLE LOGOUT (3 minutes, 1 minute warning)
+    |--------------------------------------------------------------------------
+    |
+    | Primary idle timer. Understands real typing and clicking, so a user
+    | working inside a long form is not logged out.
+    |
+    */
+
+    const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
+        timeout: 3 * 60 * 1000,
+        warningDuration: 1 * 60 * 1000,
+        logoutUrl: "/logout",
+        redirectUrl: "/login",
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | SCREEN ACTIVITY — keeps the server-side backstop informed
     |--------------------------------------------------------------------------
     */
 
-const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
-    timeout: 10 * 60 * 1000, // 10 minutes idle
-    warningDuration: 1 * 60 * 1000, // 1 minute warning
-    logoutUrl: "/logout",
-    redirectUrl: "/login",
-});
+    useScreenActivity();
 
     useEffect(() => {
         /*
