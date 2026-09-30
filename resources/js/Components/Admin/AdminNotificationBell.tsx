@@ -140,7 +140,14 @@ export default function AdminNotificationBell() {
             credentials: "same-origin",
         })
             .then((res) => {
+                if (res.status === 401) {
+                    window.location.href = "/admin/login";
+
+                    throw new Error("Session expired");
+                }
+
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
                 return res.json();
             })
             .then((data) => {

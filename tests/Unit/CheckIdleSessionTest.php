@@ -163,6 +163,26 @@ class CheckIdleSessionTest extends TestCase
     }
 
     /** @test */
+    public function it_returns_401_for_xhr_requests_instead_of_redirecting(): void
+    {
+        $request = $this->makeRequest([
+            'last_activity_at' => time() - 300,
+            'session_started_at' => time() - 300,
+        ]);
+
+        $request->headers->set('X-Requested-With', 'XMLHttpRequest');
+
+        $response = (new CheckIdleSession())->handle($request, fn () => response('OK'));
+
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertNull($response->headers->get('Location'));
+        $this->assertStringContainsString(
+            'inactivity',
+            $response->getContent() ?: '',
+        );
+    }
+
+    /** @test */
     public function it_skips_guests(): void
     {
         $request = $this->makeRequest([], null, true);

@@ -217,11 +217,6 @@ export default function PaymentNotification() {
 
     const link = getSafeValue(data, "link");
 
-    console.log("=== NOTIFICATION CLICK ===");
-    console.log("Notification:", notif);
-    console.log("Parsed data:", data);
-    console.log("Job Order ID:", jobOrderId);
-
     if (typeof redirectUrl === "string" && redirectUrl) {
         setShowDropdown(false);
         router.visit(redirectUrl);

@@ -80,6 +80,16 @@ class CheckIdleSession
                     ? 'Your session has reached its maximum length. Please sign in again.'
                     : 'You have been logged out due to inactivity.';
 
+                /*
+                | Background pollers cannot follow a redirect usefully: fetch()
+                | would silently swallow it and parse the login page as JSON.
+                | Return 401 so the client can actually send the user to login.
+                */
+
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json(['message' => $reason], 401);
+                }
+
                 return redirect()
                     ->route($loginRoute)
                     ->with('error', $reason);

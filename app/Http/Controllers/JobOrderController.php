@@ -223,30 +223,23 @@ class JobOrderController extends Controller
                             'link' => '/billing-invoicing',
                             'from_user_id' => $createdBy->id,
 
-                            // ✅ ENHANCED DATA para sa auto-open
+                            /*
+                            | Only enough to route the user to the right record.
+                            | Client email, amount and the "changes" diff are
+                            | deliberately excluded: this payload is written once
+                            | per staff member, so anything added here is copied
+                            | to every staff account and persisted in the
+                            | notifications table. The billing page already loads
+                            | the full job order from the server.
+                            */
+
                             'job_order_id' => $jobOrder->id,
                             'job_order_number' => $jobOrder->number,
                             'client' => $jobOrder->client,
-                            'client_email' => $jobOrder->client_email,
                             'project' => $jobOrder->project,
-                            'amount' => (float) $jobOrder->amount,
                             'status' => $jobOrder->status,
                             'submitted_by' => $createdBy->name,
                             'redirect_url' => "/billing-invoicing?job_order_id={$jobOrder->id}",
-                            'changes' => [
-                                'job_order' => [
-                                    'from' => null,
-                                    'to' => $jobOrder->number,
-                                ],
-                                'client' => [
-                                    'from' => null,
-                                    'to' => $jobOrder->client,
-                                ],
-                                'amount' => [
-                                    'from' => null,
-                                    'to' => (float) $jobOrder->amount,
-                                ],
-                            ],
                         ]),
                         'read_at' => null,
                     ]);

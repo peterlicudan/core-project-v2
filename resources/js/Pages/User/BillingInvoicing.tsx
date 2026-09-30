@@ -638,10 +638,6 @@ export default function BillingInvoicing() {
 
             // Clear URL param (para hindi mag-loop)
             window.history.replaceState({}, "", "/billing-invoicing");
-
-            console.log("✅ Auto-opened Job Order:", target.number);
-        } else {
-            console.warn("⚠️ Job Order not found for ID:", jobOrderIdFromUrl);
         }
     }, [url, jobOrders]);
 
