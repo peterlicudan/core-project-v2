@@ -109,7 +109,7 @@ export default function Sidebar() {
             href: "/billing-invoicing",
         },
         {
-            name: "Payment Management",
+            name: "Records and Payment Management",
             icon: CreditCard,
             href: "/payment-management",
         },
