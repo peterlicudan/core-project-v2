@@ -59,6 +59,7 @@ type DocumentAttachment = {
     file_size?: number | null;
     formatted_file_size?: string | null;
     is_primary?: boolean;
+    file_exists?: boolean;
 };
 
 type DocumentRecord = {
@@ -105,6 +106,7 @@ type DocumentRecord = {
     attachment_count?: number;
     is_deleted?: boolean;
     deleted_at?: string | null;
+    file_exists?: boolean;
 };
 
 type DocumentAccessRequest = {
@@ -3319,7 +3321,19 @@ function DocumentViewModal({
                         )}
 
                         <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black">
-                            {activeFile.mime_type === "application/pdf" ||
+                            {activeFile.file_exists === false ? (
+                                <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center bg-gray-50 dark:bg-black/40">
+                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 mb-3">
+                                        <AlertTriangle size={30} />
+                                    </div>
+                                    <p className="font-bold text-gray-900 dark:text-white">
+                                        File Not Found on Server
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400 max-w-sm">
+                                        The record for <span className="font-semibold">{activeFile.file_name}</span> exists in the database, but the physical file is not in server storage.
+                                    </p>
+                                </div>
+                            ) : activeFile.mime_type === "application/pdf" ||
                             activeFile.file_name
                                 ?.toLowerCase()
                                 .endsWith(".pdf") ? (

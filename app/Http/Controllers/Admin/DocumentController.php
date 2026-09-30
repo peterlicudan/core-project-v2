@@ -105,7 +105,7 @@ class DocumentController extends Controller
     {
         $fileUrl = null;
         if (!empty($document->file_path)) {
-            $fileUrl = asset('storage/' . ltrim($document->file_path, '/'));
+            $fileUrl = route('documents.view', ['document' => $document->id]);
         }
 
         $downloadUrl = route('admin.documents.download', [
@@ -118,7 +118,10 @@ class DocumentController extends Controller
                     'id' => $att->id,
                     'file_name' => $att->file_name,
                     'file_path' => $att->file_path,
-                    'file_url' => asset('storage/' . ltrim($att->file_path, '/')),
+                    'file_url' => route('documents.view-attachment', [
+                        'document' => $att->document_id,
+                        'attachment' => $att->id,
+                    ]),
                     'download_url' => route('admin.documents.download-attachment', [
                         'document' => $att->document_id,
                         'attachment' => $att->id,
@@ -127,6 +130,7 @@ class DocumentController extends Controller
                     'file_size' => $att->file_size,
                     'formatted_file_size' => $att->formatted_file_size,
                     'is_primary' => (bool) $att->is_primary,
+                    'file_exists' => $att->fileExists(),
                 ];
             })
             ->values()
@@ -139,6 +143,7 @@ class DocumentController extends Controller
             'file_path' => $document->file_path,
             'file_url' => $fileUrl,
             'download_url' => $downloadUrl,
+            'file_exists' => $document->fileExists(),
             'assigned_to' => $document->assigned_to,
             'assigned_name' => $document->assignee?->name,
             'assigned_email' => $document->assignee?->email,
@@ -532,13 +537,15 @@ class DocumentController extends Controller
             return back()->with('error', 'This document does not have a file attached.');
         }
 
-        if (!Storage::disk('public')->exists($document->file_path)) {
+        $filePath = $document->getResolvedFilePath();
+
+        if (!$filePath || !file_exists($filePath)) {
             return back()->with('error', 'The requested document file could not be found.');
         }
 
         return response()->download(
-            Storage::disk('public')->path($document->file_path),
-            $document->file_name
+            $filePath,
+            $document->file_name ?: basename($filePath)
         );
     }
 
@@ -564,13 +571,15 @@ class DocumentController extends Controller
             }
         }
 
-        if (!Storage::disk('public')->exists($attachment->file_path)) {
+        $filePath = $attachment->getResolvedFilePath();
+
+        if (!$filePath || !file_exists($filePath)) {
             return back()->with('error', 'The requested file could not be found.');
         }
 
         return response()->download(
-            Storage::disk('public')->path($attachment->file_path),
-            $attachment->file_name
+            $filePath,
+            $attachment->file_name ?: basename($filePath)
         );
     }
 

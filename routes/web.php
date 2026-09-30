@@ -2841,6 +2841,30 @@ Route::get('/documents', function () {
     */
 
     Route::get(
+        '/documents/{document}/view',
+        [
+            DocumentController::class,
+            'viewFile',
+        ]
+    )->name('documents.view');
+
+    Route::get(
+        '/documents/{document}/attachments/{attachment}/view',
+        [
+            DocumentController::class,
+            'viewAttachment',
+        ]
+    )->name('documents.view-attachment');
+
+    Route::get(
+        '/documents/{document}/attachments/{attachment}/download',
+        [
+            DocumentController::class,
+            'downloadAttachment',
+        ]
+    )->name('documents.download-attachment');
+
+    Route::get(
         '/documents/{document}/download',
         [
             DocumentController::class,
@@ -2917,6 +2941,8 @@ Route::get('/documents', function () {
                         $user
                     );
 
+                $fileExists = $document->fileExists();
+
                 $fileUrl = null;
 
                 $downloadUrl = null;
@@ -2926,12 +2952,12 @@ Route::get('/documents', function () {
                     !empty($document->file_path)
                 ) {
 
-                    $fileUrl = asset(
-                        'storage/' .
-                            ltrim(
-                                $document->file_path,
-                                '/'
-                            )
+                    $fileUrl = route(
+                        'documents.view',
+                        [
+                            'document' =>
+                            $document->id,
+                        ]
                     );
 
                     $downloadUrl = route(
@@ -2997,6 +3023,9 @@ Route::get('/documents', function () {
                     'download_url' =>
                     $downloadUrl,
 
+                    'file_exists' =>
+                    $fileExists,
+
                     'assigned_to' =>
                     $document->assigned_to,
 
@@ -3054,16 +3083,28 @@ Route::get('/documents', function () {
                     $requestStatus,
 
                                         'attachments' =>
-                    $document->attachments->map(function ($att) {
+                    $document->attachments->map(function ($att) use ($canAccess) {
                         return [
                             'id' => $att->id,
                             'file_name' => $att->file_name,
                             'file_path' => $att->file_path,
-                            'file_url' => asset('storage/' . ltrim($att->file_path, '/')),
+                            'file_url' => $canAccess && !empty($att->file_path)
+                                ? route('documents.view-attachment', [
+                                    'document' => $att->document_id,
+                                    'attachment' => $att->id,
+                                ])
+                                : null,
+                            'download_url' => $canAccess && !empty($att->file_path)
+                                ? route('documents.download-attachment', [
+                                    'document' => $att->document_id,
+                                    'attachment' => $att->id,
+                                ])
+                                : null,
                             'mime_type' => $att->mime_type,
                             'file_size' => $att->file_size,
                             'formatted_file_size' => $att->formatted_file_size,
                             'is_primary' => (bool) $att->is_primary,
+                            'file_exists' => $att->fileExists(),
                         ];
                     })->values()->toArray(),
 
@@ -3346,3 +3387,37 @@ Route::get('/documents', function () {
 */
 
 require __DIR__ . '/auth.php';
+
+/*
+|--------------------------------------------------------------------------
+| STORAGE FALLBACK ROUTE
+|--------------------------------------------------------------------------
+| Serves files when public/storage symlink is missing or not handled by server.
+*/
+Route::get('/storage/{path}', function (string $path) {
+    $cleanPath = ltrim($path, '/\\');
+    $cleanPath = preg_replace('#^storage/#i', '', $cleanPath);
+
+    $candidates = [
+        storage_path('app/public/' . $cleanPath),
+        public_path('storage/' . $cleanPath),
+        storage_path('app/' . $cleanPath),
+        storage_path('app/private/' . $cleanPath),
+        storage_path('app/public/documents/' . basename($cleanPath)),
+        storage_path('app/public/compliance/' . basename($cleanPath)),
+        public_path('documents/' . basename($cleanPath)),
+    ];
+
+    foreach ($candidates as $filePath) {
+        if ($filePath && file_exists($filePath) && is_file($filePath)) {
+            $mime = mime_content_type($filePath) ?: 'application/octet-stream';
+            return response()->file($filePath, [
+                'Content-Type' => $mime,
+                'Content-Disposition' => 'inline; filename="' . basename($filePath) . '"',
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
+        }
+    }
+
+    abort(404, 'File not found in storage.');
+})->where('path', '.*')->name('storage.fallback');

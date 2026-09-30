@@ -90,6 +90,8 @@ class Document extends Model
 
     protected $appends = [
         'file_url',
+        'download_url',
+        'file_exists',
         'formatted_file_size',
 
         // ========== LIFECYCLE APPENDS ==========
@@ -170,7 +172,25 @@ class Document extends Model
             return null;
         }
 
+        if ($this->exists && $this->id) {
+            return route('documents.view', ['document' => $this->id]);
+        }
+
         return asset('storage/' . ltrim($this->file_path, '/'));
+    }
+
+    public function getDownloadUrlAttribute()
+    {
+        if (empty($this->file_path) || !$this->exists || !$this->id) {
+            return null;
+        }
+
+        return route('documents.download', ['document' => $this->id]);
+    }
+
+    public function getFileExistsAttribute(): bool
+    {
+        return $this->fileExists();
     }
 
     /*
@@ -657,13 +677,45 @@ class Document extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function fileExists(): bool
+    public function getResolvedFilePath(): ?string
     {
         if (empty($this->file_path)) {
-            return false;
+            return null;
         }
 
-        return Storage::disk('public')->exists($this->file_path);
+        $raw = $this->file_path;
+
+        if (file_exists($raw) && is_file($raw)) {
+            return $raw;
+        }
+
+        $clean = ltrim($raw, '/\\');
+        $clean = preg_replace('#^(public/|storage/)#i', '', $clean);
+
+        $candidates = [
+            Storage::disk('public')->path($raw),
+            Storage::disk('public')->path($clean),
+            storage_path('app/public/' . $clean),
+            storage_path('app/' . $clean),
+            storage_path('app/private/' . $clean),
+            public_path('storage/' . $clean),
+            public_path($clean),
+            storage_path('app/public/documents/' . basename($clean)),
+            public_path('documents/' . basename($clean)),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate && file_exists($candidate) && is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    public function fileExists(): bool
+    {
+        return $this->getResolvedFilePath() !== null;
     }
 
     public function getFileSizeInBytes(): int

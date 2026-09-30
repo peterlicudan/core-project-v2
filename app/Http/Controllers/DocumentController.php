@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\DocumentForwarded;
 use App\Models\Document;
 use App\Models\DocumentAccessRequest;
+use App\Models\DocumentAttachment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -557,18 +558,119 @@ class DocumentController extends Controller
             );
         }
 
-        if (!$document->fileExists()) {
-            abort(404, 'File not found.');
-        }
+        $filePath = $document->getResolvedFilePath();
 
-        $filePath = Storage::disk('public')->path(
-            $document->file_path
-        );
+        if (!$filePath || !file_exists($filePath)) {
+            abort(404, 'File not found on the server.');
+        }
 
         return response()->download(
             $filePath,
-            $document->file_name
+            $document->file_name ?: basename($filePath)
         );
+    }
+
+    public function downloadAttachment(Document $document, DocumentAttachment $attachment)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401);
+        }
+
+        if ($attachment->document_id !== $document->id) {
+            abort(404);
+        }
+
+        if (!$document->canBeAccessedBy($user)) {
+            abort(
+                403,
+                'You do not have permission to download this attachment.'
+            );
+        }
+
+        $filePath = $attachment->getResolvedFilePath();
+
+        if (!$filePath || !file_exists($filePath)) {
+            abort(404, 'Attachment file not found on the server.');
+        }
+
+        return response()->download(
+            $filePath,
+            $attachment->file_name ?: basename($filePath)
+        );
+    }
+
+    /**
+     * Stream document file inline for preview in iframe or direct viewing.
+     */
+    public function viewFile(Document $document)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401);
+        }
+
+        if (!$document->canBeAccessedBy($user)) {
+            abort(
+                403,
+                'You do not have permission to view this document.'
+            );
+        }
+
+        $filePath = $document->getResolvedFilePath();
+
+        if (!$filePath || !file_exists($filePath)) {
+            abort(404, 'The document file could not be found on the server.');
+        }
+
+        $mime = $document->mime_type ?: (mime_content_type($filePath) ?: 'application/octet-stream');
+        $fileName = $document->file_name ?: basename($filePath);
+
+        return response()->file($filePath, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+            'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+        ]);
+    }
+
+    /**
+     * Stream attachment file inline for preview in iframe or direct viewing.
+     */
+    public function viewAttachment(Document $document, DocumentAttachment $attachment)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401);
+        }
+
+        if ($attachment->document_id !== $document->id) {
+            abort(404);
+        }
+
+        if (!$document->canBeAccessedBy($user)) {
+            abort(
+                403,
+                'You do not have permission to view this attachment.'
+            );
+        }
+
+        $filePath = $attachment->getResolvedFilePath();
+
+        if (!$filePath || !file_exists($filePath)) {
+            abort(404, 'The attachment file could not be found on the server.');
+        }
+
+        $mime = $attachment->mime_type ?: (mime_content_type($filePath) ?: 'application/octet-stream');
+        $fileName = $attachment->file_name ?: basename($filePath);
+
+        return response()->file($filePath, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . addslashes($fileName) . '"',
+            'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+        ]);
     }
 
     /*

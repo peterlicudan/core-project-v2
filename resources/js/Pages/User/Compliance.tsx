@@ -69,6 +69,7 @@ type DocumentAttachment = {
     file_size?: number | null;
     formatted_file_size?: string | null;
     is_primary?: boolean;
+    file_exists?: boolean;
 };
 
 type DocumentRecord = {
@@ -103,6 +104,7 @@ type DocumentRecord = {
     /* MULTI-FILE ATTACHMENTS */
     attachments?: DocumentAttachment[];
     attachment_count?: number;
+    file_exists?: boolean;
 };
 
 type ComplianceRecord = {
@@ -542,6 +544,11 @@ return matchesSearch && matchesType;
             return;
         }
 
+        if (doc.file_exists === false) {
+            notify("File not found on server storage.", "error");
+            return;
+        }
+
         // Primary download URL
         if (doc.download_url) {
             window.location.href = doc.download_url;
@@ -572,6 +579,10 @@ return matchesSearch && matchesType;
         setMenuDoc(null);
         if (!hasDocumentAccess(doc)) {
             setAccessDeniedDoc(doc);
+            return;
+        }
+        if (doc.file_exists === false) {
+            notify("File not found on server storage.", "error");
             return;
         }
         if (!doc.file_url) {
@@ -1651,11 +1662,11 @@ return matchesSearch && matchesType;
                             <button
                                 type="button"
                                 onClick={() => downloadDocument(viewDoc)}
-                                disabled={!hasDocumentAccess(viewDoc)}
+                                disabled={!hasDocumentAccess(viewDoc) || viewDoc.file_exists === false}
                                 className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-bold ${
-                                    hasDocumentAccess(viewDoc)
+                                    hasDocumentAccess(viewDoc) && viewDoc.file_exists !== false
                                         ? "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
-                                        : "cursor-not-allowed border-gray-200 dark:border-slate-900 bg-gray-50 dark:bg-slate-950 text-slate-700"
+                                        : "cursor-not-allowed border-gray-200 dark:border-slate-900 bg-gray-50 dark:bg-slate-950 text-slate-500"
                                 }`}
                             >
                                 <Download size={16} />
@@ -1664,11 +1675,11 @@ return matchesSearch && matchesType;
                             <button
                                 type="button"
                                 onClick={() => openExternalFile(viewDoc)}
-                                disabled={!hasDocumentAccess(viewDoc)}
+                                disabled={!hasDocumentAccess(viewDoc) || viewDoc.file_exists === false}
                                 className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-black ${
-                                    hasDocumentAccess(viewDoc)
+                                    hasDocumentAccess(viewDoc) && viewDoc.file_exists !== false
                                         ? "bg-yellow-400 text-black hover:bg-yellow-300"
-                                        : "cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-slate-600"
+                                        : "cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-slate-500"
                                 }`}
                             >
                                 <ExternalLink size={16} />
@@ -1919,7 +1930,22 @@ function DocumentPreview({ document }: { document: DocumentRecord }) {
             )}
 
             {/* FILE PREVIEW */}
-            {!url ? (
+            {activeFile.file_exists === false ? (
+                <div className="flex min-h-[480px] flex-col items-center justify-center p-8 text-center bg-gray-50 dark:bg-slate-950 rounded-2xl">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 mb-4">
+                        <AlertTriangle size={32} />
+                    </div>
+                    <h3 className="text-lg font-black text-gray-900 dark:text-white">
+                        File Not Found on Server
+                    </h3>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-gray-500 dark:text-slate-400">
+                        The record for <span className="font-semibold text-gray-800 dark:text-slate-200">{activeFile.file_name}</span> is registered in the database, but the physical file is not found in server storage.
+                    </p>
+                    <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20">
+                        Please upload or re-attach the document file.
+                    </p>
+                </div>
+            ) : !url ? (
                 <div className="flex min-h-[480px] flex-col items-center justify-center p-8 text-center">
                     <Lock size={48} className="text-red-600 dark:text-red-400" />
                     <h3 className="mt-4 text-lg font-black text-gray-900 dark:text-white">
