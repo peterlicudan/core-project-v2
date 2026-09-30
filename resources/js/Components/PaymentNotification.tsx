@@ -41,19 +41,6 @@ export default function PaymentNotification() {
     useEffect(() => {
         if (!Array.isArray(serverNotifications)) return;
 
-        // ✅ DEBUG: Log para makita mo actual structure
-        if (serverNotifications.length > 0) {
-            console.log("=== NOTIFICATION DEBUG ===");
-            console.log("First notification:", serverNotifications[0]);
-            console.log("data type:", typeof serverNotifications[0]?.data);
-            console.log("data value:", serverNotifications[0]?.data);
-            console.log("created_at:", serverNotifications[0]?.created_at);
-            console.log(
-                "createdAt:",
-                (serverNotifications[0] as any)?.createdAt,
-            );
-        }
-
         setNotifications((prev) => {
             if (!Array.isArray(prev) || prev.length === 0) {
                 return serverNotifications;

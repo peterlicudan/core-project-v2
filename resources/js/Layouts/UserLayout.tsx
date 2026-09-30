@@ -89,8 +89,6 @@ export default function UserLayout({
             window.location.pathname.startsWith("/admin/");
 
         if (isAdminPath) {
-            console.log("Admin route detected - staff heartbeat disabled.");
-
             return;
         }
 
@@ -121,10 +119,6 @@ export default function UserLayout({
                     preserveScroll: true,
                     preserveState: true,
                     replace: true,
-
-                    onSuccess: () => {
-                        console.log("Staff heartbeat sent.");
-                    },
 
                     onError: (errors) => {
                         console.error("Staff heartbeat failed:", errors);

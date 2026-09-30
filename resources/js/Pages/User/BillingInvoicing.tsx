@@ -533,11 +533,6 @@ export default function BillingInvoicing() {
     const backendInvoices = page.props.invoices ?? [];
     const backendJobOrders = page.props.jobOrders ?? page.props.records ?? [];
 
-    // ✅ DEBUG: Log notifications
-    console.log("=== BILLING PAGE DEBUG ===");
-    console.log("URL:", url);
-    console.log("Notifications:", page.props.notifications);
-
     const [invoices, setInvoices] = useState<Invoice[]>(
         backendInvoices.map(normalizeInvoice),
     );
