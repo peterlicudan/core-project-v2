@@ -137,6 +137,15 @@ class AlibatonAIController extends Controller
             return $this->appendAttachment($response, $attachmentName);
         }
 
+        // 11. ✅ SYSTEM MODULES GUIDE (Local AI module knowledge base)
+        //     Kapag may nag-ask kung ano ang mga modules, paano gamitin,
+        //     o anong kaya ng system — sasagutin ito ng AI.
+        if ($this->isSystemModulesQuestion($lower)) {
+            $response = $this->systemModulesGuideResponse($lower);
+
+            return $this->appendAttachment($response, $attachmentName);
+        }
+
         /*
         |------------------------------------------------------------------
         | FREE DATABASE Q&A
@@ -3064,5 +3073,216 @@ class AlibatonAIController extends Controller
             . "You can ask me to review, summarize, compare, "
             . "or relate the file's available information to "
             . "the authorized ALIBATON database records.";
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ SYSTEM MODULES GUIDE (Local AI — module knowledge base)
+    |--------------------------------------------------------------------------
+    |
+    | Kapag tinanong ng user kung ano ang mga modules ng system,
+    | paano gamitin ang isang module, o ano ang kaya ng sistema,
+    | dito galing ang sagot ng AI.
+    |
+    */
+
+    private function isSystemModulesQuestion(string $lower): bool
+    {
+        if (Str::contains($lower, [
+            'what are the modules',
+            'what modules',
+            'list of modules',
+            'system modules',
+            'module list',
+            'available modules',
+            'what can you do',
+            'what can you help',
+            'ano ang kaya mo',
+            'anong kaya mo',
+            'ano ang ginagawa mo',
+            'paano gamitin',
+            'paano gumamit',
+            'paano ko gamitin',
+            'how to use',
+            'how do i use',
+            'how can i use',
+            'how to use the system',
+            'help me with the system',
+            'module guide',
+            'modules of the system',
+            'ano ang mga module',
+            'ano-ano ang module',
+            'ano ano ang module',
+            'anong mga module',
+            'mga module ng system',
+            'mga modules ng system',
+            'ano ang system',
+            'what is this system',
+            'ano ang alibaton',
+            'what is alibaton',
+            'tutorial',
+            'gabay',
+            'ano ang billing module',
+            'ano ang invoice module',
+            'ano ang payment module',
+            'ano ang job order module',
+            'ano ang contract module',
+            'ano ang permit module',
+            'ano ang document module',
+            'ano ang compliance module',
+            'ano ang report module',
+            'ano ang forecasting module',
+            'ano ang forecast module',
+            'ano ang user module',
+            'what is the billing module',
+            'what is the payment module',
+            'what is the job order module',
+            'what is the contract module',
+            'what is the document module',
+            'what is the compliance module',
+            'what is the report module',
+            'what is the forecasting module',
+            'how does the billing module work',
+            'how does the payment module work',
+            'how does the job order module work',
+            'how does the contract module work',
+            'how does the document module work',
+            'how does the compliance module work',
+        ])) {
+            return true;
+        }
+
+        // Bilang huling safety check: kung may "module" at "ano"/"paano"/"what"/"how"
+        // ang tanong — module guide ito, hindi database query.
+        if (Str::contains($lower, ['module', 'gabay', 'feature'])) {
+            if (Str::contains($lower, ['ano', 'paano', 'what', 'how', 'help', 'list', 'gamitin', 'guide', 'kaya mo'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function systemModulesGuideResponse(string $lower): JsonResponse
+    {
+        $module = $this->detectRequestedModule($lower);
+
+        $modules = [
+            'billing' => [
+                'name' => 'Billing / Invoices',
+                'purpose' => 'Gumagawa ang staff ng Billing Records (Billing No. + Job Order No.) para sa mga client. Kapag na-submit, makakakita ang admin sa Billing Management at ia-approve ito. Sa approval pa lang nag-ge-generate ang Invoice Number (INV-YYYY-NNNN).',
+                'flow' => "Staff → Create Billing Record (Billing No. + JO No.) → Admin approves → Invoice No. ayusin + Service Invoice makikita.\n\nSa Billing tab may 3 views: Pending Verification (hindi pa approve), Service Invoice (approved lang), at Rejected. Ang Approved lang ang may Invoice Number.",
+                'ask' => 'Pwede mong i-ask: "ilang pending billing?", "ipakita ang mga approved invoice", "ano ang total ng billing ngayong buwan?"',
+            ],
+            'payment' => [
+                'name' => 'Payment Management',
+                'purpose' => 'Nirerecord ng staff ang mga bayad ng client. Ang bawat payment ay naka-link sa Billing No. at Job Order No. para malinaw kung anong billing ang binabayaran.',
+                'flow' => "Staff records payment (may receipt ref + Billing No. + JO No.) → Admin makikita sa Payments → status: Partial / Fully Paid.\n\nSa Payment Management may option din na mag-print ng SOA, official receipt, at payment history.",
+                'ask' => 'Pwede mong i-ask: "magkano ang nakolekta ngayong buwan?", "sino ang may unpaid balance?", "ipakita ang payments ni client X."',
+            ],
+            'job_order' => [
+                'name' => 'Job Orders',
+                'purpose' => 'Ang Job Order ang pinagmumulan ng trabaho — may Job Order No. at client info. Ito ang basehan ng Billing Record (Billing No. + JO No.).',
+                'flow' => "Staff creates Job Order → puwedeng i-approve ng admin → nagiging reference ng Billing at Contracts.",
+                'ask' => 'Pwede mong i-ask: "ilang job order ngayong buwan?", "ipakita ang mga job order ni client X."',
+            ],
+            'contract' => [
+                'name' => 'Contracts / Permits',
+                'purpose' => 'Naka-monitor dito ang mga kontrata at permits ng mga project: contract no, client, dates, status, at mga attachment.',
+                'flow' => "Staff creates / submits contract o permit → review ng admin → approved status para sa final copy.",
+                'ask' => 'Pwede mong i-ask: "ilang contract ang active?", "may expired na permit ba?", "ipakita ang contracts ni client X."',
+            ],
+            'document' => [
+                'name' => 'Documents',
+                'purpose' => 'Upload at management ng mga dokumento ng company at project files. May access request din ang staff kung kailangan ng dokumento.',
+                'flow' => "Upload ng dokumento (with title/type) → puwedeng i-assign o i-archive. Staff ay pwedeng mag-request ng access sa document.",
+                'ask' => 'Pwede mong i-ask: "ilan ang documents?", "ipakita ang mga uploaded documents.", "may access request ba na pending?"',
+            ],
+            'compliance' => [
+                'name' => 'Compliance',
+                'purpose' => 'Track ng mga regulatory at company compliance requirements — may title, status, due date, at assigned staff.',
+                'flow' => "Staff creates compliance record → pwede ma-assign sa staff → i-monitor hanggang sa maging compliant.",
+                'ask' => 'Pwede mong i-ask: "ano ang compliance status?", "may due ba na compliance ngayong buwan?"',
+            ],
+            'report' => [
+                'name' => 'Reports / Forecasting',
+                'purpose' => 'Gumagawa ng management reports ang staff at may FORECASTING pa para makita ang projected na income at activity base sa historical data.',
+                'flow' => "Staff generates report (billing summary, collections, compliance, atbp.) → makikita sa Report Management ng admin.\n\nForecasting: may graphs at key insights na nag-e-explain ng trend — kung tataas o bababa ang projected na kita o activity.",
+                'ask' => 'Pwede mong i-ask: "gumawa ng summary report ng billing", "ano ang forecast ngayong buwan?", "anong trend ng payments?"',
+            ],
+            'user' => [
+                'name' => 'User Roles / Staff Accounts',
+                'purpose' => 'Admin lang ang may access dito. Ginagawa ang staff accounts, naka-monitor ang online status, at may AUDIT LOG — kapag pinindot ang staff account, makikita ang buong activity history nila sa lahat ng modules.',
+                'flow' => "Admin creates staff account → staff logs in → admin pwede i-view activity log ng staff (billing, payments, job orders, contracts, documents, atbp.) at i-delete o i-restore kung kinakailangan.",
+                'ask' => 'Admin lang ang may access sa module na ito.',
+            ],
+        ];
+
+        // Kung may partikular na module na tinatanong — detailed guide para dito.
+        if ($module !== null && isset($modules[$module])) {
+            $info = $modules[$module];
+
+            return response()->json([
+                'message' => "{$info['name']} MODULE\n\n"
+                    . "📌 Ano ito:\n{$info['purpose']}\n\n"
+                    . "🔄 Paano gumagana:\n{$info['flow']}\n\n"
+                    . "🤖 Pwede mong i-ask sa akin:\n{$info['ask']}",
+                'records' => [],
+                'visualData' => null,
+                'report' => null,
+            ]);
+        }
+
+        // Walang specific module — buong gabay ng system modules.
+        $lines = [
+            "ALIBATON SYSTEM MODULES (Gabay)\n",
+            "Ang ALIBATON ay may mga sumusunod na modules para sa billing, payments, job orders, contracts, documents, compliance, reports, at forecasting:",
+            '',
+        ];
+
+        foreach ($modules as $key => $info) {
+            $lines[] = "• {$info['name']} — {$info['purpose']}";
+        }
+
+        $lines[] = '';
+        $lines[] = "Para sa detalyadong gabay ng isang module, itanong mo lang, halimbawa:";
+        $lines[] = "• \"Paano gamitin ang Billing module?\"";
+        $lines[] = "• \"Ano ang ginagawa sa Payment Management?\"";
+        $lines[] = "• \"Paano gumagana ang Job Orders?\"";
+        $lines[] = "• \"Ano ang Contracts/Permits module?\"";
+        $lines[] = "• \"Paano gumawa ng report o i-forecast?\"";
+        $lines[] = '';
+        $lines[] = "Pwede mo rin akong tanungin tungkol sa records — halimbawa \"ilang pending billing?\", \"magkano ang nakolekta ngayong buwan?\", o \"ano ang forecast?\" at magbibigay ako ng totoong data mula sa database.";
+
+        return response()->json([
+            'message' => implode("\n", $lines),
+            'records' => [],
+            'visualData' => null,
+            'report' => null,
+        ]);
+    }
+
+    private function detectRequestedModule(string $lower): ?string
+    {
+        $pairs = [
+            'billing' => ['billing', 'invoice', 'invoices', 'service invoice', 'official receipt'],
+            'payment' => ['payment', 'payments', 'bayad', 'receivable'],
+            'job_order' => ['job order', 'job orders', 'work order', 'jo module'],
+            'contract' => ['contract', 'contracts', 'permit', 'permits', 'kasunduan'],
+            'compliance' => ['compliance', 'regulatory', 'compliances'],
+            'document' => ['document', 'documents', 'files', 'dokumento'],
+            'report' => ['report', 'reports', 'forecasting', 'forecast', 'projection', 'pagtataya'],
+            'user' => ['user', 'users', 'staff account', 'user roles', 'staff'],
+        ];
+
+        foreach ($pairs as $module => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (Str::contains($lower, $keyword)) {
+                    return $module;
+                }
+            }
+        }
+
+        return null;
     }
 }

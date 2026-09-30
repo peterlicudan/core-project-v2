@@ -33,6 +33,7 @@ import {
     StickyNote,
     Percent,
     Calculator,
+    Printer,
 } from "lucide-react";
 
 /*
@@ -42,12 +43,7 @@ import {
 */
 
 type InvoiceStatus =
-    | "Pending"
-    | "Partial"
-    | "Paid"
-    | "Rejected"
-    | "Overdue"
-    | "Approved";
+    "Pending" | "Partial" | "Paid" | "Rejected" | "Overdue" | "Approved";
 
 type InvoiceItem = {
     id: number;
@@ -58,7 +54,12 @@ type InvoiceItem = {
 
 type Invoice = {
     id: number;
+    /* Invoice No. — NULL hanggang APPROVED */
     number: string;
+    /* May Invoice No. na? (false = billing record pa lang) */
+    hasInvoiceNumber?: boolean;
+    /* OK BILLING NUMBER */
+    billingNumber?: string | null;
     client: string;
     clientEmail: string;
     clientAddress: string;
@@ -67,6 +68,24 @@ type Invoice = {
     items: InvoiceItem[];
     taxRate: number;
     amount: number;
+    /* OK VERIFICATION DATA — billing vs job order */
+    baseAmount?: number;
+    vatRate?: number;
+    vatAmount?: number;
+    additionalCharges?: number;
+    totalAmount?: number;
+    jobOrderNumber?: string | null;
+    jobOrderStatus?: string | null;
+    quotationTotal?: number;
+    billingMonths?: number;
+    monthlyAmount?: number;
+    expectedAmount?: number;
+    amountDifference?: number;
+    matchesJobOrder?: boolean | null;
+    verifiedAt?: string | null;
+    verifiedBy?: string | null;
+    serviceMonth?: string | null;
+    billingSequence?: number | null;
     status: InvoiceStatus;
     dueDate: string;
     createdAt: string;
@@ -79,8 +98,6 @@ type Invoice = {
     rejectedAt?: string | null;
     approvedAt?: string | null;
     approvedBy?: string | null;
-    vatAmount?: number;
-    netAmount?: number;
     withholdingTax?: number;
     totalAmountDue?: number;
     paymentMethod?: string | null;
@@ -91,7 +108,6 @@ type Invoice = {
     };
 };
 
-// ✅ BAGO — Job Order type para sa admin approval
 type PendingJobOrder = {
     id: number;
     number: string;
@@ -106,6 +122,22 @@ type PendingJobOrder = {
     startDate?: string | null;
     endDate?: string | null;
     amount: number;
+    /* OK APPROVED QUOTATION */
+    quotationTotal?: number;
+    billingMonths?: number;
+    monthlyAmount?: number;
+    billingStatus?: string | null;
+    pendingCount?: number;
+    approvedCount?: number;
+    rejectedCount?: number;
+    billings?: {
+        id: number;
+        billingNumber?: string | null;
+        serviceMonth?: string | null;
+        status?: string;
+        baseAmount?: number;
+        totalAmount?: number;
+    }[];
     description?: string | null;
     notes?: string | null;
     status: string;
@@ -135,13 +167,15 @@ type AdminStats = {
     partial: number;
     total?: number;
     pendingJobOrders?: number;
+    mismatched?: number;
 };
 
 type PageProps = {
     invoices?: Invoice[];
     pendingInvoices?: Invoice[];
     allInvoices?: Invoice[];
-    pendingJobOrders?: PendingJobOrder[];   // ✅ BAGO
+    pendingJobOrders?: PendingJobOrder[];
+    jobOrders?: PendingJobOrder[];
     stats?: AdminStats;
     notifications?: Notification[];
     flash?: { success?: string; error?: string };
@@ -179,6 +213,20 @@ const formatDate = (value: string | null | undefined, fallback = "—") => {
     });
 };
 
+/** "2026-01" -> "Jan 2026" (Service Date) */
+const formatMonthLabel = (value: string | null | undefined) => {
+    if (!value) return "—";
+    const [year, month] = value.split("-").map(Number);
+    if (!year || !month) return value;
+    const date = new Date(Date.UTC(year, month - 1, 1));
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("en-PH", {
+        year: "numeric",
+        month: "short",
+        timeZone: "UTC",
+    });
+};
+
 const formatDateTime = (value: string | null | undefined, fallback = "—") => {
     if (!value) return fallback;
     const date = new Date(value);
@@ -209,6 +257,14 @@ const computeVAT = (amount: number) => {
     const totalAmountDue = netAmount + vatAmount;
     return { vatAmount, netAmount, totalAmountDue };
 };
+
+const escapeHtml = (value: unknown) =>
+    String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 
 const normalizeInvoice = (raw: any): Invoice => {
     const amount = Number(raw?.amount ?? raw?.total ?? 0);
@@ -248,18 +304,64 @@ const normalizeInvoice = (raw: any): Invoice => {
                   },
               ];
 
-    const { vatAmount, netAmount, totalAmountDue } = computeVAT(amount);
+    const num = (v: any, fallback = 0) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | OK REAL BREAKDOWN + VERIFICATION DATA (mula sa DB)
+    |--------------------------------------------------------------------------
+    */
+    const baseAmount = num(raw?.baseAmount ?? raw?.base_amount, amount);
+    const vatAmount = num(raw?.vatAmount ?? raw?.vat_amount);
+    const additionalCharges = num(
+        raw?.additionalCharges ?? raw?.additional_charges,
+    );
+    const monthlyAmount = num(raw?.monthlyAmount ?? raw?.monthly_amount);
+    const expectedAmount = num(
+        raw?.expectedAmount ?? raw?.expected_amount,
+        monthlyAmount,
+    );
 
     return {
         id: Number(raw?.id ?? 0),
-        number: String(raw?.number ?? ""),
+        /* Invoice No. — empty string kapag wala pa (bago ma-approve) */
+        number: String(raw?.number ?? "") || "",
+        hasInvoiceNumber: Boolean(
+            raw?.hasInvoiceNumber ?? raw?.has_invoice_number ?? raw?.number,
+        ),
+        billingNumber:
+            (raw?.billingNumber ?? raw?.billing_number ?? null) || null,
+        baseAmount,
+        vatRate: num(raw?.vatRate ?? raw?.vat_rate),
+        vatAmount,
+        additionalCharges,
+        totalAmount: baseAmount + additionalCharges + vatAmount,
+        jobOrderNumber: raw?.jobOrderNumber ?? raw?.job_order_number ?? null,
+        jobOrderStatus: raw?.jobOrderStatus ?? raw?.job_order_status ?? null,
+        quotationTotal: num(raw?.quotationTotal ?? raw?.quotation_total),
+        billingMonths: num(raw?.billingMonths ?? raw?.billing_months),
+        monthlyAmount,
+        expectedAmount,
+        amountDifference: num(
+            raw?.amountDifference ?? raw?.amount_difference,
+            baseAmount - expectedAmount,
+        ),
+        matchesJobOrder: raw?.matchesJobOrder ?? raw?.matches_job_order ?? null,
+        verifiedAt: raw?.verifiedAt ?? raw?.verified_at ?? null,
+        verifiedBy: raw?.verifiedBy ?? raw?.verified_by ?? null,
+        serviceMonth: raw?.serviceMonth ?? raw?.service_month ?? null,
+        billingSequence:
+            num(raw?.billingSequence ?? raw?.billing_sequence) || null,
         client: String(raw?.client ?? raw?.clientName ?? "—"),
         clientEmail: String(raw?.clientEmail ?? raw?.client_email ?? ""),
         clientAddress: String(raw?.clientAddress ?? raw?.client_address ?? ""),
         clientContact: String(raw?.clientContact ?? raw?.client_contact ?? ""),
         project: String(raw?.project ?? "—"),
         items,
-        taxRate: VAT_RATE * 100,
+        taxRate: num(raw?.vatRate ?? raw?.vat_rate),
         amount,
         status,
         dueDate: String(raw?.dueDate ?? raw?.due_date ?? ""),
@@ -274,10 +376,8 @@ const normalizeInvoice = (raw: any): Invoice => {
         rejectedAt: raw?.rejectedAt ?? raw?.rejected_at ?? null,
         approvedAt: raw?.approvedAt ?? raw?.approved_at ?? null,
         approvedBy: raw?.approvedBy ?? raw?.approved_by ?? null,
-        vatAmount,
-        netAmount,
         withholdingTax: 0,
-        totalAmountDue,
+        totalAmountDue: baseAmount + additionalCharges + vatAmount,
         paymentMethod:
             raw?.paymentMethod ?? raw?.payment_method ?? "Bank Transfer",
         supportingDocuments: {
@@ -314,16 +414,11 @@ const normalizeNotification = (raw: any): Notification => ({
 export default function BillingManagement() {
     const page = usePage<PageProps>();
 
-      // ✅ TEMPORARY DEBUG — ito ang idadagdag mo
-    console.log("🔍 ADMIN DEBUG:", {
-        userId: (page.props as any)?.auth?.user?.id,
-        pendingJobOrders: page.props.pendingJobOrders?.length,
-        notifications: page.props.notifications?.length,
-        stats: page.props.stats,
-    });
     const backendInvoices = page.props.invoices ?? page.props.allInvoices ?? [];
     const backendPendingInvoices = page.props.pendingInvoices ?? [];
-    const backendPendingJobOrders = page.props.pendingJobOrders ?? [];
+    /* OK Job Orders = reference ng admin para sa verification (hindi na "pending approval") */
+    const backendPendingJobOrders =
+        page.props.jobOrders ?? page.props.pendingJobOrders ?? [];
     const backendStats = page.props.stats ?? {
         pending: 0,
         approved: 0,
@@ -354,10 +449,12 @@ export default function BillingManagement() {
         backendNotifications.filter((n) => !n.read).length,
     );
 
-    // ✅ DEFAULT = "job-orders" — para ito agad ang makita ng admin
+    /* Alias — para ma-clear ang pangalan ng tab (reference data lang) */
+    const jobOrders = pendingJobOrders;
+
     const [activeTab, setActiveTab] = useState<
         "pending" | "all" | "job-orders"
-    >("job-orders");
+    >("pending");
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<"All" | InvoiceStatus>(
         "All",
@@ -420,65 +517,6 @@ export default function BillingManagement() {
         setNotifications(backendNotifications);
         setUnreadCount(backendNotifications.filter((n) => !n.read).length);
     }, [page.props.notifications]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | ✅ AUTO-REFRESH — Every 15 seconds (with guards)
-    |--------------------------------------------------------------------------
-    */
-
-    useEffect(() => {
-        const interval = window.setInterval(() => {
-            const hasOpenModal =
-                showInvoiceView ||
-                showInvoiceEdit ||
-                showApproveModal ||
-                showRejectModal ||
-                showNotificationPanel;
-
-            const isBusy =
-                isProcessing ||
-                isSavingInvoice ||
-                isSendingEmail ||
-                isRefreshing;
-
-            if (hasOpenModal || isBusy || document.hidden) return;
-
-            const scrollY = window.scrollY;
-
-            router.reload({
-                only: [
-                    "invoices",
-                    "pendingInvoices",
-                    "allInvoices",
-                    "pendingJobOrders",
-                    "stats",
-                    "notifications",
-                    "flash",
-                ],
-                onSuccess: () => {
-                    window.requestAnimationFrame(() => {
-                        window.scrollTo({
-                            top: scrollY,
-                            behavior: "instant" as ScrollBehavior,
-                        });
-                    });
-                },
-            });
-        }, 15000);
-
-        return () => window.clearInterval(interval);
-    }, [
-        showInvoiceView,
-        showInvoiceEdit,
-        showApproveModal,
-        showRejectModal,
-        showNotificationPanel,
-        isProcessing,
-        isSavingInvoice,
-        isSendingEmail,
-        isRefreshing,
-    ]);
 
     /*
     |--------------------------------------------------------------------------
@@ -681,6 +719,25 @@ export default function BillingManagement() {
     */
 
     const openApproveModal = (invoice: Invoice) => {
+        /*
+        |--------------------------------------------------------------------------
+        | ✅ VERIFICATION GATE — hindi puwedeng i-approve ang mismatch
+        |--------------------------------------------------------------------------
+        |
+        | Ang `null` (walang approved quotation data sa JO) ay "Review" —
+        | manual pa rin ang beripikasyon ng admin, kaya pinapayagan.
+        |
+        */
+        if (invoice.jobOrderId && invoice.matchesJobOrder === false) {
+            setSuccessMessage(
+                `Hindi tugma ang billing at job order (difference: ${money(
+                    Math.abs(invoice.amountDifference ?? 0),
+                    false,
+                )}). I-reject para makita ng staff ang problema.`,
+            );
+            return;
+        }
+
         setSelectedInvoice(invoice);
         setApprovalNotes("");
         setShowApproveModal(true);
@@ -767,7 +824,7 @@ export default function BillingManagement() {
 
     /*
     |--------------------------------------------------------------------------
-    | ✅ APPROVE / REJECT JOB ORDER
+    | APPROVE / REJECT JOB ORDER
     |--------------------------------------------------------------------------
     */
 
@@ -891,6 +948,250 @@ export default function BillingManagement() {
 
     /*
     |--------------------------------------------------------------------------
+    | PRINT INVOICE
+    |--------------------------------------------------------------------------
+    */
+
+    const printInvoice = (invoice: Invoice) => {
+        if (!invoice) return;
+
+        const totalSales = invoice.amount;
+        const vatAmount = totalSales * VAT_RATE;
+        const netOfVAT = totalSales;
+        const totalAmountDue = netOfVAT + vatAmount;
+
+        const itemsRows = invoice.items
+            .map(
+                (item) => `
+                    <tr>
+                        <td style="padding:8px;border:1px solid #ddd;text-align:center;">${escapeHtml(item.quantity)}</td>
+                        <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(item.description)}</td>
+                        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${escapeHtml(money(item.unitPrice, false))}</td>
+                        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${escapeHtml(money(item.quantity * item.unitPrice, false))}</td>
+                    </tr>
+                `,
+            )
+            .join("");
+
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>Invoice ${escapeHtml(invoice.number)}</title>
+                <style>
+                    * { box-sizing: border-box; }
+                    body {
+                        font-family: Arial, Helvetica, sans-serif;
+                        color: #111;
+                        padding: 40px;
+                        max-width: 900px;
+                        margin: 0 auto;
+                    }
+                    .header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        border-bottom: 3px solid #facc15;
+                        padding-bottom: 20px;
+                        margin-bottom: 24px;
+                        gap: 20px;
+                    }
+                    .company h1 {
+                        font-size: 22px;
+                        font-weight: 900;
+                        margin: 0;
+                        letter-spacing: 1px;
+                    }
+                    .company p {
+                        margin: 4px 0 0;
+                        font-size: 12px;
+                        color: #666;
+                    }
+                    .invoice-title h2 {
+                        font-size: 32px;
+                        font-weight: 900;
+                        margin: 0;
+                        text-align: right;
+                        color: #facc15;
+                        letter-spacing: 2px;
+                    }
+                    .invoice-title p {
+                        margin: 4px 0 0;
+                        font-size: 14px;
+                        text-align: right;
+                        font-weight: 700;
+                    }
+                    .meta {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 30px;
+                        margin-bottom: 24px;
+                        flex-wrap: wrap;
+                    }
+                    .meta-box { flex: 1; min-width: 200px; }
+                    .meta-box h3 {
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                        color: #999;
+                        margin: 0 0 6px;
+                    }
+                    .meta-box p { margin: 2px 0; font-size: 13px; }
+                    .status {
+                        display: inline-block;
+                        padding: 4px 12px;
+                        border-radius: 999px;
+                        font-size: 11px;
+                        font-weight: 900;
+                        text-transform: uppercase;
+                        background: #fef3c7;
+                        color: #92400e;
+                    }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                    thead th {
+                        background: #111;
+                        color: #fff;
+                        padding: 10px;
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                        border: 1px solid #111;
+                    }
+                    .totals { width: 320px; margin-left: auto; }
+                    .totals tr td {
+                        padding: 8px 12px;
+                        font-size: 13px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .totals tr td:last-child { text-align: right; font-weight: 700; }
+                    .totals tr.grand td {
+                        border-top: 2px solid #facc15;
+                        border-bottom: 2px solid #facc15;
+                        font-size: 16px;
+                        font-weight: 900;
+                        color: #b45309;
+                    }
+                    .footer {
+                        margin-top: 40px;
+                        padding-top: 16px;
+                        border-top: 1px solid #ddd;
+                        font-size: 11px;
+                        color: #999;
+                        text-align: center;
+                    }
+                    .section { margin-bottom: 20px; }
+                    .section h3 {
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                        color: #999;
+                        margin: 0 0 6px;
+                    }
+                    .section p {
+                        margin: 0;
+                        font-size: 13px;
+                        white-space: pre-wrap;
+                        line-height: 1.6;
+                    }
+                    @media print { body { padding: 20px; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="company">
+                        <h1>YOUR COMPANY NAME</h1>
+                        <p>Heavy Equipment &amp; Logistics Services</p>
+                        <p>123 Business Address, Philippines</p>
+                        <p>contact@yourcompany.com | +63 900 000 0000</p>
+                    </div>
+                    <div class="invoice-title">
+                        <h2>INVOICE</h2>
+                        <p>${escapeHtml(invoice.number)}</p>
+                    </div>
+                </div>
+
+                <div class="meta">
+                    <div class="meta-box">
+                        <h3>Billed To</h3>
+                        <p><strong>${escapeHtml(invoice.client)}</strong></p>
+                        ${invoice.clientEmail ? `<p>${escapeHtml(invoice.clientEmail)}</p>` : ""}
+                        ${invoice.clientContact ? `<p>${escapeHtml(invoice.clientContact)}</p>` : ""}
+                        ${invoice.clientAddress ? `<p>${escapeHtml(invoice.clientAddress)}</p>` : ""}
+                    </div>
+                    <div class="meta-box">
+                        <h3>Invoice Details</h3>
+                        <p><strong>Invoice #:</strong> ${escapeHtml(invoice.number)}</p>
+                        <p><strong>Invoice Date:</strong> ${escapeHtml(formatDate(invoice.createdAt))}</p>
+                        <p><strong>Due Date:</strong> ${escapeHtml(formatDate(invoice.dueDate))}</p>
+                        ${invoice.jobOrderId ? `<p><strong>Job Order:</strong> JO-${escapeHtml(invoice.jobOrderId)}</p>` : ""}
+                        <p><strong>Status:</strong> <span class="status">${escapeHtml(invoice.status)}</span></p>
+                    </div>
+                    <div class="meta-box">
+                        <h3>Project</h3>
+                        <p><strong>${escapeHtml(invoice.project)}</strong></p>
+                        ${invoice.paymentMethod ? `<p style="margin-top:8px;"><strong>Payment Method:</strong> ${escapeHtml(invoice.paymentMethod)}</p>` : ""}
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:8%;">Qty</th>
+                            <th style="text-align:left;">Description</th>
+                            <th style="width:18%;text-align:right;">Unit Price</th>
+                            <th style="width:18%;text-align:right;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsRows}
+                    </tbody>
+                </table>
+
+                <table class="totals">
+                    <tr><td>Total Sales</td><td>${escapeHtml(money(totalSales, false))}</td></tr>
+                    <tr><td>VAT (12%)</td><td>${escapeHtml(money(vatAmount, false))}</td></tr>
+                    <tr><td>Net of VAT</td><td>${escapeHtml(money(netOfVAT, false))}</td></tr>
+                    <tr><td>Withholding Tax</td><td>${escapeHtml(money(0, false))}</td></tr>
+                    <tr class="grand"><td>Total Amount Due</td><td>${escapeHtml(money(totalAmountDue, false))}</td></tr>
+                </table>
+
+                ${
+                    invoice.description
+                        ? `<div class="section"><h3>Description</h3><p>${escapeHtml(invoice.description)}</p></div>`
+                        : ""
+                }
+                ${
+                    invoice.notes
+                        ? `<div class="section"><h3>Notes</h3><p>${escapeHtml(invoice.notes)}</p></div>`
+                        : ""
+                }
+
+                <div class="footer">
+                    Thank you for your business! This is a computer-generated invoice.
+                </div>
+
+                <script>
+                    window.onload = function () {
+                        setTimeout(function () { window.print(); }, 300);
+                    };
+                </script>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open("", "_blank", "width=900,height=700");
+        if (!printWindow) {
+            alert("Please allow pop-ups to print the invoice.");
+            return;
+        }
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+    };
+
+    /*
+    |--------------------------------------------------------------------------
     | NOTIFICATIONS
     |--------------------------------------------------------------------------
     */
@@ -937,20 +1238,20 @@ export default function BillingManagement() {
 
     return (
         <AdminLayout title="Admin - Billing & Invoicing">
-            <div className="min-h-screen bg-black text-white">
+            <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white">
                 <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
                     {/* HEADER */}
                     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <Receipt size={25} />
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-black uppercase tracking-wide text-white sm:text-3xl">
+                                    <h1 className="text-2xl font-black uppercase tracking-wide text-gray-900 dark:text-white sm:text-3xl">
                                         Billing & Invoicing
                                     </h1>
-                                    <p className="mt-1 text-sm text-slate-400">
+                                    <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                                         Review, approve, and manage all invoices
                                     </p>
                                 </div>
@@ -966,10 +1267,10 @@ export default function BillingManagement() {
                                         setShowNotificationPanel((v) => !v)
                                     }
                                     className={[
-                                        "relative inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-black text-slate-400 transition",
+                                        "relative inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white dark:bg-black text-gray-600 dark:text-slate-400 transition",
                                         showNotificationPanel
-                                            ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
-                                            : "border-slate-700 hover:border-yellow-400/40 hover:text-yellow-400",
+                                            ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                            : "border-gray-200 dark:border-slate-700 hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400",
                                     ].join(" ")}
                                     aria-label="Notifications"
                                 >
@@ -1003,7 +1304,7 @@ export default function BillingManagement() {
                                 type="button"
                                 onClick={refreshData}
                                 disabled={isRefreshing}
-                                className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-700 bg-black px-4 text-sm font-bold text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="inline-flex h-10 items-center gap-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black px-4 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <RefreshCw
                                     size={16}
@@ -1021,20 +1322,20 @@ export default function BillingManagement() {
                         <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-4 shadow-lg shadow-emerald-950/20">
                             <CheckCircle2
                                 size={22}
-                                className="mt-0.5 shrink-0 text-emerald-400"
+                                className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="font-black uppercase tracking-wide text-emerald-300">
+                                <p className="font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                                     Success
                                 </p>
-                                <p className="mt-1 text-sm leading-6 text-emerald-400/80">
+                                <p className="mt-1 text-sm leading-6 text-emerald-600/80 dark:text-emerald-400/80">
                                     {successMessage || flashSuccess}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSuccessMessage("")}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-300"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600 dark:text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-700 dark:hover:text-emerald-300"
                             >
                                 <X size={17} />
                             </button>
@@ -1043,7 +1344,7 @@ export default function BillingManagement() {
 
                     {/* ERROR */}
                     {flashError && (
-                        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-300">
+                        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-700 dark:text-red-300">
                             <AlertCircle
                                 size={20}
                                 className="mt-0.5 shrink-0"
@@ -1147,7 +1448,6 @@ export default function BillingManagement() {
                     {/* TABS */}
                     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex flex-wrap gap-2">
-                            {/* ✅ JOB ORDERS TAB */}
                             <TabButton
                                 active={activeTab === "job-orders"}
                                 onClick={() => {
@@ -1156,8 +1456,8 @@ export default function BillingManagement() {
                                     setStatusFilter("All");
                                 }}
                                 icon={<BriefcaseBusiness size={18} />}
-                                label="Pending Job Orders"
-                                count={pendingJobOrders.length}
+                                label="Job Orders (Reference)"
+                                count={jobOrders.length}
                             />
                             <TabButton
                                 active={activeTab === "pending"}
@@ -1167,7 +1467,7 @@ export default function BillingManagement() {
                                     setStatusFilter("All");
                                 }}
                                 icon={<Clock size={18} />}
-                                label="Pending Invoices"
+                                label="Billing Verification"
                                 count={stats.pending}
                             />
                             <TabButton
@@ -1177,7 +1477,7 @@ export default function BillingManagement() {
                                     setSearch("");
                                 }}
                                 icon={<FileText size={18} />}
-                                label="All Invoices"
+                                label="All Billing Records"
                                 count={invoices.length}
                             />
                         </div>
@@ -1186,20 +1486,18 @@ export default function BillingManagement() {
                             <div className="relative">
                                 <Search
                                     size={17}
-                                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+                                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500"
                                 />
                                 <input
                                     type="text"
                                     value={search}
-                                    onChange={(e) =>
-                                        setSearch(e.target.value)
-                                    }
+                                    onChange={(e) => setSearch(e.target.value)}
                                     placeholder={
                                         activeTab === "job-orders"
                                             ? "Search job orders..."
                                             : "Search invoices..."
                                     }
-                                    className="w-48 rounded-xl border border-slate-700 bg-black py-2.5 pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-yellow-400/50 sm:w-60"
+                                    className="w-48 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-white outline-none transition placeholder:text-gray-600 dark:placeholder:text-slate-600 focus:border-yellow-400/50 sm:w-60"
                                 />
                             </div>
 
@@ -1209,11 +1507,10 @@ export default function BillingManagement() {
                                     onChange={(e) =>
                                         setStatusFilter(
                                             e.target.value as
-                                                | "All"
-                                                | InvoiceStatus,
+                                                "All" | InvoiceStatus,
                                         )
                                     }
-                                    className="rounded-xl border border-slate-700 bg-black px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-yellow-400/50"
+                                    className="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black px-3 py-2.5 text-sm text-gray-800 dark:text-slate-200 outline-none focus:border-yellow-400/50"
                                 >
                                     <option value="All">All Status</option>
                                     <option value="Pending">Pending</option>
@@ -1229,11 +1526,9 @@ export default function BillingManagement() {
                                 type="button"
                                 onClick={() => setHideAmount((v) => !v)}
                                 aria-label={
-                                    hideAmount
-                                        ? "Show amounts"
-                                        : "Hide amounts"
+                                    hideAmount ? "Show amounts" : "Hide amounts"
                                 }
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-black text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black text-gray-600 dark:text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                             >
                                 {hideAmount ? (
                                     <EyeOff size={18} />
@@ -1249,7 +1544,7 @@ export default function BillingManagement() {
                                         viewMode === "list" ? "grid" : "list",
                                     )
                                 }
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-black text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black text-gray-600 dark:text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                             >
                                 {viewMode === "list" ? (
                                     <LayoutGrid size={18} />
@@ -1264,9 +1559,6 @@ export default function BillingManagement() {
                     {activeTab === "job-orders" ? (
                         <PendingJobOrdersList
                             jobOrders={filteredPendingJobOrders}
-                            onApprove={approveJobOrder}
-                            onReject={rejectJobOrder}
-                            isProcessing={isProcessing}
                             hideAmount={hideAmount}
                         />
                     ) : activeTab === "pending" ? (
@@ -1286,6 +1578,7 @@ export default function BillingManagement() {
                             onApprove={openApproveModal}
                             onReject={openRejectModal}
                             onSendEmail={sendInvoiceToClient}
+                            onPrint={printInvoice}
                             viewMode={viewMode}
                             isProcessing={isProcessing}
                             isSendingEmail={isSendingEmail}
@@ -1312,6 +1605,7 @@ export default function BillingManagement() {
                         setShowInvoiceView(false);
                         sendInvoiceToClient(selectedInvoice);
                     }}
+                    onPrint={() => printInvoice(selectedInvoice)}
                     isProcessing={isProcessing}
                     isSendingEmail={isSendingEmail}
                     hideAmount={hideAmount}
@@ -1332,17 +1626,17 @@ export default function BillingManagement() {
                             <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-yellow-400/10 blur-3xl" />
                             <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex min-w-0 items-center gap-4">
-                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-yellow-400/30 bg-yellow-400/10 text-yellow-400 shadow-lg shadow-yellow-950/20">
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-yellow-400/30 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 shadow-lg shadow-yellow-950/20">
                                         <FilePenLine size={26} />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-400/70">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-600/70 dark:text-yellow-400/70">
                                             Invoice Editor
                                         </p>
-                                        <h3 className="mt-1 truncate text-xl font-black text-white sm:text-2xl">
+                                        <h3 className="mt-1 truncate text-xl font-black text-gray-900 dark:text-white sm:text-2xl">
                                             {selectedInvoice.number}
                                         </h3>
-                                        <p className="mt-1 text-xs text-slate-500">
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
                                             Update invoice information and
                                             billing details.
                                         </p>
@@ -1376,16 +1670,16 @@ export default function BillingManagement() {
                             />
                         </div>
 
-                        <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
+                        <div className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <FileText size={19} />
                                 </div>
                                 <div>
-                                    <h3 className="font-black uppercase tracking-wide text-white">
+                                    <h3 className="font-black uppercase tracking-wide text-gray-900 dark:text-white">
                                         Invoice Number
                                     </h3>
-                                    <p className="mt-0.5 text-xs text-slate-600">
+                                    <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-600">
                                         Auto-generated invoice reference
                                     </p>
                                 </div>
@@ -1400,21 +1694,21 @@ export default function BillingManagement() {
                                     }))
                                 }
                                 placeholder="Invoice number"
-                                className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                                className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
                                 disabled={isSavingInvoice}
                             />
                         </div>
 
-                        <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
+                        <div className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <UserRound size={19} />
                                 </div>
                                 <div>
-                                    <h3 className="font-black uppercase tracking-wide text-white">
+                                    <h3 className="font-black uppercase tracking-wide text-gray-900 dark:text-white">
                                         Billing Information
                                     </h3>
-                                    <p className="mt-0.5 text-xs text-slate-600">
+                                    <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-600">
                                         Client and project information
                                     </p>
                                 </div>
@@ -1435,7 +1729,7 @@ export default function BillingManagement() {
                                             }))
                                         }
                                         placeholder="Enter client name"
-                                        className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                                        className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
                                         disabled={isSavingInvoice}
                                     />
                                 </BeautifulFormField>
@@ -1454,23 +1748,23 @@ export default function BillingManagement() {
                                             }))
                                         }
                                         placeholder="Enter project name"
-                                        className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                                        className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
                                         disabled={isSavingInvoice}
                                     />
                                 </BeautifulFormField>
                             </div>
                         </div>
 
-                        <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
+                        <div className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <Wallet size={19} />
                                 </div>
                                 <div>
-                                    <h3 className="font-black uppercase tracking-wide text-white">
+                                    <h3 className="font-black uppercase tracking-wide text-gray-900 dark:text-white">
                                         Payment Details
                                     </h3>
-                                    <p className="mt-0.5 text-xs text-slate-600">
+                                    <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-600">
                                         Amount and payment deadline
                                     </p>
                                 </div>
@@ -1482,7 +1776,7 @@ export default function BillingManagement() {
                                     icon={<Wallet size={16} />}
                                 >
                                     <div className="relative">
-                                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-yellow-400">
+                                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-yellow-600 dark:text-yellow-400">
                                             ₱
                                         </span>
                                         <input
@@ -1500,7 +1794,7 @@ export default function BillingManagement() {
                                                 )
                                             }
                                             placeholder="0.00"
-                                            className="w-full rounded-xl border border-slate-700 bg-black py-3 pl-10 pr-4 text-lg font-black text-yellow-400 placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                                            className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 pl-10 pr-4 text-lg font-black text-yellow-600 dark:text-yellow-400 placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
                                             disabled={isSavingInvoice}
                                         />
                                     </div>
@@ -1512,7 +1806,7 @@ export default function BillingManagement() {
                                     <div className="relative">
                                         <CalendarDays
                                             size={17}
-                                            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"
+                                            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 dark:text-slate-600"
                                         />
                                         <input
                                             type="date"
@@ -1526,7 +1820,7 @@ export default function BillingManagement() {
                                                     }),
                                                 )
                                             }
-                                            className="w-full rounded-xl border border-slate-700 bg-black py-3 pl-11 pr-4 text-sm text-white outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                                            className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 pl-11 pr-4 text-sm text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
                                             disabled={isSavingInvoice}
                                         />
                                     </div>
@@ -1534,16 +1828,16 @@ export default function BillingManagement() {
                             </div>
                         </div>
 
-                        <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
+                        <div className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <FileText size={19} />
                                 </div>
                                 <div>
-                                    <h3 className="font-black uppercase tracking-wide text-white">
+                                    <h3 className="font-black uppercase tracking-wide text-gray-900 dark:text-white">
                                         Invoice Description
                                     </h3>
-                                    <p className="mt-0.5 text-xs text-slate-600">
+                                    <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-600">
                                         Add service or billing details
                                     </p>
                                 </div>
@@ -1559,21 +1853,21 @@ export default function BillingManagement() {
                                     }))
                                 }
                                 placeholder="Describe the equipment, service, work performed, or other invoice details..."
-                                className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
+                                className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
                                 disabled={isSavingInvoice}
                             />
                         </div>
 
-                        <div className="rounded-3xl border border-slate-800 bg-black/50 p-5 sm:p-6">
+                        <div className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-5 sm:p-6">
                             <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <StickyNote size={19} />
                                 </div>
                                 <div>
-                                    <h3 className="font-black uppercase tracking-wide text-white">
+                                    <h3 className="font-black uppercase tracking-wide text-gray-900 dark:text-white">
                                         Internal Notes
                                     </h3>
-                                    <p className="mt-0.5 text-xs text-slate-600">
+                                    <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-600">
                                         Optional notes for this invoice
                                     </p>
                                 </div>
@@ -1589,17 +1883,17 @@ export default function BillingManagement() {
                                     }))
                                 }
                                 placeholder="Add notes, reminders, payment instructions..."
-                                className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
+                                className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
                                 disabled={isSavingInvoice}
                             />
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-slate-800 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 disabled={isSavingInvoice}
                                 onClick={() => setShowInvoiceEdit(false)}
-                                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-black px-6 text-sm font-bold text-slate-300 transition hover:border-slate-600 hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black px-6 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:border-gray-300 dark:hover:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <X size={17} /> Cancel
                             </button>
@@ -1658,144 +1952,194 @@ export default function BillingManagement() {
 
 /*
 |--------------------------------------------------------------------------
-| ✅ PENDING JOB ORDERS LIST (BAGO)
+| JOB ORDERS LIST (reference para sa verification)
 |--------------------------------------------------------------------------
+|
+| Hindi na ito "pending approval" — ang BILLING na ang ina-verify ng admin.
+| Ito lang ang reference para makita kung tugma ang billing.
+|
 */
 
 function PendingJobOrdersList({
     jobOrders,
-    onApprove,
-    onReject,
-    isProcessing,
     hideAmount,
 }: {
     jobOrders: PendingJobOrder[];
-    onApprove: (jobOrder: PendingJobOrder) => void;
-    onReject: (jobOrder: PendingJobOrder) => void;
-    isProcessing: boolean;
     hideAmount: boolean;
 }) {
     if (jobOrders.length === 0) {
         return (
-            <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-slate-800 bg-black/50">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-700 bg-black text-slate-600">
+            <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-black text-gray-600 dark:text-slate-600">
                     <BriefcaseBusiness size={40} />
                 </div>
-                <h3 className="mt-5 text-xl font-black text-white">
-                    No Pending Job Orders
+                <h3 className="mt-5 text-xl font-black text-gray-900 dark:text-white">
+                    Walang Job Order
                 </h3>
-                <p className="mt-2 text-sm text-slate-500">
-                    All Job Orders have been reviewed. Great job!
+                <p className="mt-2 text-sm text-gray-500 dark:text-slate-500">
+                    Wala pang job order na na-create ng staff.
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-black shadow-2xl shadow-black/30">
+        <div className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-black shadow-2xl shadow-black/30">
+            <div className="border-b border-gray-200 dark:border-slate-800 bg-yellow-400/[0.06] px-5 py-3">
+                <p className="text-xs text-gray-700 dark:text-slate-300">
+                    <span className="font-black">Reference only.</span> Ito ang
+                    approved quotations na batayan ng billing verification.
+                    Hindi na ito ina-approve dito — ang{" "}
+                    <span className="font-black">Billing Verification</span> tab
+                    ang may Approve/Reject.
+                </p>
+            </div>
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[1200px]">
                     <thead>
-                        <tr className="border-b border-slate-800 bg-black/70">
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                        <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-black/70">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Job Order
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Client
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Project
                             </th>
-                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-slate-500">
-                                Amount
+                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Approved Quotation
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Monthly
+                            </th>
+                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Billing Progress
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Staff
-                            </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
-                                Submitted
-                            </th>
-                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-500">
-                                Actions
                             </th>
                         </tr>
                     </thead>
                     <tbody>
-                        {jobOrders.map((jobOrder) => (
-                            <tr
-                                key={jobOrder.id}
-                                className="border-b border-slate-800/70 transition-colors hover:bg-yellow-400/[0.025]"
-                            >
-                                <td className="px-5 py-5">
-                                    <p className="font-black text-white">
-                                        {jobOrder.number}
-                                    </p>
-                                    <p className="mt-1 text-xs text-yellow-400">
-                                        Pending Approval
-                                    </p>
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="font-semibold text-slate-200">
-                                        {jobOrder.client}
-                                    </p>
-                                    {jobOrder.clientEmail && (
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            {jobOrder.clientEmail}
+                        {jobOrders.map((jobOrder) => {
+                            const billings = jobOrder.billings ?? [];
+                            const months = jobOrder.billingMonths ?? 0;
+
+                            return (
+                                <tr
+                                    key={jobOrder.id}
+                                    className="border-b border-gray-200 dark:border-slate-800/70 transition-colors hover:bg-yellow-400/[0.025]"
+                                >
+                                    <td className="px-5 py-5">
+                                        <p className="font-black text-gray-900 dark:text-white">
+                                            {jobOrder.number}
                                         </p>
-                                    )}
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="text-sm text-slate-300">
-                                        {jobOrder.project}
-                                    </p>
-                                    {jobOrder.location && (
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            {jobOrder.location}
+                                        <p className="mt-1 text-xs font-bold text-yellow-600 dark:text-yellow-400">
+                                            {jobOrder.billingStatus ??
+                                                jobOrder.status}
                                         </p>
-                                    )}
-                                </td>
-                                <td className="px-5 py-5 text-right">
-                                    <p className="font-black text-yellow-400">
-                                        {money(jobOrder.amount, hideAmount)}
-                                    </p>
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="text-sm text-slate-300">
-                                        {jobOrder.staffName || "—"}
-                                    </p>
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="text-sm text-slate-300">
-                                        {formatDateTime(jobOrder.generatedAt)}
-                                    </p>
-                                    {jobOrder.generatedByName && (
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            by {jobOrder.generatedByName}
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        <p className="font-semibold text-gray-800 dark:text-slate-200">
+                                            {jobOrder.client}
                                         </p>
-                                    )}
-                                </td>
-                                <td className="px-5 py-5">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => onApprove(jobOrder)}
-                                            disabled={isProcessing}
-                                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/20 px-3 text-xs font-black text-emerald-400 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <Check size={14} /> Approve
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => onReject(jobOrder)}
-                                            disabled={isProcessing}
-                                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-red-500/20 px-3 text-xs font-black text-red-400 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <Ban size={14} /> Reject
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                        {jobOrder.clientEmail && (
+                                            <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
+                                                {jobOrder.clientEmail}
+                                            </p>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        <p className="text-sm text-gray-700 dark:text-slate-300">
+                                            {jobOrder.project}
+                                        </p>
+                                        {jobOrder.location && (
+                                            <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
+                                                {jobOrder.location}
+                                            </p>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-5 text-right">
+                                        <p className="font-black text-yellow-600 dark:text-yellow-400">
+                                            {money(
+                                                jobOrder.quotationTotal ??
+                                                    jobOrder.amount,
+                                                hideAmount,
+                                            )}
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
+                                            {months > 0
+                                                ? `${months} month${
+                                                      months > 1 ? "s" : ""
+                                                  }`
+                                                : "Walang months"}
+                                        </p>
+                                    </td>
+                                    <td className="px-5 py-5 text-right">
+                                        <p className="font-bold text-gray-900 dark:text-white">
+                                            {money(
+                                                jobOrder.monthlyAmount,
+                                                hideAmount,
+                                            )}
+                                        </p>
+                                        <p className="mt-1 text-[10px] text-gray-600 dark:text-slate-600">
+                                            ito ang ihihambing
+                                        </p>
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        {billings.length === 0 ? (
+                                            <span className="text-xs text-gray-500 dark:text-slate-500">
+                                                Walang billing
+                                            </span>
+                                        ) : (
+                                            <div className="space-y-1">
+                                                {billings.map((billing) => (
+                                                    <div
+                                                        key={billing.id}
+                                                        className="flex items-center gap-2 text-[11px]"
+                                                    >
+                                                        <span className="font-bold text-gray-800 dark:text-slate-200">
+                                                            {billing.billingNumber ??
+                                                                `#${billing.id}`}
+                                                        </span>
+                                                        <span className="text-gray-600 dark:text-slate-600">
+                                                            {billing.serviceMonth
+                                                                ? formatMonthLabel(
+                                                                      billing.serviceMonth,
+                                                                  )
+                                                                : "—"}
+                                                        </span>
+                                                        <AdminStatusBadge
+                                                            status={
+                                                                billing.status ??
+                                                                "Pending"
+                                                            }
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                            <span className="rounded border border-yellow-400/25 bg-yellow-400/5 px-1.5 py-0.5 text-[10px] font-bold text-yellow-600 dark:text-yellow-400">
+                                                P: {jobOrder.pendingCount ?? 0}
+                                            </span>
+                                            <span className="rounded border border-emerald-400/25 bg-emerald-400/5 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                A: {jobOrder.approvedCount ?? 0}
+                                            </span>
+                                            <span className="rounded border border-red-400/25 bg-red-400/5 px-1.5 py-0.5 text-[10px] font-bold text-red-600 dark:text-red-400">
+                                                R: {jobOrder.rejectedCount ?? 0}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        <p className="text-sm text-gray-700 dark:text-slate-300">
+                                            {jobOrder.staffName || "—"}
+                                        </p>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -1823,15 +2167,18 @@ function NotificationPanel({
     const unreadCount = notifications.filter((n) => !n.read).length;
 
     return (
-        <div className="absolute right-0 top-full z-[80] mt-3 w-80 overflow-hidden rounded-2xl border border-slate-700 bg-black/95 shadow-2xl backdrop-blur-md sm:w-96">
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+        <div className="absolute right-0 top-full z-[80] mt-3 w-80 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black/95 shadow-2xl backdrop-blur-md sm:w-96">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-4 py-3">
                 <div className="flex items-center gap-2">
-                    <Bell size={16} className="text-yellow-400" />
-                    <p className="text-sm font-black uppercase tracking-wide text-white">
+                    <Bell
+                        size={16}
+                        className="text-yellow-600 dark:text-yellow-400"
+                    />
+                    <p className="text-sm font-black uppercase tracking-wide text-gray-900 dark:text-white">
                         Notifications
                     </p>
                     {unreadCount > 0 && (
-                        <span className="rounded-full bg-yellow-400/15 px-2 py-0.5 text-[10px] font-black text-yellow-400">
+                        <span className="rounded-full bg-yellow-400/15 px-2 py-0.5 text-[10px] font-black text-yellow-600 dark:text-yellow-400">
                             {unreadCount} new
                         </span>
                     )}
@@ -1841,7 +2188,7 @@ function NotificationPanel({
                         <button
                             type="button"
                             onClick={onMarkAllRead}
-                            className="rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-yellow-400 transition hover:bg-yellow-400/10"
+                            className="rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-yellow-600 dark:text-yellow-400 transition hover:bg-yellow-400/10"
                         >
                             Mark all read
                         </button>
@@ -1849,7 +2196,7 @@ function NotificationPanel({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-600 dark:text-slate-400 transition hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                     >
                         <X size={15} />
                     </button>
@@ -1860,10 +2207,10 @@ function NotificationPanel({
                 {notifications.length === 0 ? (
                     <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
                         <Bell size={28} className="text-slate-700" />
-                        <p className="mt-3 text-sm font-bold text-slate-400">
+                        <p className="mt-3 text-sm font-bold text-gray-600 dark:text-slate-400">
                             No notifications
                         </p>
-                        <p className="mt-1 text-xs text-slate-600">
+                        <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
                             You're all caught up.
                         </p>
                     </div>
@@ -1881,7 +2228,7 @@ function NotificationPanel({
                                 }
                             }}
                             className={[
-                                "flex w-full items-start gap-3 border-b border-slate-800/70 px-4 py-3 text-left transition hover:bg-slate-800/40",
+                                "flex w-full items-start gap-3 border-b border-gray-200 dark:border-slate-800/70 px-4 py-3 text-left transition hover:bg-gray-100 dark:hover:bg-slate-800/40",
                                 !notification.read
                                     ? "bg-yellow-400/[0.04]"
                                     : "",
@@ -1891,12 +2238,12 @@ function NotificationPanel({
                                 className={[
                                     "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                                     notification.type === "success"
-                                        ? "bg-emerald-400/10 text-emerald-400"
+                                        ? "bg-emerald-400/10 text-emerald-600 dark:text-emerald-400"
                                         : notification.type === "error"
-                                          ? "bg-red-400/10 text-red-400"
+                                          ? "bg-red-400/10 text-red-600 dark:text-red-400"
                                           : notification.type === "warning"
-                                            ? "bg-yellow-400/10 text-yellow-400"
-                                            : "bg-blue-400/10 text-blue-400",
+                                            ? "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                            : "bg-blue-400/10 text-blue-600 dark:text-blue-400",
                                 ].join(" ")}
                             >
                                 {notification.type === "success" ? (
@@ -1911,17 +2258,17 @@ function NotificationPanel({
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
-                                    <p className="truncate text-sm font-bold text-white">
+                                    <p className="truncate text-sm font-bold text-gray-900 dark:text-white">
                                         {notification.title}
                                     </p>
                                     {!notification.read && (
                                         <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-yellow-400" />
                                     )}
                                 </div>
-                                <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-400">
+                                <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-gray-600 dark:text-slate-400">
                                     {notification.message}
                                 </p>
-                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-600">
                                     {formatDateTime(
                                         notification.createdAt ??
                                             notification.created_at,
@@ -1958,11 +2305,11 @@ function StatCard({
     active?: boolean;
 }) {
     const colorMap = {
-        yellow: "border-yellow-400/20 bg-yellow-400/5 text-yellow-400 hover:bg-yellow-400/10",
-        blue: "border-blue-400/20 bg-blue-400/5 text-blue-400 hover:bg-blue-400/10",
-        red: "border-red-400/20 bg-red-400/5 text-red-400 hover:bg-red-400/10",
-        green: "border-emerald-400/20 bg-emerald-400/5 text-emerald-400 hover:bg-emerald-400/10",
-        orange: "border-orange-400/20 bg-orange-400/5 text-orange-400 hover:bg-orange-400/10",
+        yellow: "border-yellow-400/20 bg-yellow-400/5 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10",
+        blue: "border-blue-400/20 bg-blue-400/5 text-blue-600 dark:text-blue-400 hover:bg-blue-400/10",
+        red: "border-red-400/20 bg-red-400/5 text-red-600 dark:text-red-400 hover:bg-red-400/10",
+        green: "border-emerald-400/20 bg-emerald-400/5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/10",
+        orange: "border-orange-400/20 bg-orange-400/5 text-orange-600 dark:text-orange-400 hover:bg-orange-400/10",
     };
 
     const activeRingMap = {
@@ -2019,8 +2366,8 @@ function TabButton({
             className={[
                 "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors",
                 active
-                    ? "bg-yellow-400/10 text-yellow-400 border border-yellow-400/30"
-                    : "border border-slate-700 bg-black text-slate-400 hover:border-yellow-400/30 hover:text-yellow-400",
+                    ? "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 border border-yellow-400/30"
+                    : "border border-gray-200 dark:border-slate-700 bg-white dark:bg-black text-gray-600 dark:text-slate-400 hover:border-yellow-400/30 hover:text-yellow-600 dark:hover:text-yellow-400",
             ].join(" ")}
         >
             {icon}
@@ -2030,14 +2377,88 @@ function TabButton({
                     className={[
                         "ml-1 rounded-full px-2 py-0.5 text-xs",
                         active
-                            ? "bg-yellow-400/20 text-yellow-400"
-                            : "bg-slate-800 text-slate-400",
+                            ? "bg-yellow-400/20 text-yellow-600 dark:text-yellow-400"
+                            : "bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400",
                     ].join(" ")}
                 >
                     {count}
                 </span>
             )}
         </button>
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| OK VERIFICATION BADGE — billing vs job order
+|--------------------------------------------------------------------------
+|
+| Ang admin ang nag-v-verify. Ihahambing ang BASE amount ng billing
+| (excl. VAT at additional charges) sa monthly amount ng approved
+| quotation ng Job Order.
+|
+*/
+
+function VerificationBadge({
+    invoice,
+    hideAmount,
+}: {
+    invoice: Invoice;
+    hideAmount: boolean;
+}) {
+    /* Walang Job Order -> hindi mavalidate */
+    if (!invoice.jobOrderId) {
+        return (
+            <span className="inline-flex items-center gap-1 rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800/60 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-gray-600 dark:text-slate-400">
+                <AlertCircle size={11} />
+                No JO
+            </span>
+        );
+    }
+
+    /* Walang quotation data -> manual review */
+    if (
+        invoice.matchesJobOrder === null ||
+        invoice.matchesJobOrder === undefined
+    ) {
+        return (
+            <span
+                title="Walang approved quotation data sa job order. Manual review."
+                className="inline-flex items-center gap-1 rounded-lg border border-yellow-400/25 bg-yellow-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-yellow-600 dark:text-yellow-400"
+            >
+                <AlertTriangle size={11} />
+                Review
+            </span>
+        );
+    }
+
+    if (invoice.matchesJobOrder) {
+        return (
+            <span
+                title={`Base amount ${money(invoice.baseAmount, hideAmount)} = monthly amount ng job order`}
+                className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400"
+            >
+                <CheckCircle2 size={11} />
+                Match
+            </span>
+        );
+    }
+
+    const diff = Math.abs(invoice.amountDifference ?? 0);
+
+    return (
+        <span
+            title={`Hindi tugma! Billing base ${money(invoice.baseAmount, hideAmount)} vs JO monthly ${money(invoice.expectedAmount, hideAmount)} (diff ${money(diff, hideAmount)}). I-reject para makita ng staff.`}
+            className="inline-flex flex-col items-center gap-0.5"
+        >
+            <span className="inline-flex items-center gap-1 rounded-lg border border-red-400/25 bg-red-400/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-red-600 dark:text-red-400">
+                <X size={11} />
+                Mismatch
+            </span>
+            <span className="text-[10px] font-bold text-red-500 dark:text-red-400">
+                ±{money(diff, hideAmount)}
+            </span>
+        </span>
     );
 }
 
@@ -2064,128 +2485,224 @@ function PendingInvoicesList({
 }) {
     if (invoices.length === 0) {
         return (
-            <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-slate-800 bg-black/50">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-700 bg-black text-slate-600">
-                    <CheckCircle2 size={40} className="text-emerald-400" />
+            <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-black text-gray-600 dark:text-slate-600">
+                    <CheckCircle2
+                        size={40}
+                        className="text-emerald-600 dark:text-emerald-400"
+                    />
                 </div>
-                <h3 className="mt-5 text-xl font-black text-white">
-                    No Pending Invoices
+                <h3 className="mt-5 text-xl font-black text-gray-900 dark:text-white">
+                    Walang Billing na Naghihintay ng Verification
                 </h3>
-                <p className="mt-2 text-sm text-slate-500">
-                    All invoices have been reviewed. Great job!
+                <p className="mt-2 text-sm text-gray-500 dark:text-slate-500">
+                    Na-verify na ng lahat ng billing records. Nice job!
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-black shadow-2xl shadow-black/30">
+        <div className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-black shadow-2xl shadow-black/30">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px]">
                     <thead>
-                        <tr className="border-b border-slate-800 bg-black/70">
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
-                                Invoice
+                        <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-black/70">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Billing No.
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Job Order
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Client
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Project
                             </th>
-                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Amount
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
-                                Created
+                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Verification
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Staff
                             </th>
-                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Actions
                             </th>
                         </tr>
                     </thead>
                     <tbody>
-                        {invoices.map((invoice) => (
-                            <tr
-                                key={invoice.id}
-                                className="border-b border-slate-800/70 transition-colors hover:bg-yellow-400/[0.025]"
-                            >
-                                <td className="px-5 py-5">
-                                    <button
-                                        type="button"
-                                        onClick={() => onView(invoice)}
-                                        className="text-left"
-                                    >
-                                        <p className="font-black text-white hover:text-yellow-400">
-                                            {invoice.number}
-                                        </p>
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            {formatDate(invoice.createdAt)}
-                                        </p>
-                                    </button>
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="font-semibold text-slate-200">
-                                        {invoice.client}
-                                    </p>
-                                    {invoice.clientEmail && (
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            {invoice.clientEmail}
-                                        </p>
-                                    )}
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="text-sm text-slate-300">
-                                        {invoice.project}
-                                    </p>
-                                </td>
-                                <td className="px-5 py-5 text-right">
-                                    <p className="font-black text-yellow-400">
-                                        {money(invoice.amount, hideAmount)}
-                                    </p>
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="text-sm text-slate-300">
-                                        {formatDate(invoice.createdAt)}
-                                    </p>
-                                </td>
-                                <td className="px-5 py-5">
-                                    <p className="text-sm text-slate-300">
-                                        {invoice.staffName || "—"}
-                                    </p>
-                                </td>
-                                <td className="px-5 py-5">
-                                    <div className="flex items-center justify-center gap-2">
+                        {invoices.map((invoice) => {
+                            const isMismatch =
+                                invoice.matchesJobOrder === false;
+                            const hasJobOrder = Boolean(invoice.jobOrderId);
+
+                            return (
+                                <tr
+                                    key={invoice.id}
+                                    className="border-b border-gray-200 dark:border-slate-800/70 transition-colors hover:bg-yellow-400/[0.025]"
+                                >
+                                    <td className="px-5 py-5">
                                         <button
                                             type="button"
                                             onClick={() => onView(invoice)}
-                                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                                            className="text-left"
                                         >
-                                            <Eye size={16} />
+                                            <p className="font-black text-gray-900 dark:text-white hover:text-yellow-600 dark:hover:text-yellow-400">
+                                                {invoice.billingNumber ?? "—"}
+                                            </p>
+                                            {/*
+                                            | Invoice No. only appears AFTER approval.
+                                            | Pending/Rejected = wala pa.
+                                            */}
+                                            {invoice.hasInvoiceNumber && (
+                                                <p className="mt-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                    Invoice: {invoice.number}
+                                                </p>
+                                            )}
+                                            <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
+                                                {invoice.serviceMonth
+                                                    ? formatMonthLabel(
+                                                          invoice.serviceMonth,
+                                                      )
+                                                    : formatDate(
+                                                          invoice.createdAt,
+                                                      )}
+                                            </p>
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => onApprove(invoice)}
-                                            disabled={isProcessing}
-                                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <Check size={16} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => onReject(invoice)}
-                                            disabled={isProcessing}
-                                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/20 text-red-400 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <Ban size={16} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        {invoice.jobOrderNumber ? (
+                                            <span className="inline-flex rounded-lg border border-yellow-400/20 bg-yellow-400/5 px-2 py-0.5 text-xs font-bold text-yellow-600 dark:text-yellow-400">
+                                                {invoice.jobOrderNumber}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-500 dark:text-slate-500">
+                                                No JO
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        <p className="font-semibold text-gray-800 dark:text-slate-200">
+                                            {invoice.client}
+                                        </p>
+                                        {invoice.clientEmail && (
+                                            <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
+                                                {invoice.clientEmail}
+                                            </p>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        <p className="text-sm text-gray-700 dark:text-slate-300">
+                                            {invoice.project}
+                                        </p>
+                                    </td>
+                                    <td className="px-5 py-5 text-right">
+                                        <p className="font-black text-yellow-600 dark:text-yellow-400">
+                                            {money(invoice.amount, hideAmount)}
+                                        </p>
+                                        {((invoice.vatAmount ?? 0) > 0 ||
+                                            (invoice.additionalCharges ?? 0) >
+                                                0) && (
+                                            <p className="mt-1 text-[11px] text-gray-600 dark:text-slate-600">
+                                                base{" "}
+                                                {money(
+                                                    invoice.baseAmount,
+                                                    hideAmount,
+                                                )}
+                                                {(invoice.additionalCharges ??
+                                                    0) > 0 && (
+                                                    <>
+                                                        {" + "}
+                                                        {money(
+                                                            invoice.additionalCharges,
+                                                            hideAmount,
+                                                        )}
+                                                    </>
+                                                )}
+                                                {(invoice.vatAmount ?? 0) >
+                                                    0 && (
+                                                    <>
+                                                        {" + VAT "}
+                                                        {money(
+                                                            invoice.vatAmount,
+                                                            hideAmount,
+                                                        )}
+                                                    </>
+                                                )}
+                                            </p>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-5 text-center">
+                                        <VerificationBadge
+                                            invoice={invoice}
+                                            hideAmount={hideAmount}
+                                        />
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        <p className="text-sm text-gray-700 dark:text-slate-300">
+                                            {invoice.staffName || "—"}
+                                        </p>
+                                    </td>
+                                    <td className="px-5 py-5">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => onView(invoice)}
+                                                title="View billing breakdown"
+                                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
+                                            >
+                                                <Eye size={16} />
+                                            </button>
+                                            {isMismatch ? (
+                                                /* MISMATCH - Approve disabled, Reject highlighted */
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        onReject(invoice)
+                                                    }
+                                                    disabled={isProcessing}
+                                                    title="Hindi tugma ang billing at job order. I-reject para makita ng staff ang problema."
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/25 text-red-600 dark:text-red-400 transition hover:bg-red-500/35 disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    <Ban size={16} />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        onApprove(invoice)
+                                                    }
+                                                    disabled={isProcessing}
+                                                    title={
+                                                        hasJobOrder
+                                                            ? "Tugma sa job order - approve"
+                                                            : "Walang job order - approve bilang service invoice"
+                                                    }
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    <Check size={16} />
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    onReject(invoice)
+                                                }
+                                                disabled={isProcessing}
+                                                title="Reject with reason"
+                                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 transition hover:border-red-400/40 hover:text-red-600 dark:hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -2206,6 +2723,7 @@ function AllInvoicesList({
     onApprove,
     onReject,
     onSendEmail,
+    onPrint,
     viewMode,
     isProcessing,
     isSendingEmail,
@@ -2217,6 +2735,7 @@ function AllInvoicesList({
     onApprove: (invoice: Invoice) => void;
     onReject: (invoice: Invoice) => void;
     onSendEmail: (invoice: Invoice) => void;
+    onPrint: (invoice: Invoice) => void;
     viewMode: "list" | "grid";
     isProcessing: boolean;
     isSendingEmail: boolean;
@@ -2224,14 +2743,14 @@ function AllInvoicesList({
 }) {
     if (invoices.length === 0) {
         return (
-            <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-slate-800 bg-black/50">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-700 bg-black text-slate-600">
+            <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-black text-gray-600 dark:text-slate-600">
                     <FileText size={40} />
                 </div>
-                <h3 className="mt-5 text-xl font-black text-white">
+                <h3 className="mt-5 text-xl font-black text-gray-900 dark:text-white">
                     No Invoices Found
                 </h3>
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-sm text-gray-500 dark:text-slate-500">
                     Try adjusting your search or filters.
                 </p>
             </div>
@@ -2250,6 +2769,7 @@ function AllInvoicesList({
                         onApprove={onApprove}
                         onReject={onReject}
                         onSendEmail={onSendEmail}
+                        onPrint={onPrint}
                         isProcessing={isProcessing}
                         isSendingEmail={isSendingEmail}
                         hideAmount={hideAmount}
@@ -2260,30 +2780,33 @@ function AllInvoicesList({
     }
 
     return (
-        <div className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-black shadow-2xl shadow-black/30">
+        <div className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-black shadow-2xl shadow-black/30">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[1200px]">
                     <thead>
-                        <tr className="border-b border-slate-800 bg-black/70">
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
-                                Invoice
+                        <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-black/70">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Billing No.
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                                Job Order
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Client
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Project
                             </th>
-                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Amount
                             </th>
-                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Due Date
                             </th>
-                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Status
                             </th>
-                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-slate-500">
+                            <th className="px-5 py-4 text-center text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Actions
                             </th>
                         </tr>
@@ -2292,7 +2815,7 @@ function AllInvoicesList({
                         {invoices.map((invoice) => (
                             <tr
                                 key={invoice.id}
-                                className="border-b border-slate-800/70 transition-colors hover:bg-yellow-400/[0.025]"
+                                className="border-b border-gray-200 dark:border-slate-800/70 transition-colors hover:bg-yellow-400/[0.025]"
                             >
                                 <td className="px-5 py-5">
                                     <button
@@ -2300,36 +2823,60 @@ function AllInvoicesList({
                                         onClick={() => onView(invoice)}
                                         className="text-left"
                                     >
-                                        <p className="font-black text-white hover:text-yellow-400">
-                                            {invoice.number}
+                                        <p className="font-black text-gray-900 dark:text-white hover:text-yellow-600 dark:hover:text-yellow-400">
+                                            {invoice.billingNumber ?? "—"}
                                         </p>
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            {formatDate(invoice.createdAt)}
+                                        {/*
+                                        | Invoice No. only shows up AFTER approval.
+                                        | Hindi pa approved = wala pa.
+                                        */}
+                                        {invoice.hasInvoiceNumber && (
+                                            <p className="mt-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                Invoice: {invoice.number}
+                                            </p>
+                                        )}
+                                        <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
+                                            {invoice.serviceMonth
+                                                ? formatMonthLabel(
+                                                      invoice.serviceMonth,
+                                                  )
+                                                : formatDate(invoice.createdAt)}
                                         </p>
                                     </button>
                                 </td>
                                 <td className="px-5 py-5">
-                                    <p className="font-semibold text-slate-200">
+                                    {invoice.jobOrderNumber ? (
+                                        <span className="inline-flex rounded-lg border border-yellow-400/20 bg-yellow-400/5 px-2 py-0.5 text-xs font-bold text-yellow-600 dark:text-yellow-400">
+                                            {invoice.jobOrderNumber}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-500 dark:text-slate-500">
+                                            —
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="px-5 py-5">
+                                    <p className="font-semibold text-gray-800 dark:text-slate-200">
                                         {invoice.client}
                                     </p>
                                     {invoice.clientEmail && (
-                                        <p className="mt-1 text-xs text-slate-600">
+                                        <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
                                             {invoice.clientEmail}
                                         </p>
                                     )}
                                 </td>
                                 <td className="px-5 py-5">
-                                    <p className="truncate text-sm text-slate-300 max-w-[180px]">
+                                    <p className="truncate text-sm text-gray-700 dark:text-slate-300 max-w-[180px]">
                                         {invoice.project}
                                     </p>
                                 </td>
                                 <td className="px-5 py-5 text-right">
-                                    <p className="font-black text-white">
+                                    <p className="font-black text-gray-900 dark:text-white">
                                         {money(invoice.amount, hideAmount)}
                                     </p>
                                 </td>
                                 <td className="px-5 py-5">
-                                    <p className="text-sm text-slate-300">
+                                    <p className="text-sm text-gray-700 dark:text-slate-300">
                                         {formatDate(invoice.dueDate)}
                                     </p>
                                 </td>
@@ -2344,6 +2891,7 @@ function AllInvoicesList({
                                         onApprove={onApprove}
                                         onReject={onReject}
                                         onSendEmail={onSendEmail}
+                                        onPrint={onPrint}
                                         isProcessing={isProcessing}
                                         isSendingEmail={isSendingEmail}
                                     />
@@ -2370,6 +2918,7 @@ function InvoiceGridCard({
     onApprove,
     onReject,
     onSendEmail,
+    onPrint,
     isProcessing,
     isSendingEmail,
     hideAmount,
@@ -2380,56 +2929,84 @@ function InvoiceGridCard({
     onApprove: (invoice: Invoice) => void;
     onReject: (invoice: Invoice) => void;
     onSendEmail: (invoice: Invoice) => void;
+    onPrint: (invoice: Invoice) => void;
     isProcessing: boolean;
     isSendingEmail: boolean;
     hideAmount: boolean;
 }) {
     return (
-        <div className="rounded-2xl border border-slate-800 bg-black/50 p-5 transition-colors hover:border-yellow-400/30">
+        <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-5 transition-colors hover:border-yellow-400/30">
             <div className="flex items-start justify-between">
                 <div>
-                    <p className="text-xs text-slate-600">
-                        {formatDate(invoice.createdAt)}
+                    <p className="text-xs text-gray-600 dark:text-slate-600">
+                        {invoice.serviceMonth
+                            ? formatMonthLabel(invoice.serviceMonth)
+                            : formatDate(invoice.createdAt)}
                     </p>
-                    <p className="mt-1 font-black text-white">
-                        {invoice.number}
+                    <p className="mt-1 font-black text-gray-900 dark:text-white">
+                        {invoice.billingNumber ?? invoice.number}
                     </p>
+                    {invoice.jobOrderNumber && (
+                        <p className="mt-1 text-[11px] font-bold text-yellow-600 dark:text-yellow-400">
+                            {invoice.jobOrderNumber}
+                        </p>
+                    )}
                 </div>
                 <AdminStatusBadge status={invoice.status} />
             </div>
 
             <div className="mt-4">
-                <p className="font-semibold text-slate-200">{invoice.client}</p>
-                <p className="mt-1 text-sm text-slate-500">{invoice.project}</p>
+                <p className="font-semibold text-gray-800 dark:text-slate-200">
+                    {invoice.client}
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-500">
+                    {invoice.project}
+                </p>
             </div>
 
             <div className="mt-2">
-                <p className="text-xs text-slate-500">Payment Method</p>
-                <p className="text-sm font-semibold text-white">
+                <p className="text-xs text-gray-500 dark:text-slate-500">
+                    Payment Method
+                </p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
                     {invoice.paymentMethod || "Bank Transfer"}
                 </p>
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-4">
+            <div className="mt-4 flex items-center justify-between border-t border-gray-200 dark:border-slate-800 pt-4">
                 <div>
-                    <p className="text-sm text-slate-500">Amount</p>
-                    <p className="text-xl font-black text-yellow-400">
+                    <p className="text-sm text-gray-500 dark:text-slate-500">
+                        Amount
+                    </p>
+                    <p className="text-xl font-black text-yellow-600 dark:text-yellow-400">
                         {money(invoice.amount, hideAmount)}
                     </p>
                 </div>
                 <div className="text-right">
-                    <p className="text-sm text-slate-500">VAT (12%)</p>
-                    <p className="text-sm font-bold text-yellow-400">
-                        {money(invoice.amount * VAT_RATE, hideAmount)}
+                    <p className="text-sm text-gray-500 dark:text-slate-500">
+                        Base
+                    </p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                        {money(invoice.baseAmount, hideAmount)}
                     </p>
                 </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
+            {(invoice.vatAmount ?? 0) > 0 &&
+                (invoice.additionalCharges ?? 0) > 0 && (
+                    <div className="mt-4">
+                        <VerificationBadge
+                            invoice={invoice}
+                            hideAmount={hideAmount}
+                        />
+                    </div>
+                )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
                 <button
                     type="button"
                     onClick={() => onView(invoice)}
-                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-700 text-sm font-bold text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                 >
                     <Eye size={15} /> View
                 </button>
@@ -2437,9 +3014,17 @@ function InvoiceGridCard({
                     type="button"
                     onClick={() => onEdit(invoice)}
                     disabled={isProcessing}
-                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-yellow-400/20 text-sm font-bold text-yellow-400 transition hover:bg-yellow-400/30 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-yellow-400/20 text-sm font-bold text-yellow-600 dark:text-yellow-400 transition hover:bg-yellow-400/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <Edit3 size={15} /> Edit
+                </button>
+                <button
+                    type="button"
+                    onClick={() => onPrint(invoice)}
+                    disabled={isProcessing}
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <Printer size={15} /> Print
                 </button>
                 {invoice.status === "Pending" && (
                     <>
@@ -2447,7 +3032,7 @@ function InvoiceGridCard({
                             type="button"
                             onClick={() => onApprove(invoice)}
                             disabled={isProcessing}
-                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/20 text-sm font-bold text-emerald-400 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/20 text-sm font-bold text-emerald-600 dark:text-emerald-400 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Check size={15} /> Approve
                         </button>
@@ -2455,7 +3040,7 @@ function InvoiceGridCard({
                             type="button"
                             onClick={() => onReject(invoice)}
                             disabled={isProcessing}
-                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-500/20 text-sm font-bold text-red-400 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-500/20 text-sm font-bold text-red-600 dark:text-red-400 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Ban size={15} /> Reject
                         </button>
@@ -2466,7 +3051,7 @@ function InvoiceGridCard({
                         type="button"
                         onClick={() => onSendEmail(invoice)}
                         disabled={isSendingEmail}
-                        className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-500/20 text-sm font-bold text-blue-400 transition hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-500/20 text-sm font-bold text-blue-600 dark:text-blue-400 transition hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <Mail size={15} /> Send
                     </button>
@@ -2489,6 +3074,7 @@ function AdminInvoiceActions({
     onApprove,
     onReject,
     onSendEmail,
+    onPrint,
     isProcessing,
     isSendingEmail,
 }: {
@@ -2498,6 +3084,7 @@ function AdminInvoiceActions({
     onApprove: (invoice: Invoice) => void;
     onReject: (invoice: Invoice) => void;
     onSendEmail: (invoice: Invoice) => void;
+    onPrint: (invoice: Invoice) => void;
     isProcessing: boolean;
     isSendingEmail: boolean;
 }) {
@@ -2574,7 +3161,7 @@ function AdminInvoiceActions({
                     ref={buttonRef}
                     type="button"
                     onClick={() => setOpen(!open)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-black text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black text-gray-600 dark:text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                 >
                     <MoreVertical size={17} />
                 </button>
@@ -2582,14 +3169,14 @@ function AdminInvoiceActions({
             {open && (
                 <div
                     ref={menuRef}
-                    className="fixed z-[9999] w-56 overflow-hidden rounded-2xl border border-slate-700 bg-black shadow-2xl shadow-black/50"
+                    className="fixed z-[9999] w-56 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black shadow-2xl shadow-black/50"
                     style={{
                         top: `${menuPosition.top}px`,
                         left: `${menuPosition.left}px`,
                     }}
                 >
-                    <div className="border-b border-slate-800 px-4 py-2.5">
-                        <p className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-slate-600">
+                    <div className="border-b border-gray-200 dark:border-slate-800 px-4 py-2.5">
+                        <p className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-slate-600">
                             Invoice Actions
                         </p>
                     </div>
@@ -2599,10 +3186,16 @@ function AdminInvoiceActions({
                         onClick={() => action(() => onView(invoice))}
                     />
                     <ActionItem
+                        icon={<Printer size={16} />}
+                        label="Print Invoice"
+                        onClick={() => action(() => onPrint(invoice))}
+                        className="text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700/40"
+                    />
+                    <ActionItem
                         icon={<Edit3 size={16} />}
                         label="Edit Invoice"
                         onClick={() => action(() => onEdit(invoice))}
-                        className="text-yellow-400 hover:bg-yellow-400/10"
+                        className="text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                     />
                     {invoice.status === "Pending" && (
                         <>
@@ -2610,13 +3203,13 @@ function AdminInvoiceActions({
                                 icon={<Check size={16} />}
                                 label="Approve"
                                 onClick={() => action(() => onApprove(invoice))}
-                                className="text-emerald-400 hover:bg-emerald-400/10"
+                                className="text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/10"
                             />
                             <ActionItem
                                 icon={<Ban size={16} />}
                                 label="Reject"
                                 onClick={() => action(() => onReject(invoice))}
-                                className="text-red-400 hover:bg-red-400/10"
+                                className="text-red-600 dark:text-red-400 hover:bg-red-400/10"
                             />
                         </>
                     )}
@@ -2625,7 +3218,7 @@ function AdminInvoiceActions({
                             icon={<Mail size={16} />}
                             label="Send to Client"
                             onClick={() => action(() => onSendEmail(invoice))}
-                            className="text-blue-400 hover:bg-blue-400/10"
+                            className="text-blue-600 dark:text-blue-400 hover:bg-blue-400/10"
                         />
                     )}
                 </div>
@@ -2650,7 +3243,7 @@ function ActionItem({
             type="button"
             onClick={onClick}
             className={[
-                "flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-300 transition hover:bg-yellow-400/10 hover:text-yellow-400",
+                "flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-slate-300 transition hover:bg-yellow-400/10 hover:text-yellow-600 dark:hover:text-yellow-400",
                 className,
             ].join(" ")}
         >
@@ -2668,12 +3261,17 @@ function ActionItem({
 function AdminStatusBadge({ status }: { status: string }) {
     const normalized = status.toLowerCase();
     const statusMap: Record<string, string> = {
-        pending: "border-yellow-400/20 bg-yellow-400/10 text-yellow-400",
-        partial: "border-orange-400/20 bg-orange-400/10 text-orange-400",
-        paid: "border-emerald-400/20 bg-emerald-400/10 text-emerald-400",
-        overdue: "border-red-400/20 bg-red-400/10 text-red-400",
-        rejected: "border-red-400/20 bg-red-400/10 text-red-400",
-        approved: "border-blue-400/20 bg-blue-400/10 text-blue-400",
+        pending:
+            "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400",
+        partial:
+            "border-orange-400/20 bg-orange-400/10 text-orange-600 dark:text-orange-400",
+        paid: "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400",
+        overdue:
+            "border-red-400/20 bg-red-400/10 text-red-600 dark:text-red-400",
+        rejected:
+            "border-red-400/20 bg-red-400/10 text-red-600 dark:text-red-400",
+        approved:
+            "border-blue-400/20 bg-blue-400/10 text-blue-600 dark:text-blue-400",
     };
 
     return (
@@ -2681,7 +3279,7 @@ function AdminStatusBadge({ status }: { status: string }) {
             className={[
                 "inline-flex rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-wide",
                 statusMap[normalized] ||
-                    "border-slate-700 bg-slate-800/60 text-slate-300",
+                    "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 text-gray-700 dark:text-slate-300",
             ].join(" ")}
         >
             {status || "Pending"}
@@ -2701,6 +3299,7 @@ function AdminInvoiceViewModal({
     onApprove,
     onReject,
     onSendEmail,
+    onPrint,
     isProcessing,
     isSendingEmail,
     hideAmount,
@@ -2710,55 +3309,343 @@ function AdminInvoiceViewModal({
     onApprove: () => void;
     onReject: () => void;
     onSendEmail: () => void;
+    onPrint: () => void;
     isProcessing: boolean;
     isSendingEmail: boolean;
     hideAmount: boolean;
 }) {
+    const baseAmount = invoice.baseAmount ?? invoice.amount;
+    const vatAmount = invoice.vatAmount ?? 0;
+    const additionalCharges = invoice.additionalCharges ?? 0;
     const totalSales = invoice.amount;
-    const vatAmount = totalSales * VAT_RATE;
-    const netOfVAT = totalSales;
     const withholdingTax = 0;
-    const totalAmountDue = netOfVAT + vatAmount;
+    const totalAmountDue = invoice.totalAmount ?? invoice.amount;
 
-    const invoiceType = invoice.items.some(
-        (item) =>
-            item.description?.toLowerCase().includes("equipment") ||
-            item.description?.toLowerCase().includes("logistics") ||
-            item.description?.toLowerCase().includes("service"),
-    )
-        ? "Service Invoice"
-        : "Sales Invoice";
+    const isApproved = invoice.status === "Approved";
 
     return (
-        <Modal title={`Invoice ${invoice.number}`} onClose={onClose} size="lg">
+        <Modal
+            title={
+                isApproved
+                    ? `Service Invoice ${invoice.number ?? ""}`
+                    : `Billing Record ${invoice.billingNumber ?? ""}`
+            }
+            onClose={onClose}
+            size="lg"
+        >
             <div className="space-y-6">
-                <div className="rounded-2xl border border-yellow-400/10 bg-black/70 p-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p className="text-xs font-black uppercase tracking-wider text-slate-600">
-                                {invoiceType}
+                <div className="rounded-2xl border border-yellow-400/10 bg-gray-50 dark:bg-black/70 p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                            {/*
+                            | OK WALANG "Invoice" label sa taas ng Billing Record.
+                            | Billing Record  → Billing No. (+ walang invoice number)
+                            | Service Invoice → Invoice No. + Billing No. + JO No.
+                            */}
+                            <p className="text-xs font-black uppercase tracking-wider text-gray-600 dark:text-slate-600">
+                                {isApproved
+                                    ? "Service Invoice"
+                                    : "Billing Record"}
                             </p>
-                            <p className="mt-1 text-2xl font-black text-yellow-400">
-                                {invoice.number}
+                            <p className="mt-1 text-2xl font-black text-yellow-600 dark:text-yellow-400">
+                                {isApproved
+                                    ? (invoice.number ?? "—")
+                                    : (invoice.billingNumber ?? "—")}
                             </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-slate-600">
+                                {isApproved && invoice.billingNumber && (
+                                    <span>
+                                        Billing No.:{" "}
+                                        <span className="font-bold text-gray-800 dark:text-slate-300">
+                                            {invoice.billingNumber}
+                                        </span>
+                                    </span>
+                                )}
+                                {invoice.jobOrderNumber && (
+                                    <span>
+                                        Job Order:{" "}
+                                        <span className="font-bold text-gray-800 dark:text-slate-300">
+                                            {invoice.jobOrderNumber}
+                                        </span>
+                                    </span>
+                                )}
+                                {invoice.serviceMonth && (
+                                    <span>
+                                        Service Date:{" "}
+                                        <span className="font-bold text-gray-800 dark:text-slate-300">
+                                            {formatMonthLabel(
+                                                invoice.serviceMonth,
+                                            )}
+                                        </span>
+                                    </span>
+                                )}
+                            </div>
+                            {!isApproved && (
+                                <p className="mt-2 rounded-lg border border-yellow-400/20 bg-yellow-400/[0.06] px-2.5 py-1.5 text-[11px] text-gray-600 dark:text-slate-600">
+                                    Walang invoice number pa. Magigigawa ito pag
+                                    na-approve.
+                                </p>
+                            )}
                         </div>
                         <AdminStatusBadge status={invoice.status} />
                     </div>
                 </div>
 
+                {/* ✅ VERIFICATION PANEL — billing vs job order */}
+                {invoice.jobOrderId && (
+                    <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/70 p-5">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <BriefcaseBusiness
+                                    size={18}
+                                    className="text-yellow-600 dark:text-yellow-400"
+                                />
+                                <p className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                                    Verification — Job Order vs Billing
+                                </p>
+                            </div>
+                            <VerificationBadge
+                                invoice={invoice}
+                                hideAmount={hideAmount}
+                            />
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {/* LEFT: JOB ORDER */}
+                            <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-black/50 p-4">
+                                <p className="mb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                    Approved Quotation (Job Order)
+                                </p>
+                                <dl className="space-y-2 text-sm">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <dt className="text-slate-600">
+                                            Quotation Total
+                                        </dt>
+                                        <dd className="font-bold text-gray-900 dark:text-white">
+                                            {money(
+                                                invoice.quotationTotal,
+                                                hideAmount,
+                                            )}
+                                        </dd>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <dt className="text-slate-600">
+                                            Months
+                                        </dt>
+                                        <dd className="font-bold text-gray-900 dark:text-white">
+                                            {invoice.billingMonths || "—"}
+                                        </dd>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-3 border-t border-gray-200 dark:border-slate-800 pt-2">
+                                        <dt className="text-slate-600">
+                                            Monthly Amount
+                                        </dt>
+                                        <dd className="font-black text-yellow-600 dark:text-yellow-400">
+                                            {money(
+                                                invoice.expectedAmount,
+                                                hideAmount,
+                                            )}
+                                        </dd>
+                                    </div>
+                                </dl>
+                                {invoice.jobOrderStatus && (
+                                    <p className="mt-3 text-[11px] text-slate-600">
+                                        JO Status:{" "}
+                                        <span className="font-bold">
+                                            {invoice.jobOrderStatus}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* RIGHT: BILLING */}
+                            <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-black/50 p-4">
+                                <p className="mb-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                    Billing Breakdown
+                                </p>
+                                <dl className="space-y-2 text-sm">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <dt className="text-slate-600">
+                                            Base Amount
+                                        </dt>
+                                        <dd
+                                            className={[
+                                                "font-bold",
+                                                invoice.matchesJobOrder ===
+                                                false
+                                                    ? "text-red-600 dark:text-red-400"
+                                                    : "text-gray-900 dark:text-white",
+                                            ].join(" ")}
+                                        >
+                                            {money(baseAmount, hideAmount)}
+                                        </dd>
+                                    </div>
+                                    {additionalCharges > 0 && (
+                                        <div className="flex items-center justify-between gap-3">
+                                            <dt className="text-slate-600">
+                                                Additional Charges
+                                            </dt>
+                                            <dd className="font-bold text-blue-600 dark:text-blue-400">
+                                                +{" "}
+                                                {money(
+                                                    additionalCharges,
+                                                    hideAmount,
+                                                )}
+                                            </dd>
+                                        </div>
+                                    )}
+                                    <div
+                                        className={[
+                                            "flex items-center justify-between gap-3",
+                                            vatAmount > 0 ? "" : "opacity-40",
+                                        ].join(" ")}
+                                    >
+                                        <dt className="text-slate-600">
+                                            VAT ({invoice.vatRate ?? 12}%)
+                                        </dt>
+                                        <dd className="font-bold text-emerald-600 dark:text-emerald-400">
+                                            {vatAmount > 0
+                                                ? `+ ${money(
+                                                      vatAmount,
+                                                      hideAmount,
+                                                  )}`
+                                                : "—"}
+                                        </dd>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-3 border-t border-gray-200 dark:border-slate-800 pt-2">
+                                        <dt className="text-slate-600">
+                                            Grand Total
+                                        </dt>
+                                        <dd className="font-black text-yellow-600 dark:text-yellow-400">
+                                            {money(totalSales, hideAmount)}
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        </div>
+
+                        {/* ✅ VERIFICATION VERDICT */}
+                        <div
+                            className={[
+                                "mt-4 flex items-start gap-3 rounded-xl border p-4",
+                                invoice.matchesJobOrder === false
+                                    ? "border-red-400/25 bg-red-400/[0.06]"
+                                    : invoice.matchesJobOrder === true
+                                      ? "border-emerald-400/25 bg-emerald-400/[0.06]"
+                                      : "border-yellow-400/25 bg-yellow-400/[0.06]",
+                            ].join(" ")}
+                        >
+                            {invoice.matchesJobOrder === false ? (
+                                <X
+                                    size={18}
+                                    className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
+                                />
+                            ) : invoice.matchesJobOrder === true ? (
+                                <CheckCircle2
+                                    size={18}
+                                    className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                                />
+                            ) : (
+                                <AlertTriangle
+                                    size={18}
+                                    className="mt-0.5 shrink-0 text-yellow-600 dark:text-yellow-400"
+                                />
+                            )}
+                            <div className="min-w-0 text-sm">
+                                {invoice.matchesJobOrder === false ? (
+                                    <>
+                                        <p className="font-black text-red-600 dark:text-red-400">
+                                            Hindi tugma ang billing at job order
+                                        </p>
+                                        <p className="mt-1 text-gray-700 dark:text-slate-300">
+                                            Base amount ng billing{" "}
+                                            <span className="font-bold">
+                                                {money(baseAmount, hideAmount)}
+                                            </span>{" "}
+                                            pero ang monthly amount ng approved
+                                            quotation ay{" "}
+                                            <span className="font-bold">
+                                                {money(
+                                                    invoice.expectedAmount,
+                                                    hideAmount,
+                                                )}
+                                            </span>{" "}
+                                            (difference{" "}
+                                            <span className="font-bold">
+                                                {money(
+                                                    Math.abs(
+                                                        invoice.amountDifference ??
+                                                            0,
+                                                    ),
+                                                    hideAmount,
+                                                )}
+                                            </span>
+                                            ). Hindi puwedeng i-approve —
+                                            pumunta sa <strong>Reject</strong>{" "}
+                                            at sabihin ang problema sa staff.
+                                        </p>
+                                    </>
+                                ) : invoice.matchesJobOrder === true ? (
+                                    <>
+                                        <p className="font-black text-emerald-600 dark:text-emerald-400">
+                                            Tugma ang billing at job order
+                                        </p>
+                                        <p className="mt-1 text-gray-700 dark:text-slate-300">
+                                            Base amount{" "}
+                                            <span className="font-bold">
+                                                {money(baseAmount, hideAmount)}
+                                            </span>{" "}
+                                            = monthly amount ng approved
+                                            quotation. Maaari nang i-approve.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="font-black text-yellow-600 dark:text-yellow-400">
+                                            Manual review
+                                        </p>
+                                        <p className="mt-1 text-gray-700 dark:text-slate-300">
+                                            Walang approved quotation data sa
+                                            Job Order — hindi maaaring i-verify
+                                            awtomatiko. Suriin manu-mano.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {invoice.verifiedAt && (
+                            <p className="mt-3 text-[11px] text-slate-600">
+                                Verified on {formatDateTime(invoice.verifiedAt)}
+                                {invoice.verifiedBy && (
+                                    <>
+                                        {" by "}
+                                        <span className="font-bold">
+                                            {invoice.verifiedBy}
+                                        </span>
+                                    </>
+                                )}
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 {invoice.status === "Rejected" && invoice.rejectionReason && (
                     <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5">
                         <div className="flex items-start gap-3">
-                            <Ban size={20} className="mt-0.5 text-red-400" />
+                            <Ban
+                                size={20}
+                                className="mt-0.5 text-red-600 dark:text-red-400"
+                            />
                             <div>
-                                <p className="font-bold text-red-400">
+                                <p className="font-bold text-red-600 dark:text-red-400">
                                     Rejection Reason
                                 </p>
-                                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-slate-300">
                                     {invoice.rejectionReason}
                                 </p>
                                 {invoice.rejectedAt && (
-                                    <p className="mt-2 text-xs text-slate-600">
+                                    <p className="mt-2 text-xs text-gray-600 dark:text-slate-600">
                                         Rejected on{" "}
                                         {formatDateTime(invoice.rejectedAt)}
                                     </p>
@@ -2773,18 +3660,18 @@ function AdminInvoiceViewModal({
                         <div className="flex items-start gap-3">
                             <CheckCircle2
                                 size={20}
-                                className="mt-0.5 text-blue-400"
+                                className="mt-0.5 text-blue-600 dark:text-blue-400"
                             />
                             <div>
-                                <p className="font-bold text-blue-400">
+                                <p className="font-bold text-blue-600 dark:text-blue-400">
                                     Invoice Approved
                                 </p>
-                                <p className="mt-1 text-sm text-slate-400">
+                                <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                                     Approved on{" "}
                                     {formatDateTime(invoice.approvedAt)}
                                 </p>
                                 {invoice.approvedBy && (
-                                    <p className="mt-1 text-xs text-slate-600">
+                                    <p className="mt-1 text-xs text-gray-600 dark:text-slate-600">
                                         By {invoice.approvedBy}
                                     </p>
                                 )}
@@ -2829,44 +3716,42 @@ function AdminInvoiceViewModal({
                     />
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-800">
-                    <div className="border-b border-slate-800 bg-black px-5 py-4">
-                        <p className="text-xs font-black uppercase tracking-wider text-slate-500">
-                            {invoiceType} Items
+                <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
+                    <div className="border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-black px-5 py-4">
+                        <p className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                            {isApproved
+                                ? "Service Invoice Items"
+                                : "Billing Items"}
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-12 gap-2 border-b border-slate-800 bg-black/50 px-5 py-3 text-xs font-black uppercase tracking-wider text-slate-500">
+                    <div className="grid grid-cols-12 gap-2 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 px-5 py-3 text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         <div className="col-span-1">Qty</div>
                         <div className="col-span-5">
-                            {invoiceType === "Service Invoice"
-                                ? "Description"
-                                : "Particulars"}
+                            {isApproved ? "Description" : "Particulars"}
                         </div>
                         <div className="col-span-2 text-right">
-                            {invoiceType === "Service Invoice"
-                                ? "Unit Cost"
-                                : "Unit Price"}
+                            {isApproved ? "Unit Cost" : "Unit Price"}
                         </div>
                         <div className="col-span-4 text-right">Amount</div>
                     </div>
 
-                    <div className="divide-y divide-slate-800">
+                    <div className="divide-y divide-gray-200 dark:divide-slate-800">
                         {invoice.items.map((item) => (
                             <div
                                 key={item.id}
                                 className="grid grid-cols-12 gap-2 px-5 py-4"
                             >
-                                <div className="col-span-1 font-semibold text-slate-300">
+                                <div className="col-span-1 font-semibold text-gray-700 dark:text-slate-300">
                                     {item.quantity}
                                 </div>
-                                <div className="col-span-5 text-slate-200">
+                                <div className="col-span-5 text-gray-800 dark:text-slate-200">
                                     {item.description}
                                 </div>
-                                <div className="col-span-2 text-right text-slate-300">
+                                <div className="col-span-2 text-right text-gray-700 dark:text-slate-300">
                                     {money(item.unitPrice, hideAmount)}
                                 </div>
-                                <div className="col-span-4 text-right font-bold text-white">
+                                <div className="col-span-4 text-right font-bold text-gray-900 dark:text-white">
                                     {money(
                                         item.quantity * item.unitPrice,
                                         hideAmount,
@@ -2876,61 +3761,79 @@ function AdminInvoiceViewModal({
                         ))}
                     </div>
 
-                    <div className="border-t border-slate-800 bg-black/50 px-5 py-4">
+                    <div className="border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 px-5 py-4">
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold uppercase tracking-wide text-slate-400">
-                                    Total Sales
+                                <span className="font-bold uppercase tracking-wide text-gray-600 dark:text-slate-400">
+                                    Base Amount
                                 </span>
-                                <span className="text-lg font-bold text-white">
+                                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                                    {money(baseAmount, hideAmount)}
+                                </span>
+                            </div>
+
+                            {additionalCharges > 0 && (
+                                <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3">
+                                    <span className="font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                                        Additional Charges
+                                    </span>
+                                    <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                        + {money(additionalCharges, hideAmount)}
+                                    </span>
+                                </div>
+                            )}
+
+                            <div
+                                className={[
+                                    "flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3",
+                                    vatAmount > 0 ? "" : "opacity-40",
+                                ].join(" ")}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Percent
+                                        size={16}
+                                        className="text-yellow-600 dark:text-yellow-400"
+                                    />
+                                    <span className="font-bold uppercase tracking-wide text-yellow-600 dark:text-yellow-400">
+                                        VAT ({invoice.vatRate ?? 12}%)
+                                    </span>
+                                </div>
+                                <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
+                                    {vatAmount > 0
+                                        ? `+ ${money(vatAmount, hideAmount)}`
+                                        : "—"}
+                                </span>
+                            </div>
+
+                            <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3">
+                                <div className="flex items-center gap-2">
+                                    <Calculator
+                                        size={16}
+                                        className="text-gray-600 dark:text-slate-400"
+                                    />
+                                    <span className="font-bold uppercase tracking-wide text-gray-600 dark:text-slate-400">
+                                        Total Sales
+                                    </span>
+                                </div>
+                                <span className="text-lg font-bold text-gray-900 dark:text-white">
                                     {money(totalSales, hideAmount)}
                                 </span>
                             </div>
 
-                            <div className="flex items-center justify-between border-t border-slate-800/50 pt-3">
-                                <div className="flex items-center gap-2">
-                                    <Percent
-                                        size={16}
-                                        className="text-yellow-400"
-                                    />
-                                    <span className="font-bold uppercase tracking-wide text-yellow-400">
-                                        VAT (12%)
-                                    </span>
-                                </div>
-                                <span className="text-lg font-bold text-yellow-400">
-                                    {money(vatAmount, hideAmount)}
-                                </span>
-                            </div>
-
-                            <div className="flex items-center justify-between border-t border-slate-800/50 pt-3">
-                                <div className="flex items-center gap-2">
-                                    <Calculator
-                                        size={16}
-                                        className="text-slate-400"
-                                    />
-                                    <span className="font-bold uppercase tracking-wide text-slate-400">
-                                        Net of VAT
-                                    </span>
-                                </div>
-                                <span className="text-lg font-bold text-white">
-                                    {money(netOfVAT, hideAmount)}
-                                </span>
-                            </div>
-
-                            <div className="flex items-center justify-between border-t border-slate-800/50 pt-3">
-                                <span className="font-bold uppercase tracking-wide text-orange-400">
+                            <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3">
+                                <span className="font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
                                     Withholding Tax
                                 </span>
-                                <span className="text-lg font-bold text-orange-400">
+                                <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
                                     {money(withholdingTax, hideAmount)}
                                 </span>
                             </div>
 
                             <div className="flex items-center justify-between border-t-2 border-yellow-400/30 pt-4">
-                                <span className="text-xl font-black uppercase tracking-wide text-yellow-400">
+                                <span className="text-xl font-black uppercase tracking-wide text-yellow-600 dark:text-yellow-400">
                                     Total Amount Due
                                 </span>
-                                <span className="text-2xl font-black text-yellow-400">
+                                <span className="text-2xl font-black text-yellow-600 dark:text-yellow-400">
                                     {money(totalAmountDue, hideAmount)}
                                 </span>
                             </div>
@@ -2939,8 +3842,8 @@ function AdminInvoiceViewModal({
                 </div>
 
                 {invoice.supportingDocuments && (
-                    <div className="rounded-2xl border border-slate-800 bg-black/60 p-5">
-                        <p className="text-xs font-black uppercase tracking-wider text-slate-600">
+                    <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/60 p-5">
+                        <p className="text-xs font-black uppercase tracking-wider text-gray-600 dark:text-slate-600">
                             Supporting Documents
                         </p>
                         <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -2963,34 +3866,42 @@ function AdminInvoiceViewModal({
                 )}
 
                 {invoice.description && (
-                    <div className="rounded-2xl border border-slate-800 bg-black/60 p-5">
-                        <p className="text-xs font-black uppercase tracking-wider text-slate-600">
+                    <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/60 p-5">
+                        <p className="text-xs font-black uppercase tracking-wider text-gray-600 dark:text-slate-600">
                             Description
                         </p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-300">
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-gray-700 dark:text-slate-300">
                             {invoice.description}
                         </p>
                     </div>
                 )}
 
                 {invoice.notes && (
-                    <div className="rounded-2xl border border-slate-800 bg-black/60 p-5">
-                        <p className="text-xs font-black uppercase tracking-wider text-slate-600">
+                    <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/60 p-5">
+                        <p className="text-xs font-black uppercase tracking-wider text-gray-600 dark:text-slate-600">
                             Notes
                         </p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-300">
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-gray-700 dark:text-slate-300">
                             {invoice.notes}
                         </p>
                     </div>
                 )}
 
-                <div className="flex flex-wrap gap-3 border-t border-slate-800 pt-5">
+                <div className="flex flex-wrap gap-3 border-t border-gray-200 dark:border-slate-800 pt-5">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900"
+                        className="rounded-xl border border-gray-200 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900"
                     >
                         Close
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onPrint}
+                        className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-slate-700 px-5 py-3 text-sm font-black text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
+                    >
+                        <Printer size={17} /> Print
                     </button>
 
                     {invoice.status === "Pending" && (
@@ -3050,9 +3961,13 @@ function DocLink({
 }) {
     if (!value) {
         return (
-            <div className="rounded-xl border border-slate-800 bg-black/50 p-3">
-                <p className="text-xs text-slate-600">{label}</p>
-                <p className="mt-1 text-sm text-slate-500">—</p>
+            <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-3">
+                <p className="text-xs text-gray-600 dark:text-slate-600">
+                    {label}
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-500">
+                    —
+                </p>
             </div>
         );
     }
@@ -3061,15 +3976,20 @@ function DocLink({
             href={value}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between rounded-xl border border-slate-700 bg-black/50 p-3 transition hover:border-yellow-400/40 hover:bg-black/80"
+            className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black/50 p-3 transition hover:border-yellow-400/40 hover:bg-black/80"
         >
             <div>
-                <p className="text-xs text-slate-600">{label}</p>
-                <p className="mt-1 text-sm font-semibold text-white">
+                <p className="text-xs text-gray-600 dark:text-slate-600">
+                    {label}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
                     View Document
                 </p>
             </div>
-            <ExternalLink size={16} className="text-slate-500" />
+            <ExternalLink
+                size={16}
+                className="text-gray-500 dark:text-slate-500"
+            />
         </a>
     );
 }
@@ -3102,18 +4022,21 @@ function ApproveModal({
             <div className="space-y-5">
                 <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4">
                     <div className="flex items-center gap-3">
-                        <CheckCircle2 size={24} className="text-emerald-400" />
+                        <CheckCircle2
+                            size={24}
+                            className="text-emerald-600 dark:text-emerald-400"
+                        />
                         <div>
-                            <p className="font-bold text-emerald-400">
+                            <p className="font-bold text-emerald-600 dark:text-emerald-400">
                                 Confirm Approval
                             </p>
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-gray-600 dark:text-slate-400">
                                 You are about to approve invoice{" "}
-                                <span className="font-bold text-white">
+                                <span className="font-bold text-gray-900 dark:text-white">
                                     {invoice.number}
                                 </span>{" "}
                                 for{" "}
-                                <span className="font-bold text-white">
+                                <span className="font-bold text-gray-900 dark:text-white">
                                     {invoice.client}
                                 </span>
                             </p>
@@ -3121,23 +4044,23 @@ function ApproveModal({
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-800 bg-black/50 p-4">
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-4">
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                        <p className="text-slate-400">
+                        <p className="text-gray-600 dark:text-slate-400">
                             Amount:{" "}
-                            <span className="font-bold text-yellow-400">
+                            <span className="font-bold text-yellow-600 dark:text-yellow-400">
                                 {money(invoice.amount, hideAmount)}
                             </span>
                         </p>
-                        <p className="text-slate-400">
+                        <p className="text-gray-600 dark:text-slate-400">
                             VAT (12%):{" "}
-                            <span className="font-bold text-yellow-400">
+                            <span className="font-bold text-yellow-600 dark:text-yellow-400">
                                 {money(invoice.amount * VAT_RATE, hideAmount)}
                             </span>
                         </p>
-                        <p className="text-slate-400 col-span-2">
+                        <p className="text-gray-600 dark:text-slate-400 col-span-2">
                             Project:{" "}
-                            <span className="text-white">
+                            <span className="text-gray-900 dark:text-white">
                                 {invoice.project}
                             </span>
                         </p>
@@ -3145,7 +4068,7 @@ function ApproveModal({
                 </div>
 
                 <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Approval Notes (Optional)
                     </label>
                     <textarea
@@ -3153,7 +4076,7 @@ function ApproveModal({
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Add any notes about this approval..."
-                        className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
+                        className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
                         disabled={isProcessing}
                     />
                 </div>
@@ -3163,7 +4086,7 @@ function ApproveModal({
                         type="button"
                         onClick={onCancel}
                         disabled={isProcessing}
-                        className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-xl border border-gray-200 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         Cancel
                     </button>
@@ -3214,18 +4137,21 @@ function RejectModal({
             <div className="space-y-5">
                 <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-4">
                     <div className="flex items-center gap-3">
-                        <Ban size={24} className="text-red-400" />
+                        <Ban
+                            size={24}
+                            className="text-red-600 dark:text-red-400"
+                        />
                         <div>
-                            <p className="font-bold text-red-400">
+                            <p className="font-bold text-red-600 dark:text-red-400">
                                 Confirm Rejection
                             </p>
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-gray-600 dark:text-slate-400">
                                 You are about to reject invoice{" "}
-                                <span className="font-bold text-white">
+                                <span className="font-bold text-gray-900 dark:text-white">
                                     {invoice.number}
                                 </span>{" "}
                                 for{" "}
-                                <span className="font-bold text-white">
+                                <span className="font-bold text-gray-900 dark:text-white">
                                     {invoice.client}
                                 </span>
                             </p>
@@ -3233,23 +4159,23 @@ function RejectModal({
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-800 bg-black/50 p-4">
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/50 p-4">
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                        <p className="text-slate-400">
+                        <p className="text-gray-600 dark:text-slate-400">
                             Amount:{" "}
-                            <span className="font-bold text-yellow-400">
+                            <span className="font-bold text-yellow-600 dark:text-yellow-400">
                                 {money(invoice.amount, hideAmount)}
                             </span>
                         </p>
-                        <p className="text-slate-400">
+                        <p className="text-gray-600 dark:text-slate-400">
                             VAT (12%):{" "}
-                            <span className="font-bold text-yellow-400">
+                            <span className="font-bold text-yellow-600 dark:text-yellow-400">
                                 {money(invoice.amount * VAT_RATE, hideAmount)}
                             </span>
                         </p>
-                        <p className="text-slate-400 col-span-2">
+                        <p className="text-gray-600 dark:text-slate-400 col-span-2">
                             Project:{" "}
-                            <span className="text-white">
+                            <span className="text-gray-900 dark:text-white">
                                 {invoice.project}
                             </span>
                         </p>
@@ -3257,19 +4183,21 @@ function RejectModal({
                 </div>
 
                 <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Reason for Rejection{" "}
-                        <span className="text-red-400">*</span>
+                        <span className="text-red-600 dark:text-red-400">
+                            *
+                        </span>
                     </label>
                     <textarea
                         rows={4}
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
                         placeholder="Please provide a detailed reason why this invoice is being rejected..."
-                        className="w-full rounded-xl border border-slate-700 bg-black py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
+                        className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-black py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-gray-600 dark:placeholder:text-slate-600 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10 resize-y"
                         disabled={isProcessing}
                     />
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
                         {reason.length} / 500 characters
                     </p>
                 </div>
@@ -3279,7 +4207,7 @@ function RejectModal({
                         type="button"
                         onClick={onCancel}
                         disabled={isProcessing}
-                        className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-xl border border-gray-200 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         Cancel
                     </button>
@@ -3318,14 +4246,16 @@ function DetailBox({
     highlight?: boolean;
 }) {
     return (
-        <div className="rounded-2xl border border-slate-800 bg-black/60 p-4">
-            <p className="text-[11px] font-black uppercase tracking-wider text-slate-600">
+        <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black/60 p-4">
+            <p className="text-[11px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-600">
                 {label}
             </p>
             <p
                 className={[
                     "mt-2 break-words text-sm font-semibold",
-                    highlight ? "text-yellow-400" : "text-slate-200",
+                    highlight
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-gray-800 dark:text-slate-200",
                 ].join(" ")}
             >
                 {value}
@@ -3350,16 +4280,16 @@ function EditInfoCard({
     value: string;
 }) {
     return (
-        <div className="rounded-2xl border border-slate-800 bg-black/70 p-4">
+        <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-black/70 p-4">
             <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-800 bg-black text-slate-500">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-black text-gray-500 dark:text-slate-500">
                     {icon}
                 </div>
                 <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-600">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-600">
                         {label}
                     </p>
-                    <p className="mt-1 truncate text-sm font-bold text-slate-300">
+                    <p className="mt-1 truncate text-sm font-bold text-gray-700 dark:text-slate-300">
                         {value}
                     </p>
                 </div>
@@ -3387,10 +4317,18 @@ function BeautifulFormField({
 }) {
     return (
         <label className="block">
-            <span className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
-                {icon && <span className="text-slate-600">{icon}</span>}
+            <span className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
+                {icon && (
+                    <span className="text-gray-600 dark:text-slate-600">
+                        {icon}
+                    </span>
+                )}
                 {label}
-                {required && <span className="text-yellow-400">*</span>}
+                {required && (
+                    <span className="text-yellow-600 dark:text-yellow-400">
+                        *
+                    </span>
+                )}
             </span>
             {children}
         </label>
@@ -3421,18 +4359,18 @@ function Modal({
         <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm">
             <div
                 className={[
-                    "w-full overflow-hidden rounded-3xl border border-yellow-400/10 bg-black shadow-2xl",
+                    "w-full overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-black shadow-2xl",
                     sizeClass,
                 ].join(" ")}
             >
-                <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4 sm:px-6">
-                    <h2 className="text-lg font-black uppercase tracking-wide text-white">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-5 py-4 sm:px-6">
+                    <h2 className="text-lg font-black uppercase tracking-wide text-gray-900 dark:text-white">
                         {title}
                     </h2>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                     >
                         <X size={18} />
                     </button>

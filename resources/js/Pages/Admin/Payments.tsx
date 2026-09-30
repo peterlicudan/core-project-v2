@@ -24,6 +24,7 @@ import {
     ShieldCheck,
     Printer,
     Eye,
+    EyeOff,
     Banknote,
     Hash,
     CircleDollarSign,
@@ -40,12 +41,7 @@ import AdminSidebar from "../../Components/Admin/AdminSidebar";
 */
 
 type PaymentStatus =
-    | "Paid"
-    | "Partial"
-    | "Pending"
-    | "Rejected"
-    | "Due"
-    | string;
+    "Paid" | "Partial" | "Pending" | "Rejected" | "Due" | string;
 
 interface ArchiveInfo {
     expiration?: string | null;
@@ -72,6 +68,9 @@ interface Payment {
 
     receipt?: string | null;
     invoice?: string | null;
+    /* ✅ REFERENCE — Billing No. */
+    billing_number?: string | null;
+    billingNumber?: string | null;
     method?: string | null;
 
     paymentDate?: string | null;
@@ -88,7 +87,7 @@ interface Payment {
     editedAt?: string | null;
 
     client?: string | null;
-    clientEmail?: string | null; // Added
+    clientEmail?: string | null;
 
     userName?: string | null;
     userEmail?: string | null;
@@ -104,21 +103,21 @@ interface Payment {
     invoiceAmount?: number | null;
     invoiceStatus?: string | null;
 
+    /* ✅ USER-side archive (hindi natin gagalawin) */
     archived?: boolean;
-
     archivedAt?: string | null;
-
     archiveExpiresAt?: string | null;
-
     deleteAfter?: string | null;
-
     archiveExpired?: boolean;
-
     readyForDeletion?: boolean;
-
     daysUntilExpiration?: number | null;
-
     archiveInfo?: ArchiveInfo | null;
+
+    /* ✅ ADMIN-side archive (BAGO — ito ang gagamitin natin) */
+    admin_archived?: boolean;
+    adminArchived?: boolean;
+    admin_archived_at?: string | null;
+    adminArchivedAt?: string | null;
 }
 
 interface Props {
@@ -148,6 +147,8 @@ const STATUS_OPTIONS = ["Pending", "Paid", "Partial"];
 */
 
 const ACTIVE_STATUS_FILTERS = ["All", "Pending", "Partial", "Due", "Paid"];
+
+const MASKED_AMOUNT = "₱ ••••••";
 
 function getReceipt(payment: Payment) {
     return (
@@ -198,6 +199,20 @@ function normalizeDate(value?: string | null) {
     return String(value).substring(0, 10);
 }
 
+/*
+|--------------------------------------------------------------------------
+| ✅ ADMIN ARCHIVE HELPERS (BAGO)
+|--------------------------------------------------------------------------
+| Ito lang ang gagamitin natin para sa admin archive.
+| Hiwalay ito sa `archived` na ginagamit ng user side.
+|--------------------------------------------------------------------------
+*/
+
+function isAdminArchived(payment: Payment) {
+    return Boolean(payment.admin_archived ?? payment.adminArchived);
+}
+
+// Legacy user-side (hindi natin gagalawin)
 function isArchived(payment: Payment) {
     return Boolean(payment.archived);
 }
@@ -262,6 +277,78 @@ function formatShortDate(value?: string | null) {
 
 /*
 |--------------------------------------------------------------------------
+| MONEY HELPERS
+|--------------------------------------------------------------------------
+*/
+
+function formatMoney(
+    value: number | string | null | undefined,
+    hide: boolean,
+): string {
+    if (hide) {
+        return MASKED_AMOUNT;
+    }
+
+    const amount = Number(value ?? 0);
+
+    return new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+    }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+/*
+|--------------------------------------------------------------------------
+| EMAIL MASKING
+|--------------------------------------------------------------------------
+*/
+
+function maskEmail(email: string | null | undefined): string {
+    if (!email) return "N/A";
+
+    const trimmed = String(email).trim();
+    if (!trimmed) return "N/A";
+
+    const atIndex = trimmed.lastIndexOf("@");
+    if (atIndex <= 0 || atIndex === trimmed.length - 1) {
+        return trimmed.length <= 2
+            ? "*".repeat(trimmed.length)
+            : trimmed.slice(0, 2) + "*".repeat(trimmed.length - 2);
+    }
+
+    const local = trimmed.slice(0, atIndex);
+    const domain = trimmed.slice(atIndex + 1);
+
+    let maskedLocal: string;
+    if (local.length <= 2) {
+        maskedLocal = "*".repeat(local.length);
+    } else {
+        maskedLocal = local.slice(0, 2) + "*".repeat(local.length - 2);
+    }
+
+    const lastDot = domain.lastIndexOf(".");
+    const domainName = lastDot > 0 ? domain.slice(0, lastDot) : domain;
+    const tld = lastDot > 0 ? domain.slice(lastDot) : "";
+
+    let maskedDomain: string;
+    if (domainName.length <= 2) {
+        maskedDomain = "*".repeat(domainName.length);
+    } else {
+        maskedDomain =
+            domainName.slice(0, 2) + "*".repeat(domainName.length - 2);
+    }
+
+    return `${maskedLocal}@${maskedDomain}${tld}`;
+}
+
+function displayEmail(email: string | null | undefined, hide: boolean): string {
+    if (!email) return "N/A";
+    return hide ? maskEmail(email) : String(email);
+}
+
+/*
+|--------------------------------------------------------------------------
 | MAIN COMPONENT
 |--------------------------------------------------------------------------
 */
@@ -271,31 +358,15 @@ export default function Payments({
     paymentMethods = PAYMENT_METHODS,
     paymentStatuses = STATUS_OPTIONS,
 }: Props) {
-    /*
-    |--------------------------------------------------------------------------
-    | SIDEBAR
-    |--------------------------------------------------------------------------
-    */
-
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH / FILTER
-    |--------------------------------------------------------------------------
-    */
+    const [hideAmounts, setHideAmounts] = useState(true);
 
     const [search, setSearch] = useState("");
 
     const [statusFilter, setStatusFilter] = useState("All");
 
     const [viewMode, setViewMode] = useState<"active" | "archive">("active");
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACTION MENU
-    |--------------------------------------------------------------------------
-    */
 
     const [openMenu, setOpenMenu] = useState<number | null>(null);
 
@@ -304,21 +375,9 @@ export default function Payments({
         left: 0,
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | SELECTED PAYMENT
-    |--------------------------------------------------------------------------
-    */
-
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(
         null,
     );
-
-    /*
-    |--------------------------------------------------------------------------
-    | MODALS
-    |--------------------------------------------------------------------------
-    */
 
     const [showEmailModal, setShowEmailModal] = useState(false);
 
@@ -332,15 +391,13 @@ export default function Payments({
 
     const [showViewModal, setShowViewModal] = useState(false);
 
-    // ✅ Edit modal only (no Add)
     const [showEditModal, setShowEditModal] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    /*
-    |--------------------------------------------------------------------------
-    | EMAIL
-    |--------------------------------------------------------------------------
-    */
+    /* ✅ ADMIN ARCHIVE MODAL */
+    const [showArchiveModal, setShowArchiveModal] = useState(false);
+    const [archiveProcessing, setArchiveProcessing] = useState(false);
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [emailSending, setEmailSending] = useState(false);
 
@@ -350,27 +407,9 @@ export default function Payments({
         message: "",
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | PARTIAL CONFIRMATION
-    |--------------------------------------------------------------------------
-    */
-
     const [partialAmount, setPartialAmount] = useState(0);
 
-    /*
-    |--------------------------------------------------------------------------
-    | FULLY PAID CONFIRMATION
-    |--------------------------------------------------------------------------
-    */
-
     const [paidProcessing, setPaidProcessing] = useState(false);
-
-    /*
-    |--------------------------------------------------------------------------
-    | EDIT PAYMENT FORM
-    |--------------------------------------------------------------------------
-    */
 
     const [paymentForm, setPaymentForm] = useState({
         client: "",
@@ -384,43 +423,30 @@ export default function Payments({
         notes: "",
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | CURRENCY
-    |--------------------------------------------------------------------------
-    */
+    const formatCurrency = (value: number | string | null | undefined) =>
+        formatMoney(value, hideAmounts);
 
-    const formatCurrency = (value: number | string | null | undefined) => {
-        const amount = Number(value ?? 0);
-
-        return new Intl.NumberFormat("en-PH", {
-            style: "currency",
-            currency: "PHP",
-            minimumFractionDigits: 2,
-        }).format(Number.isFinite(amount) ? amount : 0);
-    };
+    const formatEmail = (email: string | null | undefined) =>
+        displayEmail(email, hideAmounts);
 
     /*
     |--------------------------------------------------------------------------
-    | ACTIVE / ARCHIVED
+    | ✅ ACTIVE / ADMIN-ARCHIVED SPLIT (BAGO)
+    |--------------------------------------------------------------------------
+    | Naka-base sa `admin_archived`, HINDI sa `archived`.
+    | Kaya hindi maapektuhan ang user side.
     |--------------------------------------------------------------------------
     */
 
     const activePayments = useMemo(
-        () => payments.filter((payment) => !isArchived(payment)),
+        () => payments.filter((payment) => !isAdminArchived(payment)),
         [payments],
     );
 
     const archivedPayments = useMemo(
-        () => payments.filter((payment) => isArchived(payment)),
+        () => payments.filter((payment) => isAdminArchived(payment)),
         [payments],
     );
-
-    /*
-    |--------------------------------------------------------------------------
-    | FILTER
-    |--------------------------------------------------------------------------
-    */
 
     const filteredPayments = useMemo(() => {
         const source =
@@ -435,6 +461,10 @@ export default function Payments({
 
             const invoice = getInvoice(payment).toLowerCase();
 
+            const billing = String(
+                payment.billing_number ?? payment.billingNumber ?? "",
+            ).toLowerCase();
+
             const method = getMethod(payment).toLowerCase();
 
             const status = getStatus(payment).toLowerCase();
@@ -447,6 +477,7 @@ export default function Payments({
                 client.includes(keyword) ||
                 receipt.includes(keyword) ||
                 invoice.includes(keyword) ||
+                billing.includes(keyword) ||
                 method.includes(keyword) ||
                 status.includes(keyword) ||
                 email.includes(keyword) ||
@@ -465,12 +496,6 @@ export default function Payments({
         statusFilter,
         viewMode,
     ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | SUMMARY
-    |--------------------------------------------------------------------------
-    */
 
     const summary = useMemo(() => {
         const active = activePayments;
@@ -545,12 +570,6 @@ export default function Payments({
         };
     }, [payments, activePayments, archivedPayments]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | MENU
-    |--------------------------------------------------------------------------
-    */
-
     const toggleMenu = (
         event: React.MouseEvent<HTMLButtonElement>,
         paymentId: number,
@@ -584,13 +603,20 @@ export default function Payments({
             left = window.innerWidth - menuWidth - 10;
         }
 
-        const archived = Boolean(payment.archived);
+        const adminArchived = isAdminArchived(payment);
 
         const paid = getStatus(payment) === "Paid";
 
         const partial = getStatus(payment) === "Partial";
 
-        const menuHeight = archived ? 220 : paid ? 190 : partial ? 170 : 280;
+        /* ✅ menu height para kasya lahat ng options */
+        const menuHeight = adminArchived
+            ? 220
+            : paid
+              ? 260
+              : partial
+                ? 240
+                : 340;
 
         if (top + menuHeight > window.innerHeight - 10) {
             top = rect.top - menuHeight - 8;
@@ -608,12 +634,6 @@ export default function Payments({
         setOpenMenu(paymentId);
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | VIEW
-    |--------------------------------------------------------------------------
-    */
-
     const openView = (payment: Payment) => {
         setOpenMenu(null);
         setSelectedPayment(payment);
@@ -624,12 +644,6 @@ export default function Payments({
         setShowViewModal(false);
         setSelectedPayment(null);
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | EDIT PAYMENT
-    |--------------------------------------------------------------------------
-    */
 
     const openEditPayment = (payment: Payment) => {
         setSelectedPayment(payment);
@@ -733,12 +747,6 @@ export default function Payments({
         });
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | EMAIL
-    |--------------------------------------------------------------------------
-    */
-
     const openEmailModal = (payment: Payment) => {
         setOpenMenu(null);
 
@@ -840,16 +848,10 @@ export default function Payments({
         );
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | OPEN FULLY PAID CONFIRMATION
-    |--------------------------------------------------------------------------
-    */
-
     const openApprove = (payment: Payment) => {
         setOpenMenu(null);
 
-        if (payment.archived) {
+        if (isAdminArchived(payment)) {
             return;
         }
 
@@ -870,12 +872,6 @@ export default function Payments({
         setSelectedPayment(null);
         setPaidProcessing(false);
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | CONFIRM FULLY PAID
-    |--------------------------------------------------------------------------
-    */
 
     const confirmFullyPaid = () => {
         if (!selectedPayment) {
@@ -916,16 +912,10 @@ export default function Payments({
         );
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | PARTIAL
-    |--------------------------------------------------------------------------
-    */
-
     const openPartial = (payment: Payment) => {
         setOpenMenu(null);
 
-        if (payment.archived) {
+        if (isAdminArchived(payment)) {
             return;
         }
 
@@ -950,12 +940,6 @@ export default function Payments({
         setSelectedPayment(null);
         setPartialAmount(0);
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | CONFIRM PARTIAL
-    |--------------------------------------------------------------------------
-    */
 
     const confirmPartial = () => {
         if (!selectedPayment) {
@@ -993,14 +977,80 @@ export default function Payments({
 
     /*
     |--------------------------------------------------------------------------
-    | RESTORE
+    | ✅ ADMIN ARCHIVE (BAGO — WORKS FOR ALL STATUSES)
+    |--------------------------------------------------------------------------
+    | Naka-base sa `admin_archived` column. Hiwalay sa user-side archive.
+    | HINDI ginagalaw ang `archived` column (user side).
     |--------------------------------------------------------------------------
     */
+
+    const openArchive = (payment: Payment) => {
+        setOpenMenu(null);
+
+        if (isAdminArchived(payment)) {
+            window.alert("This payment record is already archived.");
+            return;
+        }
+
+        // ✅ WALANG status restriction — Pending, Partial, Due, Paid — LAHAT pwedeng i-archive
+        setSelectedPayment(payment);
+        setShowArchiveModal(true);
+    };
+
+    const closeArchive = () => {
+        if (archiveProcessing) {
+            return;
+        }
+
+        setShowArchiveModal(false);
+        setSelectedPayment(null);
+        setArchiveProcessing(false);
+    };
+
+    const confirmArchive = () => {
+        if (!selectedPayment) {
+            return;
+        }
+
+        if (archiveProcessing) {
+            return;
+        }
+
+        setArchiveProcessing(true);
+
+        router.put(
+            `/admin/payments/${selectedPayment.id}/archive`,
+            {},
+            {
+                preserveScroll: true,
+
+                onSuccess: () => {
+                    setArchiveProcessing(false);
+                    setShowArchiveModal(false);
+                    setSelectedPayment(null);
+                    setShowSuccessModal(true);
+                },
+
+                onError: (errors) => {
+                    console.error("Archive failed:", errors);
+                    setArchiveProcessing(false);
+                    const firstError = Object.values(errors ?? {})[0];
+                    window.alert(
+                        firstError
+                            ? String(firstError)
+                            : "Unable to move this payment record to archive.",
+                    );
+                },
+
+                onFinish: () => setArchiveProcessing(false),
+            },
+        );
+    };
 
     const openRestore = (payment: Payment) => {
         setOpenMenu(null);
 
-        if (!payment.archived) {
+        if (!isAdminArchived(payment)) {
             return;
         }
 
@@ -1036,12 +1086,6 @@ export default function Payments({
             },
         );
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | PRINT
-    |--------------------------------------------------------------------------
-    */
 
     const printPayment = (payment: Payment) => {
         setOpenMenu(null);
@@ -1083,388 +1127,106 @@ export default function Payments({
             <html>
             <head>
                 <title>Statement of Account - ${escapeHtml(receipt)}</title>
-
                 <style>
-                    * {
-                        box-sizing: border-box;
-                    }
-
-                    @page {
-                        size: A4;
-                        margin: 0;
-                    }
-
-                    body {
-                        margin: 0;
-                        padding: 0;
-                        background: #f3f4f6;
-                        color: #111827;
-                        font-family:
-                            Arial,
-                            Helvetica,
-                            sans-serif;
-                    }
-
-                    .page {
-                        width: 210mm;
-                        min-height: 297mm;
-                        margin: 20px auto;
-                        background: #ffffff;
-                        padding: 15mm;
-                    }
-
-                    .header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        padding-bottom: 15px;
-                        border-bottom: 2px solid #111827;
-                    }
-
-                    .brand {
-                        display: flex;
-                        gap: 12px;
-                        align-items: center;
-                    }
-
-                    .logo {
-                        width: 52px;
-                        height: 52px;
-                        border: 1px solid #d1d5db;
-                        border-radius: 9px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: 900;
-                        font-size: 16px;
-                        letter-spacing: 1px;
-                    }
-
-                    .company {
-                        font-size: 22px;
-                        font-weight: 900;
-                        letter-spacing: 1px;
-                    }
-
-                    .company-sub {
-                        margin-top: 3px;
-                        font-size: 9px;
-                        color: #6b7280;
-                        letter-spacing: 1.5px;
-                        text-transform: uppercase;
-                    }
-
-                    .document-title {
-                        text-align: right;
-                    }
-
-                    .document-title h1 {
-                        margin: 0;
-                        font-size: 18px;
-                        letter-spacing: .5px;
-                    }
-
-                    .document-title p {
-                        margin: 5px 0 0;
-                        font-size: 10px;
-                        color: #6b7280;
-                    }
-
-                    .section {
-                        margin-top: 18px;
-                    }
-
-                    .section-title {
-                        margin-bottom: 7px;
-                        font-size: 10px;
-                        font-weight: 900;
-                        text-transform: uppercase;
-                        letter-spacing: 1px;
-                        color: #4b5563;
-                    }
-
-                    .info-grid {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        border: 1px solid #d1d5db;
-                    }
-
-                    .info-item {
-                        padding: 9px 11px;
-                        border-bottom: 1px solid #e5e7eb;
-                    }
-
-                    .info-item:nth-child(odd) {
-                        border-right: 1px solid #e5e7eb;
-                    }
-
-                    .info-label {
-                        font-size: 8px;
-                        text-transform: uppercase;
-                        letter-spacing: .7px;
-                        color: #6b7280;
-                        margin-bottom: 3px;
-                    }
-
-                    .info-value {
-                        font-size: 11px;
-                        font-weight: 700;
-                    }
-
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-
-                    th {
-                        background: #111827;
-                        color: #ffffff;
-                        text-align: left;
-                        padding: 8px;
-                        font-size: 9px;
-                        text-transform: uppercase;
-                        letter-spacing: .6px;
-                    }
-
-                    td {
-                        padding: 9px 8px;
-                        border: 1px solid #d1d5db;
-                        font-size: 10px;
-                    }
-
-                    .amount {
-                        text-align: right;
-                        font-weight: 800;
-                    }
-
-                    .summary {
-                        width: 48%;
-                        margin-left: auto;
-                        margin-top: 13px;
-                    }
-
-                    .summary-row {
-                        display: flex;
-                        justify-content: space-between;
-                        padding: 6px 0;
-                        font-size: 10px;
-                        border-bottom: 1px solid #e5e7eb;
-                    }
-
-                    .summary-row.total {
-                        padding-top: 10px;
-                        border-bottom: 2px solid #111827;
-                        font-size: 13px;
-                        font-weight: 900;
-                    }
-
-                    .status {
-                        display: inline-block;
-                        padding: 4px 7px;
-                        border: 1px solid #9ca3af;
-                        border-radius: 4px;
-                        font-size: 8px;
-                        font-weight: 900;
-                        text-transform: uppercase;
-                    }
-
-                    .notes {
-                        min-height: 65px;
-                        padding: 10px;
-                        border: 1px solid #d1d5db;
-                        font-size: 10px;
-                        line-height: 1.5;
-                    }
-
-                    .signature {
-                        margin-top: 45px;
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 70px;
-                    }
-
-                    .signature-line {
-                        padding-top: 6px;
-                        border-top: 1px solid #111827;
-                        text-align: center;
-                        font-size: 9px;
-                    }
-
-                    .footer {
-                        margin-top: 35px;
-                        padding-top: 12px;
-                        border-top: 1px solid #d1d5db;
-                        display: flex;
-                        justify-content: space-between;
-                        font-size: 8px;
-                        color: #6b7280;
-                    }
-
-                    @media print {
-                        body {
-                            background: #ffffff;
-                        }
-
-                        .page {
-                            margin: 0;
-                            width: 210mm;
-                            min-height: 297mm;
-                            box-shadow: none;
-                        }
-                    }
+                    * { box-sizing: border-box; }
+                    @page { size: A4; margin: 0; }
+                    body { margin: 0; padding: 0; background: #f3f4f6; color: #111827; font-family: Arial, Helvetica, sans-serif; }
+                    .page { width: 210mm; min-height: 297mm; margin: 20px auto; background: #ffffff; padding: 15mm; }
+                    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 15px; border-bottom: 2px solid #111827; }
+                    .brand { display: flex; gap: 12px; align-items: center; }
+                    .logo { width: 52px; height: 52px; border: 1px solid #d1d5db; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; letter-spacing: 1px; }
+                    .company { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+                    .company-sub { margin-top: 3px; font-size: 9px; color: #6b7280; letter-spacing: 1.5px; text-transform: uppercase; }
+                    .document-title { text-align: right; }
+                    .document-title h1 { margin: 0; font-size: 18px; letter-spacing: .5px; }
+                    .document-title p { margin: 5px 0 0; font-size: 10px; color: #6b7280; }
+                    .section { margin-top: 18px; }
+                    .section-title { margin-bottom: 7px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #4b5563; }
+                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #d1d5db; }
+                    .info-item { padding: 9px 11px; border-bottom: 1px solid #e5e7eb; }
+                    .info-item:nth-child(odd) { border-right: 1px solid #e5e7eb; }
+                    .info-label { font-size: 8px; text-transform: uppercase; letter-spacing: .7px; color: #6b7280; margin-bottom: 3px; }
+                    .info-value { font-size: 11px; font-weight: 700; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th { background: #111827; color: #ffffff; text-align: left; padding: 8px; font-size: 9px; text-transform: uppercase; letter-spacing: .6px; }
+                    td { padding: 9px 8px; border: 1px solid #d1d5db; font-size: 10px; }
+                    .amount { text-align: right; font-weight: 800; }
+                    .summary { width: 48%; margin-left: auto; margin-top: 13px; }
+                    .summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 10px; border-bottom: 1px solid #e5e7eb; }
+                    .summary-row.total { padding-top: 10px; border-bottom: 2px solid #111827; font-size: 13px; font-weight: 900; }
+                    .status { display: inline-block; padding: 4px 7px; border: 1px solid #9ca3af; border-radius: 4px; font-size: 8px; font-weight: 900; text-transform: uppercase; }
+                    .notes { min-height: 65px; padding: 10px; border: 1px solid #d1d5db; font-size: 10px; line-height: 1.5; }
+                    .signature { margin-top: 45px; display: grid; grid-template-columns: 1fr 1fr; gap: 70px; }
+                    .signature-line { padding-top: 6px; border-top: 1px solid #111827; text-align: center; font-size: 9px; }
+                    .footer { margin-top: 35px; padding-top: 12px; border-top: 1px solid #d1d5db; display: flex; justify-content: space-between; font-size: 8px; color: #6b7280; }
+                    @media print { body { background: #ffffff; } .page { margin: 0; width: 210mm; min-height: 297mm; box-shadow: none; } }
                 </style>
             </head>
-
             <body>
                 <div class="page">
-
                     <div class="header">
                         <div class="brand">
-                            <div class="logo">
-                                AL
-                            </div>
-
+                            <div class="logo">AL</div>
                             <div>
-                                <div class="company">
-                                    ALIBATON
-                                </div>
-
-                                <div class="company-sub">
-                                    Power • Precision • Reliability
-                                </div>
+                                <div class="company">ALIBATON</div>
+                                <div class="company-sub">Power • Precision • Reliability</div>
                             </div>
                         </div>
-
                         <div class="document-title">
-                            <h1>
-                                STATEMENT OF ACCOUNT
-                            </h1>
-
-                            <p>
-                                Official Payment Record
-                            </p>
+                            <h1>STATEMENT OF ACCOUNT</h1>
+                            <p>Official Payment Record</p>
                         </div>
                     </div>
 
                     <div class="section">
-                        <div class="section-title">
-                            Client Information
-                        </div>
-
+                        <div class="section-title">Client Information</div>
                         <div class="info-grid">
-
                             <div class="info-item">
-                                <div class="info-label">
-                                    Client / Company
-                                </div>
-
-                                <div class="info-value">
-                                    ${escapeHtml(client)}
-                                </div>
+                                <div class="info-label">Client / Company</div>
+                                <div class="info-value">${escapeHtml(client)}</div>
                             </div>
-
                             <div class="info-item">
-                                <div class="info-label">
-                                    Invoice Number
-                                </div>
-
-                                <div class="info-value">
-                                    ${escapeHtml(invoice)}
-                                </div>
+                                <div class="info-label">Invoice Number</div>
+                                <div class="info-value">${escapeHtml(invoice)}</div>
                             </div>
-
                             <div class="info-item">
-                                <div class="info-label">
-                                    Receipt Number
-                                </div>
-
-                                <div class="info-value">
-                                    ${escapeHtml(receipt)}
-                                </div>
+                                <div class="info-label">Receipt Number</div>
+                                <div class="info-value">${escapeHtml(receipt)}</div>
                             </div>
-
                             <div class="info-item">
-                                <div class="info-label">
-                                    Payment Method
-                                </div>
-
-                                <div class="info-value">
-                                    ${escapeHtml(method)}
-                                </div>
+                                <div class="info-label">Payment Method</div>
+                                <div class="info-value">${escapeHtml(method)}</div>
                             </div>
-
-                            <!-- ✅ CLIENT EMAIL - Added to print -->
                             <div class="info-item">
-                                <div class="info-label">
-                                    Client Email
-                                </div>
-
-                                <div class="info-value">
-                                    ${escapeHtml(clientEmail || "N/A")}
-                                </div>
+                                <div class="info-label">Client Email</div>
+                                <div class="info-value">${escapeHtml(clientEmail || "N/A")}</div>
                             </div>
-
                             <div class="info-item">
-                                <div class="info-label">
-                                    Payment Date
-                                </div>
-
-                                <div class="info-value">
-                                    ${escapeHtml(paymentDate)}
-                                </div>
+                                <div class="info-label">Payment Date</div>
+                                <div class="info-value">${escapeHtml(paymentDate)}</div>
                             </div>
-
                             <div class="info-item">
-                                <div class="info-label">
-                                    Due Date
-                                </div>
-
-                                <div class="info-value">
-                                    ${escapeHtml(dueDate)}
-                                </div>
+                                <div class="info-label">Due Date</div>
+                                <div class="info-value">${escapeHtml(dueDate)}</div>
                             </div>
-
                         </div>
                     </div>
 
                     <div class="section">
-                        <div class="section-title">
-                            Payment Details
-                        </div>
-
+                        <div class="section-title">Payment Details</div>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>
-                                        Description
-                                    </th>
-
-                                    <th>
-                                        Status
-                                    </th>
-
-                                    <th style="text-align:right">
-                                        Amount
-                                    </th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th style="text-align:right">Amount</th>
                                 </tr>
                             </thead>
-
                             <tbody>
                                 <tr>
-                                    <td>
-                                        Payment for invoice
-                                        ${escapeHtml(invoice)}
-                                    </td>
-
-                                    <td>
-                                        <span class="status">
-                                            ${escapeHtml(status)}
-                                        </span>
-                                    </td>
-
-                                    <td class="amount">
-                                        ${formatCurrencyPrint(amount)}
-                                    </td>
+                                    <td>Payment for invoice ${escapeHtml(invoice)}</td>
+                                    <td><span class="status">${escapeHtml(status)}</span></td>
+                                    <td class="amount">${formatCurrencyPrint(amount)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1472,75 +1234,39 @@ export default function Payments({
 
                     <div class="summary">
                         <div class="summary-row">
-                            <span>
-                                Invoice Total
-                            </span>
-
-                            <strong>
-                                ${formatCurrencyPrint(invoiceTotal)}
-                            </strong>
+                            <span>Invoice Total</span>
+                            <strong>${formatCurrencyPrint(invoiceTotal)}</strong>
                         </div>
-
                         <div class="summary-row">
-                            <span>
-                                Amount Paid
-                            </span>
-
-                            <strong>
-                                ${formatCurrencyPrint(amount)}
-                            </strong>
+                            <span>Amount Paid</span>
+                            <strong>${formatCurrencyPrint(amount)}</strong>
                         </div>
-
                         <div class="summary-row total">
-                            <span>
-                                Remaining Balance
-                            </span>
-
-                            <span>
-                                ${formatCurrencyPrint(remaining)}
-                            </span>
+                            <span>Remaining Balance</span>
+                            <span>${formatCurrencyPrint(remaining)}</span>
                         </div>
                     </div>
 
                     <div class="section">
-                        <div class="section-title">
-                            Notes
-                        </div>
-
-                        <div class="notes">
-                            ${escapeHtml(notes)}
-                        </div>
+                        <div class="section-title">Notes</div>
+                        <div class="notes">${escapeHtml(notes)}</div>
                     </div>
 
                     <div class="signature">
-                        <div class="signature-line">
-                            Prepared / Verified By
-                        </div>
-
-                        <div class="signature-line">
-                            Client / Authorized Representative
-                        </div>
+                        <div class="signature-line">Prepared / Verified By</div>
+                        <div class="signature-line">Client / Authorized Representative</div>
                     </div>
 
                     <div class="footer">
-                        <span>
-                            ALIBATON — Official Payment Record
-                        </span>
-
-                        <span>
-                            Receipt: ${escapeHtml(receipt)}
-                        </span>
+                        <span>ALIBATON — Official Payment Record</span>
+                        <span>Receipt: ${escapeHtml(receipt)}</span>
                     </div>
-
                 </div>
 
                 <script>
                     window.onload = function () {
                         window.print();
-
-                        setTimeout(function () {
-                            window.close();
-                        }, 500);
+                        setTimeout(function () { window.close(); }, 500);
                     };
                 </script>
             </body>
@@ -1549,12 +1275,6 @@ export default function Payments({
 
         printWindow.document.close();
     };
-
-    /*
-    |--------------------------------------------------------------------------
-    | RENDER
-    |--------------------------------------------------------------------------
-    */
 
     return (
         <>
@@ -1569,8 +1289,8 @@ export default function Payments({
                 className={`
                     min-h-screen
                     overflow-x-hidden
-                    bg-black
-                    text-white
+                    bg-gray-50 dark:bg-black
+                    text-gray-900 dark:text-white
                     transition-[margin]
                     duration-300
                     ease-out
@@ -1629,7 +1349,7 @@ export default function Payments({
                                     >
                                         <WalletCards
                                             size={20}
-                                            className="text-yellow-400"
+                                            className="text-yellow-600 dark:text-yellow-400"
                                         />
                                     </div>
 
@@ -1639,7 +1359,7 @@ export default function Payments({
                                             font-black
                                             uppercase
                                             tracking-[0.22em]
-                                            text-yellow-400
+                                            text-yellow-600 dark:text-yellow-400
                                             sm:text-xs
                                         "
                                     >
@@ -1665,7 +1385,7 @@ export default function Payments({
                                         max-w-3xl
                                         text-sm
                                         leading-6
-                                        text-gray-400
+                                        text-gray-600 dark:text-gray-400
                                     "
                                 >
                                     Review, verify and manage all staff and
@@ -1673,39 +1393,97 @@ export default function Payments({
                                 </p>
                             </div>
 
-                            <div
-                                className="
-                                    w-full
-                                    rounded-2xl
-                                    border
-                                    border-white/10
-                                    bg-white/[0.04]
-                                    px-4
-                                    py-3
-                                    sm:w-auto
-                                "
-                            >
+                            <div className="flex items-stretch gap-3">
                                 <div
                                     className="
-                                        text-[10px]
-                                        uppercase
-                                        tracking-wider
-                                        text-gray-500
+                                        w-full
+                                        rounded-2xl
+                                        border
+                                        border-gray-200 dark:border-white/10
+                                        bg-white dark:bg-white/[0.04]
+                                        px-4
+                                        py-3
+                                        sm:w-auto
                                     "
                                 >
-                                    Total Records
+                                    <div
+                                        className="
+                                            text-[10px]
+                                            uppercase
+                                            tracking-wider
+                                            text-gray-500
+                                        "
+                                    >
+                                        Total Records
+                                    </div>
+
+                                    <div
+                                        className="
+                                            mt-1
+                                            text-xl
+                                            font-black
+                                            text-yellow-600 dark:text-yellow-400
+                                        "
+                                    >
+                                        {summary.count}
+                                    </div>
                                 </div>
 
-                                <div
+                                {/* ✅ HIDE / SHOW ALL (AMOUNTS + EMAILS) */}
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setHideAmounts((prev) => !prev)
+                                    }
+                                    aria-label={
+                                        hideAmounts
+                                            ? "Show all amounts and emails"
+                                            : "Hide all amounts and emails"
+                                    }
+                                    title={
+                                        hideAmounts
+                                            ? "Show all amounts and emails"
+                                            : "Hide all amounts and emails"
+                                    }
                                     className="
-                                        mt-1
-                                        text-xl
-                                        font-black
-                                        text-yellow-400
+                                        inline-flex
+                                        h-full
+                                        min-h-[64px]
+                                        w-14
+                                        shrink-0
+                                        flex-col
+                                        items-center
+                                        justify-center
+                                        gap-1
+                                        rounded-2xl
+                                        border
+                                        border-gray-200 dark:border-white/10
+                                        bg-white dark:bg-white/[0.04]
+                                        text-gray-600 dark:text-gray-400
+                                        transition
+                                        hover:border-yellow-400/40
+                                        hover:bg-yellow-400/5
+                                        hover:text-yellow-600 dark:hover:text-yellow-400
                                     "
                                 >
-                                    {summary.count}
-                                </div>
+                                    {hideAmounts ? (
+                                        <EyeOff size={20} />
+                                    ) : (
+                                        <Eye size={20} />
+                                    )}
+
+                                    <span
+                                        className="
+                                            text-[8px]
+                                            font-black
+                                            uppercase
+                                            tracking-wider
+                                        "
+                                    >
+                                        {hideAmounts ? "Show" : "Hide"}
+                                    </span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1731,28 +1509,28 @@ export default function Payments({
                             title="Paid"
                             value={formatCurrency(summary.collected)}
                             icon={<CheckCircle2 size={18} />}
-                            iconClass="text-emerald-400"
+                            iconClass="text-emerald-600 dark:text-emerald-400"
                         />
 
                         <SummaryCard
                             title="Pending"
                             value={formatCurrency(summary.pending)}
                             icon={<Clock3 size={18} />}
-                            iconClass="text-yellow-400"
+                            iconClass="text-yellow-600 dark:text-yellow-400"
                         />
 
                         <SummaryCard
                             title="Partial"
                             value={formatCurrency(summary.partial)}
                             icon={<CreditCard size={18} />}
-                            iconClass="text-blue-400"
+                            iconClass="text-blue-600 dark:text-blue-400"
                         />
 
                         <SummaryCard
                             title="Archived"
                             value={String(summary.archiveCount)}
                             icon={<Archive size={18} />}
-                            iconClass="text-purple-400"
+                            iconClass="text-purple-600 dark:text-purple-400"
                         />
                     </div>
 
@@ -1766,8 +1544,8 @@ export default function Payments({
                             gap-2
                             rounded-2xl
                             border
-                            border-white/10
-                            bg-white/[0.035]
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-white/[0.035]
                             p-2
                             sm:flex-row
                         "
@@ -1793,7 +1571,7 @@ export default function Payments({
                                 ${
                                     viewMode === "active"
                                         ? "bg-yellow-400 text-black"
-                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                                 }
                             `}
                         >
@@ -1808,7 +1586,7 @@ export default function Payments({
                                     ${
                                         viewMode === "active"
                                             ? "bg-black/15 text-black"
-                                            : "bg-white/10 text-gray-400"
+                                            : "bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400"
                                     }
                                 `}
                             >
@@ -1837,7 +1615,7 @@ export default function Payments({
                                 ${
                                     viewMode === "archive"
                                         ? "bg-yellow-400 text-black"
-                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                                 }
                             `}
                         >
@@ -1852,7 +1630,7 @@ export default function Payments({
                                     ${
                                         viewMode === "archive"
                                             ? "bg-black/15 text-black"
-                                            : "bg-white/10 text-gray-400"
+                                            : "bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400"
                                     }
                                 `}
                             >
@@ -1869,8 +1647,8 @@ export default function Payments({
                                 mb-5
                                 rounded-2xl
                                 border
-                                border-yellow-400/15
-                                bg-yellow-400/[0.04]
+                                border-purple-400/15
+                                bg-purple-400/[0.04]
                                 p-4
                             "
                         >
@@ -1884,22 +1662,23 @@ export default function Payments({
                                         items-center
                                         justify-center
                                         rounded-xl
-                                        bg-yellow-400/10
-                                        text-yellow-400
+                                        bg-purple-400/10
+                                        text-purple-600 dark:text-purple-400
                                     "
                                 >
                                     <Archive size={18} />
                                 </div>
 
                                 <div>
-                                    <h3 className="text-sm font-bold text-white">
-                                        Payment Archive
+                                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                        Admin Payment Archive
                                     </h3>
 
-                                    <p className="mt-1 text-xs leading-5 text-gray-400">
-                                        Archived payment records remain
-                                        available for review. Archived records
-                                        are read-only.
+                                    <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-400">
+                                        Admin-only archive. These records are
+                                        hidden from your admin view only. The
+                                        client/user side is NOT affected. You
+                                        can restore them anytime.
                                     </p>
                                 </div>
                             </div>
@@ -1913,8 +1692,8 @@ export default function Payments({
                             mb-5
                             rounded-2xl
                             border
-                            border-white/10
-                            bg-white/[0.035]
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-white/[0.035]
                             p-3
                             backdrop-blur-xl
                             sm:p-4
@@ -1963,17 +1742,20 @@ export default function Payments({
                                         appearance-none
                                         rounded-xl
                                         border
-                                        border-white/10
-                                        bg-black/40
+                                        border-gray-200 dark:border-white/10
+                                        bg-white dark:bg-black/40
                                         px-4
                                         pr-10
                                         text-sm
-                                        text-white
+                                        text-gray-900 dark:text-white
                                         outline-none
                                         focus:border-yellow-400/50
                                     "
                                 >
-                                    <option value="All" className="bg-black">
+                                    <option
+                                        value="All"
+                                        className="bg-white dark:bg-black"
+                                    >
                                         All Status
                                     </option>
 
@@ -1983,7 +1765,7 @@ export default function Payments({
                                         <option
                                             key={status}
                                             value={status}
-                                            className="bg-black"
+                                            className="bg-white dark:bg-black"
                                         >
                                             {status}
                                         </option>
@@ -2012,8 +1794,8 @@ export default function Payments({
                             overflow-hidden
                             rounded-2xl
                             border
-                            border-white/10
-                            bg-white/[0.035]
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-white/[0.035]
                             shadow-2xl
                             shadow-black/30
                         "
@@ -2021,7 +1803,7 @@ export default function Payments({
                         <div
                             className="
                                 border-b
-                                border-white/10
+                                border-gray-200 dark:border-white/10
                                 px-4
                                 py-4
                                 sm:px-5
@@ -2038,9 +1820,9 @@ export default function Payments({
                                 "
                             >
                                 <div>
-                                    <h2 className="font-bold text-white">
+                                    <h2 className="font-bold text-gray-900 dark:text-white">
                                         {viewMode === "archive"
-                                            ? "Archived Payments"
+                                            ? "Admin Archived Payments"
                                             : "Active Payment Records"}
                                     </h2>
 
@@ -2082,7 +1864,7 @@ export default function Payments({
                                     />
 
                                     {viewMode === "archive"
-                                        ? "Archive controls enabled"
+                                        ? "Admin archive controls enabled"
                                         : "Admin controls enabled"}
                                 </div>
                             </div>
@@ -2092,16 +1874,20 @@ export default function Payments({
                             <EmptyState archive={viewMode === "archive"} />
                         ) : (
                             <div
-                                className="
-                                    max-h-[680px]
+                                className={`
                                     overflow-y-auto
                                     overscroll-contain
-                                    [&::-webkit-scrollbar]:w-1.5
-                                    [&::-webkit-scrollbar-track]:bg-transparent
+                                    [&::-webkit-scrollbar]:w-2
+                                    [&::-webkit-scrollbar-track]:bg-white dark:[&::-webkit-scrollbar-track]:bg-white/[0.02]
                                     [&::-webkit-scrollbar-thumb]:rounded-full
-                                    [&::-webkit-scrollbar-thumb]:bg-yellow-400/20
-                                    hover:[&::-webkit-scrollbar-thumb]:bg-yellow-400/40
-                                "
+                                    [&::-webkit-scrollbar-thumb]:bg-yellow-400/40
+                                    hover:[&::-webkit-scrollbar-thumb]:bg-yellow-400/70
+                                    ${
+                                        filteredPayments.length >= 4
+                                            ? "max-h-[520px]"
+                                            : "max-h-none"
+                                    }
+                                `}
                                 onScroll={() => setOpenMenu(null)}
                             >
                                 <div className="divide-y divide-white/[0.06]">
@@ -2130,10 +1916,15 @@ export default function Payments({
                                             onPrint={() =>
                                                 printPayment(payment)
                                             }
+                                            onArchive={() =>
+                                                openArchive(payment)
+                                            }
                                             onRestore={() =>
                                                 openRestore(payment)
                                             }
                                             formatCurrency={formatCurrency}
+                                            formatEmail={formatEmail}
+                                            hideAmounts={hideAmounts}
                                         />
                                     ))}
                                 </div>
@@ -2170,7 +1961,7 @@ export default function Payments({
                         const status = getStatus(payment);
                         const paid = status === "Paid";
                         const partial = status === "Partial";
-                        const archived = Boolean(payment.archived);
+                        const adminArchived = isAdminArchived(payment);
 
                         return (
                             <div
@@ -2181,8 +1972,8 @@ export default function Payments({
                                     overflow-hidden
                                     rounded-2xl
                                     border
-                                    border-white/10
-                                    bg-[#101010]
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-[#101010]
                                     p-1.5
                                     shadow-2xl
                                     shadow-black/80
@@ -2193,7 +1984,7 @@ export default function Payments({
                                 }}
                                 onClick={(event) => event.stopPropagation()}
                             >
-                                {!archived && (
+                                {!adminArchived && (
                                     <>
                                         <MenuItem
                                             icon={<Eye size={16} />}
@@ -2207,7 +1998,7 @@ export default function Payments({
                                             onClick={() =>
                                                 openEditPayment(payment)
                                             }
-                                            className="text-yellow-400 hover:bg-yellow-400/10"
+                                            className="text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                                         />
 
                                         {paid ? (
@@ -2228,7 +2019,19 @@ export default function Payments({
                                                     }
                                                 />
 
-                                                <div className="my-1 border-t border-white/10" />
+                                                {/* ✅ MOVE TO ARCHIVE (PAID) */}
+                                                <div className="my-1 border-t border-gray-200 dark:border-white/10" />
+
+                                                <MenuItem
+                                                    icon={<Archive size={16} />}
+                                                    label="Move to Archive"
+                                                    onClick={() =>
+                                                        openArchive(payment)
+                                                    }
+                                                    className="text-purple-600 dark:text-purple-400 hover:bg-purple-400/10"
+                                                />
+
+                                                <div className="my-1 border-t border-gray-200 dark:border-white/10" />
 
                                                 <div
                                                     className="
@@ -2239,7 +2042,7 @@ export default function Payments({
                                                         py-2
                                                         text-[11px]
                                                         font-semibold
-                                                        text-emerald-400
+                                                        text-emerald-600 dark:text-emerald-400
                                                     "
                                                 >
                                                     <ShieldCheck size={15} />
@@ -2258,7 +2061,7 @@ export default function Payments({
                                                     onClick={() =>
                                                         openApprove(payment)
                                                     }
-                                                    className="text-emerald-400 hover:bg-emerald-400/10"
+                                                    className="text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/10"
                                                 />
 
                                                 {!partial && (
@@ -2272,7 +2075,7 @@ export default function Payments({
                                                         onClick={() =>
                                                             openPartial(payment)
                                                         }
-                                                        className="text-blue-400 hover:bg-blue-400/10"
+                                                        className="text-blue-600 dark:text-blue-400 hover:bg-blue-400/10"
                                                     />
                                                 )}
 
@@ -2286,7 +2089,7 @@ export default function Payments({
                                                             py-2
                                                             text-[11px]
                                                             font-semibold
-                                                            text-blue-400
+                                                            text-blue-600 dark:text-blue-400
                                                         "
                                                     >
                                                         <CreditCard size={15} />
@@ -2309,12 +2112,24 @@ export default function Payments({
                                                         printPayment(payment)
                                                     }
                                                 />
+
+                                                {/* ✅ MOVE TO ARCHIVE (PENDING/PARTIAL/DUE) */}
+                                                <div className="my-1 border-t border-gray-200 dark:border-white/10" />
+
+                                                <MenuItem
+                                                    icon={<Archive size={16} />}
+                                                    label="Move to Archive"
+                                                    onClick={() =>
+                                                        openArchive(payment)
+                                                    }
+                                                    className="text-purple-600 dark:text-purple-400 hover:bg-purple-400/10"
+                                                />
                                             </>
                                         )}
                                     </>
                                 )}
 
-                                {archived && (
+                                {adminArchived && (
                                     <>
                                         <MenuItem
                                             icon={<Eye size={16} />}
@@ -2334,10 +2149,10 @@ export default function Payments({
                                             icon={<RotateCcw size={16} />}
                                             label="Restore Payment"
                                             onClick={() => openRestore(payment)}
-                                            className="text-yellow-400 hover:bg-yellow-400/10"
+                                            className="text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                                         />
 
-                                        <div className="my-1 border-t border-white/10" />
+                                        <div className="my-1 border-t border-gray-200 dark:border-white/10" />
 
                                         <div
                                             className="
@@ -2348,7 +2163,8 @@ export default function Payments({
                                                 text-gray-500
                                             "
                                         >
-                                            Archived records are read-only.
+                                            Admin-archived — restore to bring
+                                            back to active list.
                                         </div>
                                     </>
                                 )}
@@ -2359,7 +2175,7 @@ export default function Payments({
             )}
 
             {/* =========================================================
-                VIEW PAYMENT MODAL - WITH CLIENT EMAIL
+                VIEW PAYMENT MODAL
             ========================================================= */}
 
             {showViewModal && selectedPayment && (
@@ -2374,15 +2190,13 @@ export default function Payments({
                             overflow-hidden
                             rounded-2xl
                             border
-                            border-white/10
-                            bg-[#090909]
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-[#090909]
                             shadow-[0_30px_100px_rgba(0,0,0,0.75)]
                             sm:max-h-[calc(100vh-32px)]
                         "
                         onMouseDown={(e) => e.stopPropagation()}
                     >
-                        {/* MODAL HEADER */}
-
                         <ModalHeader
                             icon={<Eye size={19} />}
                             title="Payment Document"
@@ -2392,20 +2206,16 @@ export default function Payments({
                             onClose={closeView}
                         />
 
-                        {/* DOCUMENT SCROLL AREA */}
-
                         <div
                             className="
                                 min-h-0
                                 flex-1
                                 overflow-y-auto
-                                bg-[#151515]
+                                bg-white dark:bg-[#151515]
                                 p-3
                                 sm:p-6
                             "
                         >
-                            {/* REALISTIC PAYMENT DOCUMENT */}
-
                             <div
                                 className="
                                     mx-auto
@@ -2417,12 +2227,8 @@ export default function Payments({
                                     shadow-[0_20px_60px_rgba(0,0,0,0.45)]
                                 "
                             >
-                                {/* DOCUMENT HEADER */}
-
                                 <div className="border-b-4 border-yellow-400 px-6 py-6 sm:px-10 sm:py-8">
                                     <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-                                        {/* COMPANY */}
-
                                         <div className="flex items-center gap-4">
                                             <div
                                                 className="
@@ -2433,7 +2239,7 @@ export default function Payments({
                                                     items-center
                                                     justify-center
                                                     border-2
-                                                    border-slate-900
+                                                    border-gray-200 dark:border-slate-900
                                                     text-xl
                                                     font-black
                                                     tracking-widest
@@ -2447,22 +2253,20 @@ export default function Payments({
                                                     ALIBATON
                                                 </h1>
 
-                                                <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                                                <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
                                                     Heavy Equipment & Logistics
                                                     Management System
                                                 </p>
 
-                                                <p className="mt-1 text-[8px] text-slate-400">
+                                                <p className="mt-1 text-[8px] text-gray-600 dark:text-slate-400">
                                                     45 Riverside, Quezon City,
                                                     Philippines
                                                 </p>
                                             </div>
                                         </div>
 
-                                        {/* DOCUMENT TYPE */}
-
                                         <div className="text-left sm:text-right">
-                                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-gray-600 dark:text-slate-400">
                                                 Official Payment Record
                                             </p>
 
@@ -2470,19 +2274,17 @@ export default function Payments({
                                                 {getReceipt(selectedPayment)}
                                             </p>
 
-                                            <p className="mt-1 text-[8px] uppercase tracking-wider text-slate-400">
+                                            <p className="mt-1 text-[8px] uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Payment Statement
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* PAYMENT STATUS BAR */}
-
                                 <div className="border-b border-slate-200 px-6 py-5 sm:px-10">
                                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-gray-600 dark:text-slate-400">
                                                 Transaction Record
                                             </p>
 
@@ -2490,14 +2292,14 @@ export default function Payments({
                                                 PAYMENT STATEMENT
                                             </h2>
 
-                                            <p className="mt-1 text-[9px] text-slate-500">
+                                            <p className="mt-1 text-[9px] text-gray-500 dark:text-slate-500">
                                                 Official record of payment
                                                 transaction
                                             </p>
                                         </div>
 
                                         <div className="flex flex-col items-start gap-1 sm:items-end">
-                                            <span className="text-[7px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                            <span className="text-[7px] font-black uppercase tracking-[0.18em] text-gray-600 dark:text-slate-400">
                                                 Payment Status
                                             </span>
 
@@ -2539,16 +2341,14 @@ export default function Payments({
                                     </div>
                                 </div>
 
-                                {/* ACCOUNT INFORMATION - WITH CLIENT EMAIL */}
-
                                 <div className="px-6 py-5 sm:px-10">
-                                    <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                         Account Information
                                     </p>
 
                                     <div className="grid grid-cols-1 border border-slate-200 sm:grid-cols-2">
                                         <div className="border-b border-slate-200 p-4 sm:border-r">
-                                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Client / Company
                                             </p>
 
@@ -2558,7 +2358,7 @@ export default function Payments({
                                         </div>
 
                                         <div className="border-b border-slate-200 p-4">
-                                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Invoice Number
                                             </p>
 
@@ -2567,9 +2367,8 @@ export default function Payments({
                                             </p>
                                         </div>
 
-                                        {/* ✅ PAYMENT METHOD - Added to view modal */}
                                         <div className="border-b border-slate-200 p-4 sm:border-r">
-                                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Payment Method
                                             </p>
 
@@ -2578,21 +2377,22 @@ export default function Payments({
                                             </p>
                                         </div>
 
-                                        {/* ✅ CLIENT EMAIL - Added to view modal */}
                                         <div className="border-b border-slate-200 p-4">
-                                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Client Email
                                             </p>
 
                                             <p className="mt-1 text-sm font-bold text-slate-900">
-                                                {getClientEmail(
-                                                    selectedPayment,
-                                                ) || "N/A"}
+                                                {formatEmail(
+                                                    getClientEmail(
+                                                        selectedPayment,
+                                                    ),
+                                                )}
                                             </p>
                                         </div>
 
                                         <div className="border-b border-slate-200 p-4 sm:border-r">
-                                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Receipt Number
                                             </p>
 
@@ -2602,7 +2402,7 @@ export default function Payments({
                                         </div>
 
                                         <div className="border-b border-slate-200 p-4 sm:border-r sm:border-b-0">
-                                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Payment Date
                                             </p>
 
@@ -2616,7 +2416,7 @@ export default function Payments({
                                         </div>
 
                                         <div className="p-4">
-                                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Due Date
                                             </p>
 
@@ -2629,20 +2429,16 @@ export default function Payments({
                                     </div>
                                 </div>
 
-                                {/* PAYMENT SUMMARY */}
-
                                 <div className="mx-6 border border-slate-200 sm:mx-10">
                                     <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
-                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                             Payment Summary
                                         </p>
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-3">
-                                        {/* INVOICE TOTAL */}
-
                                         <div className="border-b border-slate-200 p-5 sm:border-r">
-                                            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-bold uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Invoice Total
                                             </p>
 
@@ -2655,10 +2451,8 @@ export default function Payments({
                                             </p>
                                         </div>
 
-                                        {/* AMOUNT PAID */}
-
                                         <div className="border-b border-slate-200 p-5 sm:border-r">
-                                            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-bold uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Amount Paid
                                             </p>
 
@@ -2672,10 +2466,8 @@ export default function Payments({
                                             </p>
                                         </div>
 
-                                        {/* REMAINING */}
-
                                         <div className="p-5">
-                                            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                            <p className="text-[8px] font-bold uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                                 Remaining Balance
                                             </p>
 
@@ -2710,17 +2502,15 @@ export default function Payments({
                                     </div>
                                 </div>
 
-                                {/* PAYMENT DETAILS */}
-
                                 <div className="px-6 py-5 sm:px-10">
-                                    <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                         Payment Details
                                     </p>
 
                                     <table className="w-full border-collapse border border-slate-200">
                                         <tbody>
                                             <tr>
-                                                <td className="w-[40%] border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <td className="w-[40%] border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Payment Date
                                                 </td>
 
@@ -2734,7 +2524,7 @@ export default function Payments({
                                             </tr>
 
                                             <tr>
-                                                <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Due Date
                                                 </td>
 
@@ -2748,7 +2538,7 @@ export default function Payments({
                                             </tr>
 
                                             <tr>
-                                                <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Payment Status
                                                 </td>
 
@@ -2792,7 +2582,7 @@ export default function Payments({
                                             {getStatus(selectedPayment) ===
                                                 "Partial" && (
                                                 <tr>
-                                                    <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                    <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Partial Payment Date
                                                     </td>
 
@@ -2808,7 +2598,7 @@ export default function Payments({
                                             )}
 
                                             <tr>
-                                                <td className="bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <td className="bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Receipt Number
                                                 </td>
 
@@ -2821,8 +2611,6 @@ export default function Payments({
                                         </tbody>
                                     </table>
                                 </div>
-
-                                {/* BALANCE NOTICE FOR PARTIAL PAYMENT */}
 
                                 {getStatus(selectedPayment) === "Partial" && (
                                     <div className="mx-6 border border-yellow-300 bg-yellow-50 px-5 py-4 sm:mx-10">
@@ -2865,22 +2653,18 @@ export default function Payments({
                                     </div>
                                 )}
 
-                                {/* NOTES */}
-
                                 <div className="px-6 py-5 sm:px-10">
-                                    <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    <p className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                         Payment Notes
                                     </p>
 
                                     <div className="min-h-[80px] border border-slate-200 bg-slate-50 px-5 py-4">
-                                        <p className="whitespace-pre-wrap text-xs leading-6 text-slate-600">
+                                        <p className="whitespace-pre-wrap text-xs leading-6 text-gray-600 dark:text-slate-600">
                                             {selectedPayment.notes?.trim() ||
                                                 "No notes provided."}
                                         </p>
                                     </div>
                                 </div>
-
-                                {/* PAYMENT CONFIRMATION */}
 
                                 {getStatus(selectedPayment) === "Paid" && (
                                     <div className="mx-6 border border-emerald-300 bg-emerald-50 px-5 py-4 sm:mx-10">
@@ -2905,14 +2689,12 @@ export default function Payments({
                                     </div>
                                 )}
 
-                                {/* SIGNATURES */}
-
                                 <div className="px-6 pb-8 pt-10 sm:px-10">
                                     <div className="grid gap-10 sm:grid-cols-2">
                                         <div>
                                             <div className="h-8 border-b border-slate-400" />
 
-                                            <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-slate-500">
+                                            <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Client / Authorized
                                                 Representative
                                             </p>
@@ -2921,7 +2703,7 @@ export default function Payments({
                                         <div>
                                             <div className="h-8 border-b border-slate-400" />
 
-                                            <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-slate-500">
+                                            <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 ALIBATON Finance / Authorized
                                                 Staff
                                             </p>
@@ -2929,17 +2711,15 @@ export default function Payments({
                                     </div>
                                 </div>
 
-                                {/* DOCUMENT FOOTER */}
-
                                 <div className="border-t border-slate-200 px-6 py-4 sm:px-10">
-                                    <div className="flex flex-col gap-2 text-[7px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex flex-col gap-2 text-[7px] text-gray-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                                         <span>
                                             ALIBATON Payment Management System
                                         </span>
 
                                         <span>
                                             Receipt:{" "}
-                                            <strong className="text-slate-500">
+                                            <strong className="text-gray-500 dark:text-slate-500">
                                                 {getReceipt(selectedPayment)}
                                             </strong>
                                         </span>
@@ -2954,8 +2734,6 @@ export default function Payments({
                                 </div>
                             </div>
                         </div>
-
-                        {/* MODAL FOOTER */}
 
                         <ModalFooter>
                             <button
@@ -2985,7 +2763,7 @@ export default function Payments({
                             rounded-2xl
                             border
                             border-yellow-400/20
-                            bg-[#0b0b0b]
+                            bg-white dark:bg-[#0b0b0b]
                             shadow-2xl
                         "
                         onMouseDown={(e) => e.stopPropagation()}
@@ -3004,9 +2782,9 @@ export default function Payments({
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
-                                        <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                        <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             Client{" "}
-                                            <span className="text-red-400">
+                                            <span className="text-red-600 dark:text-red-400">
                                                 *
                                             </span>
                                         </label>
@@ -3027,7 +2805,7 @@ export default function Payments({
                                     </div>
 
                                     <div>
-                                        <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                        <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             Invoice Number
                                         </label>
                                         <input
@@ -3047,7 +2825,7 @@ export default function Payments({
                                     </div>
 
                                     <div>
-                                        <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                        <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             Receipt Number
                                         </label>
                                         <input
@@ -3067,9 +2845,9 @@ export default function Payments({
                                     </div>
 
                                     <div>
-                                        <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                        <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             Payment Method{" "}
-                                            <span className="text-red-400">
+                                            <span className="text-red-600 dark:text-red-400">
                                                 *
                                             </span>
                                         </label>
@@ -3096,18 +2874,22 @@ export default function Payments({
                                     </div>
 
                                     <div>
-                                        <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                        <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             Amount{" "}
-                                            <span className="text-red-400">
+                                            <span className="text-red-600 dark:text-red-400">
                                                 *
                                             </span>
                                         </label>
                                         <div className="relative">
-                                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-yellow-400">
+                                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-yellow-600 dark:text-yellow-400">
                                                 ₱
                                             </span>
                                             <input
-                                                type="number"
+                                                type={
+                                                    hideAmounts
+                                                        ? "password"
+                                                        : "number"
+                                                }
                                                 step="0.01"
                                                 min="0.01"
                                                 value={paymentForm.amount}
@@ -3126,7 +2908,7 @@ export default function Payments({
                                     </div>
 
                                     <div>
-                                        <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                        <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             Payment Date
                                         </label>
                                         <input
@@ -3145,7 +2927,7 @@ export default function Payments({
                                     </div>
 
                                     <div>
-                                        <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                        <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             Due Date
                                         </label>
                                         <input
@@ -3164,7 +2946,7 @@ export default function Payments({
                                 </div>
 
                                 <div>
-                                    <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                    <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                         Notes
                                     </label>
                                     <textarea
@@ -3229,7 +3011,7 @@ export default function Payments({
                             rounded-2xl
                             border
                             border-blue-400/20
-                            bg-[#0b0b0b]
+                            bg-white dark:bg-[#0b0b0b]
                             shadow-2xl
                         "
                         onMouseDown={(e) => e.stopPropagation()}
@@ -3255,15 +3037,15 @@ export default function Payments({
                                 <div className="flex gap-3">
                                     <AlertCircle
                                         size={20}
-                                        className="shrink-0 text-blue-400"
+                                        className="shrink-0 text-blue-600 dark:text-blue-400"
                                     />
 
                                     <div>
-                                        <p className="text-sm font-bold text-blue-300">
+                                        <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
                                             Automatic Half Payment
                                         </p>
 
-                                        <p className="mt-1 text-xs leading-5 text-gray-400">
+                                        <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-400">
                                             The system automatically calculated
                                             50% of the invoice amount. Admin
                                             only needs to confirm.
@@ -3303,19 +3085,19 @@ export default function Payments({
                                     mt-5
                                     rounded-xl
                                     border
-                                    border-white/10
-                                    bg-white/[0.025]
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-white/[0.025]
                                     p-4
                                 "
                             >
                                 <div className="flex items-center gap-3">
                                     <CheckCircle2
                                         size={19}
-                                        className="text-blue-400"
+                                        className="text-blue-600 dark:text-blue-400"
                                     />
 
                                     <div>
-                                        <p className="text-sm font-bold text-white">
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">
                                             Ready to confirm?
                                         </p>
 
@@ -3351,7 +3133,7 @@ export default function Payments({
                                     px-6
                                     text-sm
                                     font-black
-                                    text-white
+                                    text-gray-900 dark:text-white
                                     transition
                                     hover:bg-blue-400
                                 "
@@ -3378,7 +3160,7 @@ export default function Payments({
                             rounded-2xl
                             border
                             border-emerald-400/20
-                            bg-[#0b0b0b]
+                            bg-white dark:bg-[#0b0b0b]
                             shadow-2xl
                         "
                         onMouseDown={(e) => e.stopPropagation()}
@@ -3414,17 +3196,17 @@ export default function Payments({
                                 >
                                     <ShieldCheck
                                         size={40}
-                                        className="text-emerald-400"
+                                        className="text-emerald-600 dark:text-emerald-400"
                                     />
                                 </div>
 
-                                <h2 className="mt-5 text-xl font-black text-white">
+                                <h2 className="mt-5 text-xl font-black text-gray-900 dark:text-white">
                                     Confirm Fully Paid
                                 </h2>
 
-                                <p className="mt-2 max-w-sm text-sm leading-6 text-gray-400">
+                                <p className="mt-2 max-w-sm text-sm leading-6 text-gray-600 dark:text-gray-400">
                                     Mark{" "}
-                                    <span className="font-bold text-white">
+                                    <span className="font-bold text-gray-900 dark:text-white">
                                         {getReceipt(selectedPayment)}
                                     </span>{" "}
                                     as fully paid?
@@ -3436,8 +3218,8 @@ export default function Payments({
                                     mt-5
                                     rounded-xl
                                     border
-                                    border-white/10
-                                    bg-white/[0.025]
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-white/[0.025]
                                     p-4
                                 "
                             >
@@ -3447,7 +3229,7 @@ export default function Payments({
                                             Client
                                         </p>
 
-                                        <p className="mt-1 truncate text-sm font-bold text-white">
+                                        <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
                                             {getClientName(selectedPayment)}
                                         </p>
                                     </div>
@@ -3457,7 +3239,7 @@ export default function Payments({
                                             Invoice
                                         </p>
 
-                                        <p className="mt-1 truncate text-sm font-bold text-white">
+                                        <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
                                             {getInvoice(selectedPayment)}
                                         </p>
                                     </div>
@@ -3467,7 +3249,7 @@ export default function Payments({
                                             Amount
                                         </p>
 
-                                        <p className="mt-1 text-sm font-black text-yellow-400">
+                                        <p className="mt-1 text-sm font-black text-yellow-600 dark:text-yellow-400">
                                             {formatCurrency(
                                                 selectedPayment.amount,
                                             )}
@@ -3479,7 +3261,7 @@ export default function Payments({
                                             Status
                                         </p>
 
-                                        <p className="mt-1 text-sm font-black text-yellow-400">
+                                        <p className="mt-1 text-sm font-black text-yellow-600 dark:text-yellow-400">
                                             {getStatus(selectedPayment)}
                                         </p>
                                     </div>
@@ -3496,7 +3278,7 @@ export default function Payments({
                                     p-4
                                 "
                             >
-                                <p className="text-xs leading-5 text-emerald-300">
+                                <p className="text-xs leading-5 text-emerald-700 dark:text-emerald-300">
                                     Once confirmed, this record will become
                                     <strong> Fully Paid</strong> and the payment
                                     record will be locked.
@@ -3564,6 +3346,211 @@ export default function Payments({
             )}
 
             {/* =========================================================
+                ✅ MOVE TO ADMIN ARCHIVE MODAL
+            ========================================================= */}
+
+            {showArchiveModal && selectedPayment && (
+                <ModalOverlay onClose={closeArchive}>
+                    <div
+                        className="
+                            w-full
+                            max-w-lg
+                            overflow-hidden
+                            rounded-2xl
+                            border
+                            border-purple-400/20
+                            bg-white dark:bg-[#0b0b0b]
+                            shadow-2xl
+                        "
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <ModalHeader
+                            icon={<Archive size={19} />}
+                            title="Move to Archive"
+                            subtitle={getReceipt(selectedPayment)}
+                            onClose={closeArchive}
+                        />
+
+                        <div className="p-5 sm:p-6">
+                            <div
+                                className="
+                                    flex
+                                    flex-col
+                                    items-center
+                                    text-center
+                                "
+                            >
+                                <div
+                                    className="
+                                        flex
+                                        h-20
+                                        w-20
+                                        items-center
+                                        justify-center
+                                        rounded-full
+                                        border
+                                        border-purple-400/20
+                                        bg-purple-400/10
+                                    "
+                                >
+                                    <Archive
+                                        size={40}
+                                        className="text-purple-600 dark:text-purple-400"
+                                    />
+                                </div>
+
+                                <h2 className="mt-5 text-xl font-black text-gray-900 dark:text-white">
+                                    Archive this Payment?
+                                </h2>
+
+                                <p className="mt-2 max-w-sm text-sm leading-6 text-gray-600 dark:text-gray-400">
+                                    <span className="font-bold text-gray-900 dark:text-white">
+                                        {getReceipt(selectedPayment)}
+                                    </span>{" "}
+                                    will be hidden from your active list.
+                                    <strong className="text-purple-700 dark:text-purple-300">
+                                        {" "}
+                                        The client/user side is NOT affected.
+                                    </strong>{" "}
+                                    You can restore it anytime.
+                                </p>
+                            </div>
+
+                            <div
+                                className="
+                                    mt-5
+                                    rounded-xl
+                                    border
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-white/[0.025]
+                                    p-4
+                                "
+                            >
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                                            Client
+                                        </p>
+
+                                        <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
+                                            {getClientName(selectedPayment)}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                                            Invoice
+                                        </p>
+
+                                        <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
+                                            {getInvoice(selectedPayment)}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                                            Amount
+                                        </p>
+
+                                        <p className="mt-1 text-sm font-black text-yellow-600 dark:text-yellow-400">
+                                            {formatCurrency(
+                                                selectedPayment.amount,
+                                            )}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-wider text-gray-600">
+                                            Status
+                                        </p>
+
+                                        <p className="mt-1 text-sm font-black text-yellow-600 dark:text-yellow-400">
+                                            {getStatus(selectedPayment)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                className="
+                                    mt-4
+                                    rounded-xl
+                                    border
+                                    border-purple-400/15
+                                    bg-purple-400/[0.04]
+                                    p-4
+                                "
+                            >
+                                <p className="text-xs leading-5 text-purple-700 dark:text-purple-300">
+                                    This is an{" "}
+                                    <strong>admin-only archive</strong>. The
+                                    payment will still be visible to the client
+                                    and staff — only hidden from your admin
+                                    active list.
+                                </p>
+                            </div>
+                        </div>
+
+                        <ModalFooter>
+                            <button
+                                type="button"
+                                onClick={closeArchive}
+                                disabled={archiveProcessing}
+                                className={secondaryButtonClass}
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={confirmArchive}
+                                disabled={archiveProcessing}
+                                className="
+                                    flex
+                                    h-11
+                                    items-center
+                                    justify-center
+                                    gap-2
+                                    rounded-xl
+                                    bg-purple-500
+                                    px-6
+                                    text-sm
+                                    font-black
+                                    text-gray-900 dark:text-white
+                                    transition
+                                    hover:bg-purple-400
+                                    disabled:cursor-not-allowed
+                                    disabled:opacity-50
+                                "
+                            >
+                                {archiveProcessing ? (
+                                    <>
+                                        <div
+                                            className="
+                                                h-4
+                                                w-4
+                                                animate-spin
+                                                rounded-full
+                                                border-2
+                                                border-gray-300 dark:border-white/30
+                                                border-t-white
+                                            "
+                                        />
+                                        Archiving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Archive size={17} />
+                                        YES, ARCHIVE
+                                    </>
+                                )}
+                            </button>
+                        </ModalFooter>
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {/* =========================================================
                 EMAIL MODAL
             ========================================================= */}
 
@@ -3583,7 +3570,7 @@ export default function Payments({
                             rounded-2xl
                             border
                             border-yellow-400/20
-                            bg-[#0b0b0b]
+                            bg-white dark:bg-[#0b0b0b]
                             shadow-2xl
                             shadow-black/70
                             sm:max-h-[calc(100vh-48px)]
@@ -3611,8 +3598,8 @@ export default function Payments({
                                     mb-5
                                     rounded-2xl
                                     border
-                                    border-white/10
-                                    bg-white/[0.025]
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-white/[0.025]
                                     p-4
                                 "
                             >
@@ -3634,7 +3621,7 @@ export default function Payments({
                                             justify-center
                                             rounded-xl
                                             bg-yellow-400/10
-                                            text-yellow-400
+                                            text-yellow-600 dark:text-yellow-400
                                         "
                                     >
                                         <CreditCard size={18} />
@@ -3704,7 +3691,7 @@ export default function Payments({
                             </div>
 
                             <div className="mb-4 min-w-0">
-                                <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                     Client Email Address
                                 </label>
 
@@ -3743,7 +3730,7 @@ export default function Payments({
                             </div>
 
                             <div className="mb-4">
-                                <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                     Subject
                                 </label>
 
@@ -3764,7 +3751,7 @@ export default function Payments({
                             </div>
 
                             <div>
-                                <label className="mb-2 block text-xs font-semibold text-gray-300">
+                                <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-gray-300">
                                     Message
                                 </label>
 
@@ -3841,7 +3828,7 @@ export default function Payments({
                             rounded-2xl
                             border
                             border-emerald-400/20
-                            bg-[#0b0b0b]
+                            bg-white dark:bg-[#0b0b0b]
                             shadow-2xl
                         "
                         onMouseDown={(e) => e.stopPropagation()}
@@ -3863,15 +3850,15 @@ export default function Payments({
                                 >
                                     <CheckCircle2
                                         size={34}
-                                        className="text-emerald-400"
+                                        className="text-emerald-600 dark:text-emerald-400"
                                     />
                                 </div>
 
-                                <h2 className="mt-5 text-xl font-bold text-white">
+                                <h2 className="mt-5 text-xl font-bold text-gray-900 dark:text-white">
                                     Successfully Completed
                                 </h2>
 
-                                <p className="mt-2 text-sm leading-6 text-gray-400">
+                                <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
                                     The payment record has been successfully
                                     updated.
                                 </p>
@@ -3918,7 +3905,7 @@ export default function Payments({
                             rounded-2xl
                             border
                             border-yellow-400/20
-                            bg-[#0b0b0b]
+                            bg-white dark:bg-[#0b0b0b]
                             shadow-2xl
                         "
                         onMouseDown={(e) => e.stopPropagation()}
@@ -3931,8 +3918,9 @@ export default function Payments({
                         />
 
                         <div className="p-5 sm:p-6">
-                            <p className="text-sm leading-6 text-gray-400">
-                                Restore this payment record from the archive?
+                            <p className="text-sm leading-6 text-gray-600 dark:text-gray-400">
+                                Restore this payment record from the admin
+                                archive?
                             </p>
 
                             <div
@@ -3940,14 +3928,14 @@ export default function Payments({
                                     mt-4
                                     rounded-xl
                                     border
-                                    border-white/10
-                                    bg-white/[0.025]
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-white/[0.025]
                                     p-4
                                 "
                             >
                                 <p className="text-xs text-gray-500">Client</p>
 
-                                <p className="mt-1 font-bold text-white">
+                                <p className="mt-1 font-bold text-gray-900 dark:text-white">
                                     {getClientName(selectedPayment)}
                                 </p>
 
@@ -3955,7 +3943,7 @@ export default function Payments({
                                     Amount
                                 </p>
 
-                                <p className="mt-1 font-black text-yellow-400">
+                                <p className="mt-1 font-black text-yellow-600 dark:text-yellow-400">
                                     {formatCurrency(selectedPayment.amount)}
                                 </p>
                             </div>
@@ -3988,7 +3976,7 @@ export default function Payments({
 
 /*
 |--------------------------------------------------------------------------
-| PAYMENT ROW - WITH CLIENT EMAIL
+| PAYMENT ROW
 |--------------------------------------------------------------------------
 */
 
@@ -4003,8 +3991,11 @@ function PaymentRow({
     onEdit,
     onSendEmail,
     onPrint,
+    onArchive,
     onRestore,
     formatCurrency,
+    formatEmail,
+    hideAmounts,
 }: {
     payment: Payment;
     clientName: string;
@@ -4016,13 +4007,16 @@ function PaymentRow({
     onEdit: () => void;
     onSendEmail: () => void;
     onPrint: () => void;
+    onArchive: () => void;
     onRestore: () => void;
     formatCurrency: (value: number | string | null | undefined) => string;
+    formatEmail: (value: string | null | undefined) => string;
+    hideAmounts: boolean;
 }) {
     const status = getStatus(payment);
     const paid = status === "Paid";
     const partial = status === "Partial";
-    const archived = Boolean(payment.archived);
+    const adminArchived = isAdminArchived(payment);
     const amount = Number(payment.amount ?? 0);
     const invoiceTotal = getInvoiceTotal(payment);
     const remaining = Math.max(invoiceTotal - amount, 0);
@@ -4035,7 +4029,7 @@ function PaymentRow({
                 relative
                 p-4
                 transition
-                hover:bg-white/[0.025]
+                hover:bg-gray-100 dark:hover:bg-white/[0.025]
                 sm:p-5
                 ${paid ? "bg-emerald-400/[0.015]" : ""}
                 ${partial ? "bg-blue-400/[0.015]" : ""}
@@ -4062,10 +4056,10 @@ function PaymentRow({
                             rounded-xl
                             ${
                                 paid
-                                    ? "bg-emerald-400/10 text-emerald-400"
+                                    ? "bg-emerald-400/10 text-emerald-600 dark:text-emerald-400"
                                     : partial
-                                      ? "bg-blue-400/10 text-blue-400"
-                                      : "bg-yellow-400/10 text-yellow-400"
+                                      ? "bg-blue-400/10 text-blue-600 dark:text-blue-400"
+                                      : "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
                             }
                         `}
                     >
@@ -4087,7 +4081,7 @@ function PaymentRow({
                                 gap-2
                             "
                         >
-                            <h3 className="truncate text-sm font-black text-white sm:text-base">
+                            <h3 className="truncate text-sm font-black text-gray-900 dark:text-white sm:text-base">
                                 {clientName}
                             </h3>
 
@@ -4112,6 +4106,15 @@ function PaymentRow({
                                 {getInvoice(payment)}
                             </span>
 
+                            {/* ✅ REFERENCE — Billing No. */}
+                            {payment.billing_number || payment.billingNumber ? (
+                                <span className="flex items-center gap-1.5 truncate font-semibold text-emerald-700 dark:text-emerald-400">
+                                    <Hash size={13} />
+                                    {payment.billing_number ??
+                                        payment.billingNumber}
+                                </span>
+                            ) : null}
+
                             <span className="flex items-center gap-1.5 truncate">
                                 <Hash size={13} />
                                 {getReceipt(payment)}
@@ -4133,11 +4136,10 @@ function PaymentRow({
                             </span>
                         </div>
 
-                        {/* ✅ CLIENT EMAIL - Added to row */}
                         {clientEmail && (
                             <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
                                 <Mail size={12} />
-                                <span>{clientEmail}</span>
+                                <span>{formatEmail(clientEmail)}</span>
                             </div>
                         )}
                     </div>
@@ -4157,8 +4159,8 @@ function PaymentRow({
                         className="
                             rounded-xl
                             border
-                            border-white/10
-                            bg-black/20
+                            border-gray-200 dark:border-white/10
+                            bg-gray-50 dark:bg-black/20
                             px-3
                             py-2.5
                         "
@@ -4167,7 +4169,7 @@ function PaymentRow({
                             Paid Amount
                         </p>
 
-                        <p className="mt-1 text-sm font-black text-white">
+                        <p className="mt-1 text-sm font-black text-gray-900 dark:text-white">
                             {formatCurrency(amount)}
                         </p>
                     </div>
@@ -4176,8 +4178,8 @@ function PaymentRow({
                         className="
                             rounded-xl
                             border
-                            border-white/10
-                            bg-black/20
+                            border-gray-200 dark:border-white/10
+                            bg-gray-50 dark:bg-black/20
                             px-3
                             py-2.5
                         "
@@ -4192,9 +4194,11 @@ function PaymentRow({
                                 text-sm
                                 font-black
                                 ${
-                                    remaining > 0
-                                        ? "text-yellow-400"
-                                        : "text-emerald-400"
+                                    hideAmounts
+                                        ? "text-gray-600 dark:text-gray-400"
+                                        : remaining > 0
+                                          ? "text-yellow-600 dark:text-yellow-400"
+                                          : "text-emerald-600 dark:text-emerald-400"
                                 }
                             `}
                         >
@@ -4206,8 +4210,8 @@ function PaymentRow({
                         className="
                             rounded-xl
                             border
-                            border-white/10
-                            bg-black/20
+                            border-gray-200 dark:border-white/10
+                            bg-gray-50 dark:bg-black/20
                             px-3
                             py-2.5
                         "
@@ -4216,7 +4220,7 @@ function PaymentRow({
                             Payment Date
                         </p>
 
-                        <p className="mt-1 truncate text-xs font-bold text-gray-300">
+                        <p className="mt-1 truncate text-xs font-bold text-gray-700 dark:text-gray-300">
                             {formatShortDate(getPaymentDate(payment))}
                         </p>
                     </div>
@@ -4239,8 +4243,8 @@ function PaymentRow({
                         transition
                         ${
                             isMenuOpen
-                                ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-400"
-                                : "border-white/10 bg-white/[0.025] text-gray-400 hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-400"
+                                ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025] text-gray-600 dark:text-gray-400 hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-600 dark:hover:text-yellow-400"
                         }
                     `}
                 >
@@ -4263,7 +4267,7 @@ function PaymentRow({
                         py-2
                         text-[10px]
                         font-semibold
-                        text-emerald-400/80
+                        text-emerald-600/80 dark:text-emerald-400/80
                     "
                 >
                     <ShieldCheck size={13} />
@@ -4286,7 +4290,7 @@ function PaymentRow({
                         py-2
                         text-[10px]
                         font-semibold
-                        text-blue-400/80
+                        text-blue-600/80 dark:text-blue-400/80
                     "
                 >
                     <CreditCard size={13} />
@@ -4294,7 +4298,7 @@ function PaymentRow({
                 </div>
             )}
 
-            {archived && (
+            {adminArchived && (
                 <div
                     className="
                         mt-3
@@ -4309,11 +4313,12 @@ function PaymentRow({
                         py-2
                         text-[10px]
                         font-semibold
-                        text-purple-300/80
+                        text-purple-700/80 dark:text-purple-300/80
                     "
                 >
                     <Archive size={13} />
-                    Archived — read-only payment record.
+                    Admin-archived — hidden from admin active list only. Client
+                    side unaffected.
                 </div>
             )}
         </div>
@@ -4352,10 +4357,10 @@ function MenuItem({
                 text-left
                 text-xs
                 font-bold
-                text-gray-300
+                text-gray-700 dark:text-gray-300
                 transition
-                hover:bg-white/5
-                hover:text-white
+                hover:bg-gray-100 dark:hover:bg-white/5
+                hover:text-gray-900 dark:hover:text-white
                 ${className}
             `}
         >
@@ -4375,12 +4380,12 @@ function MenuItem({
 function StatusBadge({ status }: { status: string }) {
     const classes =
         status === "Paid"
-            ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400"
+            ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400"
             : status === "Partial"
-              ? "border-blue-400/20 bg-blue-400/10 text-blue-400"
+              ? "border-blue-400/20 bg-blue-400/10 text-blue-600 dark:text-blue-400"
               : status === "Due"
-                ? "border-orange-400/20 bg-orange-400/10 text-orange-400"
-                : "border-yellow-400/20 bg-yellow-400/10 text-yellow-400";
+                ? "border-orange-400/20 bg-orange-400/10 text-orange-600 dark:text-orange-400"
+                : "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400";
 
     return (
         <span
@@ -4422,7 +4427,7 @@ function SummaryCard({
     title,
     value,
     icon,
-    iconClass = "text-yellow-400",
+    iconClass = "text-yellow-600 dark:text-yellow-400",
 }: {
     title: string;
     value: string;
@@ -4434,18 +4439,18 @@ function SummaryCard({
             className="
                 rounded-2xl
                 border
-                border-white/10
-                bg-white/[0.035]
+                border-gray-200 dark:border-white/10
+                bg-white dark:bg-white/[0.035]
                 p-4
             "
         >
             <div className="flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
                         {title}
                     </p>
 
-                    <p className="mt-1 text-base font-black text-white sm:text-lg">
+                    <p className="mt-1 truncate text-base font-black text-gray-900 dark:text-white sm:text-lg">
                         {value}
                     </p>
                 </div>
@@ -4459,7 +4464,7 @@ function SummaryCard({
                         items-center
                         justify-center
                         rounded-xl
-                        bg-white/[0.04]
+                        bg-white dark:bg-white/[0.04]
                         ${iconClass}
                     `}
                 >
@@ -4488,15 +4493,15 @@ function EmptyState({ archive }: { archive: boolean }) {
                     justify-center
                     rounded-2xl
                     border
-                    border-white/10
-                    bg-white/[0.03]
+                    border-gray-200 dark:border-white/10
+                    bg-white dark:bg-white/[0.03]
                     text-gray-600
                 "
             >
                 {archive ? <Archive size={28} /> : <Receipt size={28} />}
             </div>
 
-            <p className="mt-4 text-sm font-bold text-gray-400">
+            <p className="mt-4 text-sm font-bold text-gray-600 dark:text-gray-400">
                 No payment records found
             </p>
 
@@ -4572,10 +4577,11 @@ function ModalHeader({
                 justify-between
                 gap-4
                 border-b
-                border-white/10
+                border-gray-200 dark:border-white/10
                 px-4
                 py-4
-                sm:px-6            "
+                sm:px-6
+            "
         >
             <div className="flex min-w-0 items-center gap-3">
                 <div
@@ -4587,14 +4593,14 @@ function ModalHeader({
                         items-center
                         justify-center
                         rounded-xl
-                        ${danger ? "bg-red-400/10 text-red-400" : "bg-yellow-400/10 text-yellow-400"}
+                        ${danger ? "bg-red-400/10 text-red-600 dark:text-red-400" : "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"}
                     `}
                 >
                     {icon}
                 </div>
 
                 <div className="min-w-0">
-                    <h2 className="truncate text-sm font-black text-white sm:text-base">
+                    <h2 className="truncate text-sm font-black text-gray-900 dark:text-white sm:text-base">
                         {title}
                     </h2>
 
@@ -4618,11 +4624,11 @@ function ModalHeader({
                     justify-center
                     rounded-lg
                     border
-                    border-white/10
+                    border-gray-200 dark:border-white/10
                     text-gray-500
                     transition
-                    hover:bg-white/5
-                    hover:text-white
+                    hover:bg-gray-100 dark:hover:bg-white/5
+                    hover:text-gray-900 dark:hover:text-white
                 "
             >
                 <X size={17} />
@@ -4646,8 +4652,8 @@ function ModalFooter({ children }: { children: React.ReactNode }) {
                 flex-col-reverse
                 gap-2
                 border-t
-                border-white/10
-                bg-black/20
+                border-gray-200 dark:border-white/10
+                bg-gray-50 dark:bg-black/20
                 p-4
                 sm:flex-row
                 sm:justify-end
@@ -4680,20 +4686,22 @@ function EmailInfo({
                 min-w-0
                 rounded-xl
                 border
-                border-white/10
-                bg-black/20
+                border-gray-200 dark:border-white/10
+                bg-gray-50 dark:bg-black/20
                 p-3
             "
         >
             <div className="flex items-center gap-2">
-                <span className="text-yellow-400">{icon}</span>
+                <span className="text-yellow-600 dark:text-yellow-400">
+                    {icon}
+                </span>
 
                 <span className="text-[10px] uppercase tracking-wider text-gray-600">
                     {label}
                 </span>
             </div>
 
-            <p className="mt-1 truncate text-xs font-bold text-gray-300">
+            <p className="mt-1 truncate text-xs font-bold text-gray-700 dark:text-gray-300">
                 {value}
             </p>
         </div>
@@ -4724,8 +4732,8 @@ function AmountConfirmRow({
                 gap-4
                 rounded-xl
                 border
-                border-white/10
-                bg-white/[0.025]
+                border-gray-200 dark:border-white/10
+                bg-white dark:bg-white/[0.025]
                 px-4
                 py-3
             "
@@ -4736,7 +4744,7 @@ function AmountConfirmRow({
                 className={`
                     text-sm
                     font-black
-                    ${highlight ? "text-blue-400" : "text-white"}
+                    ${highlight ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-white"}
                 `}
             >
                 {value}
@@ -4757,13 +4765,13 @@ const inputClass = `
     min-w-0
     rounded-xl
     border
-    border-white/10
-    bg-black/40
+    border-gray-200 dark:border-white/10
+    bg-white dark:bg-black/40
     px-4
     text-sm
-    text-white
+    text-gray-900 dark:text-white
     outline-none
-    placeholder:text-gray-700
+    placeholder:text-gray-400 dark:placeholder:text-gray-700
     focus:border-yellow-400/50
     focus:ring-1
     focus:ring-yellow-400/10
@@ -4776,11 +4784,11 @@ const selectClass = `
     appearance-none
     rounded-xl
     border
-    border-white/10
-    bg-black/40
+    border-gray-200 dark:border-white/10
+    bg-white dark:bg-black/40
     px-4
     text-sm
-    text-white
+    text-gray-900 dark:text-white
     outline-none
     focus:border-yellow-400/50
     focus:ring-1
@@ -4813,15 +4821,15 @@ const secondaryButtonClass = `
     gap-2
     rounded-xl
     border
-    border-white/10
-    bg-white/[0.03]
+    border-gray-200 dark:border-white/10
+    bg-white dark:bg-white/[0.03]
     px-5
     text-sm
     font-bold
-    text-gray-300
+    text-gray-700 dark:text-gray-300
     transition
-    hover:bg-white/5
-    hover:text-white
+    hover:bg-gray-100 dark:hover:bg-white/5
+    hover:text-gray-900 dark:hover:text-white
 `;
 
 /*

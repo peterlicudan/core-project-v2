@@ -20,7 +20,20 @@ class InvoiceMail extends Mailable
     public function __construct(Invoice $invoice, $subject = null, $message = null)
     {
         $this->invoice = $invoice;
-        $this->subjectLine = $subject ?? "Invoice {$invoice->number} from ALIBATON";
+
+        /*
+        |------------------------------------------------------------------
+        | OK Reference label — ang Invoice No. ay NULL hanggang ma-approve,
+        | kaya Billing No. (BILL-YYYY-NNN) ang fallback. Para walang
+        | mailable na "Invoice  from ALIBATON".
+        |------------------------------------------------------------------
+        */
+
+        $ref = $invoice->number
+            ?? $invoice->billing_number
+            ?? "#{$invoice->id}";
+
+        $this->subjectLine = $subject ?? "Invoice {$ref} from ALIBATON";
         $this->customMessage = $message;
     }
 
@@ -42,7 +55,7 @@ class InvoiceMail extends Mailable
                 'amount' => number_format($this->invoice->amount, 2),
                 'dueDate' => $this->invoice->due_date?->format('F d, Y'),
                 'client' => $this->invoice->client,
-                'number' => $this->invoice->number,
+                'number' => $this->invoice->number ?? $this->invoice->billing_number,
                 'rejectionReason' => $this->invoice->rejection_reason,
                 'project' => $this->invoice->project,
             ],

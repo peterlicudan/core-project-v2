@@ -973,27 +973,27 @@ export default function AdminReportManagement() {
         <AdminLayout>
             <Head title="Admin — Reports" />
 
-            <div className="min-h-screen min-w-0 overflow-x-hidden bg-[#050505] text-white">
+            <div className="min-h-screen min-w-0 overflow-x-hidden bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white">
                 <div className="mx-auto w-full max-w-[1600px] px-2 pb-10 sm:px-3 lg:px-5">
                     {/* HEADER */}
-                    <div className="mb-6 flex min-w-0 flex-col gap-4 border-b border-white/5 pb-6 pt-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="mb-6 flex min-w-0 flex-col gap-4 border-b border-gray-100 dark:border-white/5 pb-6 pt-4 lg:flex-row lg:items-end lg:justify-between">
                         <div className="min-w-0">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-400">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-600 dark:text-yellow-400">
                                 Administration
                             </p>
 
-                            <h1 className="mt-1 break-words text-2xl font-black tracking-tight text-white sm:text-3xl">
+                            <h1 className="mt-1 break-words text-2xl font-black tracking-tight text-gray-900 dark:text-white sm:text-3xl">
                                 Admin — Reports
                             </h1>
 
-                            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
+                            <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-zinc-500">
                                 Generate your own admin reports and manage them here.
                                 Reports are private to your admin account.
                             </p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/15 bg-yellow-400/[0.05] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-yellow-400">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/15 bg-yellow-400/[0.05] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
                                 <Sparkles size={12} />
                                 Admin Only
                             </span>
@@ -1002,7 +1002,7 @@ export default function AdminReportManagement() {
                                 type="button"
                                 onClick={() => void fetchReports()}
                                 disabled={loading}
-                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-yellow-400/30 hover:bg-white/[0.07] hover:text-yellow-400 disabled:opacity-50"
+                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] px-5 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 transition hover:border-yellow-400/30 hover:bg-white/[0.07] hover:text-yellow-600 dark:hover:text-yellow-400 disabled:opacity-50"
                             >
                                 <RefreshCw
                                     size={15}
@@ -1023,10 +1023,10 @@ export default function AdminReportManagement() {
                                 <FileBarChart size={18} />
                             </div>
                             <div>
-                                <h2 className="text-sm font-black text-white">
+                                <h2 className="text-sm font-black text-gray-900 dark:text-white">
                                     Generate Admin Report
                                 </h2>
-                                <p className="text-[10px] text-zinc-600">
+                                <p className="text-[10px] text-gray-600 dark:text-zinc-600">
                                     Create a private report based on selected filters. Only you can see this.
                                 </p>
                             </div>
@@ -1123,51 +1123,51 @@ export default function AdminReportManagement() {
                     <div className="min-w-0">
                         <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h2 className="text-lg font-black text-white">
+                                <h2 className="text-lg font-black text-gray-900 dark:text-white">
                                     My Admin Reports
                                 </h2>
 
-                                <p className="mt-1 text-xs text-zinc-600">
+                                <p className="mt-1 text-xs text-gray-600 dark:text-zinc-600">
                                     These reports belong to your admin account only.
                                 </p>
                             </div>
 
-                            <span className="text-xs font-bold text-zinc-600">
+                            <span className="text-xs font-bold text-gray-600 dark:text-zinc-600">
                                 {rows.length} record
                                 {rows.length === 1 ? "" : "s"}
                             </span>
                         </div>
 
                         {loading ? (
-                            <div className="rounded-3xl border border-white/10 bg-white/[0.025] px-6 py-20 text-center">
+                            <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025] px-6 py-20 text-center">
                                 <RefreshCw
                                     size={32}
-                                    className="mx-auto mb-4 animate-spin text-yellow-400"
+                                    className="mx-auto mb-4 animate-spin text-yellow-600 dark:text-yellow-400"
                                 />
 
-                                <p className="text-sm font-bold text-zinc-400">
+                                <p className="text-sm font-bold text-gray-600 dark:text-zinc-400">
                                     Loading reports...
                                 </p>
                             </div>
                         ) : rows.length === 0 ? (
-                            <div className="rounded-3xl border border-white/10 bg-white/[0.025] px-6 py-20 text-center">
-                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04] text-zinc-600">
+                            <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025] px-6 py-20 text-center">
+                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white dark:bg-white/[0.04] text-gray-600 dark:text-zinc-600">
                                     <FileText size={25} />
                                 </div>
 
-                                <h3 className="mt-4 text-lg font-black text-zinc-300">
+                                <h3 className="mt-4 text-lg font-black text-gray-700 dark:text-zinc-300">
                                     No reports found
                                 </h3>
 
-                                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
+                                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600 dark:text-zinc-600">
                                     Generate your first admin report above.
                                 </p>
                             </div>
                         ) : (
-                            <div className="min-w-0 overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.025]">
+                            <div className="min-w-0 overflow-x-auto rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025]">
                                 <table className="w-full min-w-[1000px] text-left">
                                     <thead>
-                                        <tr className="border-b border-white/5">
+                                        <tr className="border-b border-gray-100 dark:border-white/5">
                                             {[
                                                 "Report Name",
                                                 "Generated By",
@@ -1179,7 +1179,7 @@ export default function AdminReportManagement() {
                                             ].map((label) => (
                                                 <th
                                                     key={label}
-                                                    className="px-5 py-4 text-[9px] font-black uppercase tracking-[0.15em] text-zinc-500"
+                                                    className="px-5 py-4 text-[9px] font-black uppercase tracking-[0.15em] text-gray-500 dark:text-zinc-500"
                                                 >
                                                     {label}
                                                 </th>
@@ -1200,12 +1200,12 @@ export default function AdminReportManagement() {
                                             return (
                                                 <tr
                                                     key={row.id}
-                                                    className="border-b border-white/5 transition hover:bg-white/[0.02]"
+                                                    className="border-b border-gray-100 dark:border-white/5 transition hover:bg-gray-100 dark:hover:bg-white/[0.02]"
                                                 >
-                                                    <td className="px-5 py-4 text-xs font-bold text-zinc-200">
+                                                    <td className="px-5 py-4 text-xs font-bold text-gray-800 dark:text-zinc-200">
                                                         <div className="flex min-w-0 items-center gap-2">
                                                             {row.ai_generated && (
-                                                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-yellow-400/15 bg-yellow-400/[0.07] text-yellow-400">
+                                                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-yellow-400/15 bg-yellow-400/[0.07] text-yellow-600 dark:text-yellow-400">
                                                                     <Sparkles
                                                                         size={11}
                                                                     />
@@ -1218,7 +1218,7 @@ export default function AdminReportManagement() {
                                                                 </p>
 
                                                                 {rowClient && (
-                                                                    <p className="mt-0.5 truncate text-[10px] font-medium text-zinc-600">
+                                                                    <p className="mt-0.5 truncate text-[10px] font-medium text-gray-600 dark:text-zinc-600">
                                                                         {rowClient}
                                                                     </p>
                                                                 )}
@@ -1227,20 +1227,20 @@ export default function AdminReportManagement() {
                                                     </td>
 
                                                     <td className="px-5 py-4">
-                                                        <div className="flex items-center gap-2 text-xs text-zinc-400">
-                                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-yellow-400/10 bg-yellow-400/[0.05] text-yellow-400">
+                                                        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-zinc-400">
+                                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-yellow-400/10 bg-yellow-400/[0.05] text-yellow-600 dark:text-yellow-400">
                                                                 <Shield size={12} />
                                                             </div>
 
                                                             <div className="min-w-0">
-                                                                <p className="truncate font-bold text-zinc-300">
+                                                                <p className="truncate font-bold text-gray-700 dark:text-zinc-300">
                                                                     {row.owner_name ??
                                                                         row.created_by ??
                                                                         "System"}
                                                                 </p>
 
                                                                 {row.owner_email && (
-                                                                    <p className="mt-0.5 truncate text-[10px] text-zinc-600">
+                                                                    <p className="mt-0.5 truncate text-[10px] text-gray-600 dark:text-zinc-600">
                                                                         {row.owner_email}
                                                                     </p>
                                                                 )}
@@ -1249,26 +1249,26 @@ export default function AdminReportManagement() {
                                                     </td>
 
                                                     <td className="px-5 py-4">
-                                                        <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+                                                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-zinc-400">
                                                             <Building2
                                                                 size={13}
-                                                                className="text-yellow-400"
+                                                                className="text-yellow-600 dark:text-yellow-400"
                                                             />
                                                             {rowClient || "All Clients"}
                                                         </span>
                                                     </td>
 
                                                     <td className="px-5 py-4">
-                                                        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-zinc-400">
+                                                        <span className="inline-flex items-center rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-gray-600 dark:text-zinc-400">
                                                             {row.type || row.report_type || "All"}
                                                         </span>
                                                     </td>
 
-                                                    <td className="px-5 py-4 text-xs text-zinc-400">
+                                                    <td className="px-5 py-4 text-xs text-gray-600 dark:text-zinc-400">
                                                         {row.date_range}
                                                     </td>
 
-                                                    <td className="px-5 py-4 text-xs text-zinc-400">
+                                                    <td className="px-5 py-4 text-xs text-gray-600 dark:text-zinc-400">
                                                         {formatDateDisplay(row.generated_on)}
                                                     </td>
 
@@ -1277,7 +1277,7 @@ export default function AdminReportManagement() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleView(row)}
-                                                                className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-zinc-500 transition hover:border-yellow-400/30 hover:bg-yellow-400/[0.07] hover:text-yellow-400"
+                                                                className="rounded-lg border border-gray-100 dark:border-white/5 bg-white dark:bg-white/[0.03] p-2 text-gray-500 dark:text-zinc-500 transition hover:border-yellow-400/30 hover:bg-yellow-400/[0.07] hover:text-yellow-600 dark:hover:text-yellow-400"
                                                                 title="View"
                                                             >
                                                                 <Eye size={14} />
@@ -1286,7 +1286,7 @@ export default function AdminReportManagement() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleDownload(row)}
-                                                                className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-zinc-500 transition hover:border-yellow-400/30 hover:bg-yellow-400/[0.07] hover:text-yellow-400"
+                                                                className="rounded-lg border border-gray-100 dark:border-white/5 bg-white dark:bg-white/[0.03] p-2 text-gray-500 dark:text-zinc-500 transition hover:border-yellow-400/30 hover:bg-yellow-400/[0.07] hover:text-yellow-600 dark:hover:text-yellow-400"
                                                                 title="Download PDF"
                                                             >
                                                                 <Download size={14} />
@@ -1297,7 +1297,7 @@ export default function AdminReportManagement() {
                                                                 onClick={(event) =>
                                                                     openMenu(event, row.id)
                                                                 }
-                                                                className="rounded-lg border border-white/5 bg-white/[0.03] p-2 text-zinc-500 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+                                                                className="rounded-lg border border-gray-100 dark:border-white/5 bg-white dark:bg-white/[0.03] p-2 text-gray-500 dark:text-zinc-500 transition hover:border-gray-300 dark:hover:border-white/20 hover:bg-white/[0.07] hover:text-gray-900 dark:hover:text-white"
                                                                 title="More"
                                                             >
                                                                 <MoreVertical size={14} />
@@ -1342,30 +1342,30 @@ export default function AdminReportManagement() {
                                 left: menuPosition.left,
                                 zIndex: 100,
                             }}
-                            className="w-48 overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0b] shadow-2xl shadow-black"
+                            className="w-48 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b] shadow-2xl shadow-black"
                         >
                             <button
                                 type="button"
                                 onClick={() => handleView(row)}
-                                className="flex w-full items-center gap-2 border-b border-white/5 px-4 py-3 text-left text-xs font-bold text-zinc-300 transition hover:bg-white/[0.04] hover:text-white"
+                                className="flex w-full items-center gap-2 border-b border-gray-100 dark:border-white/5 px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-zinc-300 transition hover:bg-white dark:hover:bg-white/[0.04] hover:text-gray-900 dark:hover:text-white"
                             >
-                                <Eye size={14} className="text-yellow-400" />
+                                <Eye size={14} className="text-yellow-600 dark:text-yellow-400" />
                                 View Report
                             </button>
 
                             <button
                                 type="button"
                                 onClick={() => handleDownload(row)}
-                                className="flex w-full items-center gap-2 border-b border-white/5 px-4 py-3 text-left text-xs font-bold text-zinc-300 transition hover:bg-white/[0.04] hover:text-white"
+                                className="flex w-full items-center gap-2 border-b border-gray-100 dark:border-white/5 px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-zinc-300 transition hover:bg-white dark:hover:bg-white/[0.04] hover:text-gray-900 dark:hover:text-white"
                             >
-                                <Download size={14} className="text-yellow-400" />
+                                <Download size={14} className="text-yellow-600 dark:text-yellow-400" />
                                 Download PDF
                             </button>
 
                             <button
                                 type="button"
                                 onClick={() => handleDelete(row)}
-                                className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs font-bold text-red-400 transition hover:bg-red-400/[0.07]"
+                                className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs font-bold text-red-600 dark:text-red-400 transition hover:bg-red-400/[0.07]"
                             >
                                 <Trash2 size={14} />
                                 Delete
@@ -1400,19 +1400,19 @@ export default function AdminReportManagement() {
             {/* DELETE CONFIRMATION */}
             {deletingReport && (
                 <div className="fixed inset-0 z-[180] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-md sm:p-6">
-                    <div className="my-auto w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl shadow-black">
-                        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5">
+                    <div className="my-auto w-full max-w-md overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b] shadow-2xl shadow-black">
+                        <div className="flex items-start justify-between gap-4 border-b border-gray-200 dark:border-white/10 px-5 py-5">
                             <div className="flex min-w-0 items-start gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-400/10 text-red-400">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-400/10 text-red-600 dark:text-red-400">
                                     <Trash2 size={18} />
                                 </div>
 
                                 <div className="min-w-0">
-                                    <h2 className="break-words text-lg font-black text-white">
+                                    <h2 className="break-words text-lg font-black text-gray-900 dark:text-white">
                                         Delete Report
                                     </h2>
 
-                                    <p className="mt-1 text-xs leading-5 text-zinc-600">
+                                    <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-zinc-600">
                                         This action cannot be undone.
                                     </p>
                                 </div>
@@ -1421,7 +1421,7 @@ export default function AdminReportManagement() {
                             <button
                                 type="button"
                                 onClick={() => setDeletingReport(null)}
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-500 transition hover:bg-white/[0.08] hover:text-white"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-gray-500 dark:text-zinc-500 transition hover:bg-white/[0.08] hover:text-gray-900 dark:hover:text-white"
                             >
                                 <X size={17} />
                             </button>
@@ -1432,37 +1432,37 @@ export default function AdminReportManagement() {
                                 <div className="flex gap-3">
                                     <AlertTriangle
                                         size={20}
-                                        className="mt-0.5 shrink-0 text-red-400"
+                                        className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
                                     />
 
                                     <div className="min-w-0">
-                                        <p className="text-sm font-bold text-red-300">
+                                        <p className="text-sm font-bold text-red-700 dark:text-red-300">
                                             Permanent deletion
                                         </p>
 
-                                        <p className="mt-1 break-words text-xs leading-5 text-red-300/60">
+                                        <p className="mt-1 break-words text-xs leading-5 text-red-700/60 dark:text-red-300/60">
                                             This will permanently remove the report
                                             owned by{" "}
-                                            <strong className="text-red-300">
+                                            <strong className="text-red-700 dark:text-red-300">
                                                 {deletingReport.owner_name ??
                                                     deletingReport.created_by}
                                             </strong>
                                             .
                                         </p>
 
-                                        <p className="mt-2 text-xs leading-5 text-red-300/50">
+                                        <p className="mt-2 text-xs leading-5 text-red-700/50 dark:text-red-300/50">
                                             This action cannot be undone.
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="mt-4 rounded-2xl border border-white/5 bg-black/20 p-4">
-                                <p className="text-xs font-bold text-zinc-300">
+                            <div className="mt-4 rounded-2xl border border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-black/20 p-4">
+                                <p className="text-xs font-bold text-gray-700 dark:text-zinc-300">
                                     {deletingReport.name}
                                 </p>
 
-                                <p className="mt-1 text-[10px] text-zinc-600">
+                                <p className="mt-1 text-[10px] text-gray-600 dark:text-zinc-600">
                                     {deletingReport.type} •{" "}
                                     {deletingReport.date_range}
                                 </p>
@@ -1472,7 +1472,7 @@ export default function AdminReportManagement() {
                                 <button
                                     type="button"
                                     onClick={() => setDeletingReport(null)}
-                                    className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-zinc-300 transition hover:bg-white/[0.08]"
+                                    className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] px-5 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 transition hover:bg-white/[0.08]"
                                 >
                                     Cancel
                                 </button>
@@ -1515,27 +1515,27 @@ function StatCard({
 }) {
     const toneClasses: Record<string, { icon: string; text: string }> = {
         yellow: {
-            icon: "border-yellow-400/15 bg-yellow-400/[0.07] text-yellow-400",
-            text: "text-yellow-400",
+            icon: "border-yellow-400/15 bg-yellow-400/[0.07] text-yellow-600 dark:text-yellow-400",
+            text: "text-yellow-600 dark:text-yellow-400",
         },
         blue: {
-            icon: "border-blue-400/15 bg-blue-400/[0.07] text-blue-400",
-            text: "text-blue-400",
+            icon: "border-blue-400/15 bg-blue-400/[0.07] text-blue-600 dark:text-blue-400",
+            text: "text-blue-600 dark:text-blue-400",
         },
         purple: {
-            icon: "border-purple-400/15 bg-purple-400/[0.07] text-purple-400",
-            text: "text-purple-400",
+            icon: "border-purple-400/15 bg-purple-400/[0.07] text-purple-600 dark:text-purple-400",
+            text: "text-purple-600 dark:text-purple-400",
         },
         green: {
-            icon: "border-emerald-400/15 bg-emerald-400/[0.07] text-emerald-400",
-            text: "text-emerald-400",
+            icon: "border-emerald-400/15 bg-emerald-400/[0.07] text-emerald-600 dark:text-emerald-400",
+            text: "text-emerald-600 dark:text-emerald-400",
         },
     };
 
     const c = toneClasses[tone];
 
     return (
-        <div className="group min-w-0 rounded-2xl border border-white/10 bg-white/[0.025] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.045]">
+        <div className="group min-w-0 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025] p-4 transition-all duration-300 hover:-translate-y-1 hover:border-gray-300 dark:hover:border-white/20 hover:bg-white/[0.045]">
             <div className="flex items-center justify-between gap-2">
                 <div
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${c.icon}`}
@@ -1544,14 +1544,14 @@ function StatCard({
                 </div>
 
                 <div className="flex flex-col items-end gap-0.5">
-                    <span className="text-2xl font-black text-white">
+                    <span className="text-2xl font-black text-gray-900 dark:text-white">
                         {formatNumber(value)}
                     </span>
 
                     {delta !== 0 && (
                         <span
                             className={`text-[10px] font-black ${
-                                delta > 0 ? "text-emerald-400" : "text-red-400"
+                                delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
                             }`}
                         >
                             {delta > 0 ? "+" : ""}
@@ -1561,7 +1561,7 @@ function StatCard({
                 </div>
             </div>
 
-            <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-zinc-600">
+            <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-gray-600 dark:text-zinc-600">
                 {label}
             </p>
         </div>
@@ -1589,13 +1589,13 @@ function FilterField({
 }) {
     return (
         <div className="min-w-0">
-            <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500">
+            <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 dark:text-zinc-500">
                 {label}
             </label>
 
             <div className="relative">
                 {icon && (
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-yellow-400">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-yellow-600 dark:text-yellow-400">
                         {icon}
                     </span>
                 )}
@@ -1603,7 +1603,7 @@ function FilterField({
                 <select
                     value={value}
                     onChange={(event) => onChange(event.target.value)}
-                    className={`w-full appearance-none rounded-xl border border-white/10 bg-white/[0.04] py-3 pr-10 text-sm font-bold text-white outline-none transition focus:border-yellow-400/60 ${
+                    className={`w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] py-3 pr-10 text-sm font-bold text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/60 ${
                         icon ? "pl-11" : "pl-4"
                     }`}
                 >
@@ -1611,7 +1611,7 @@ function FilterField({
                         <option
                             key={optionValue}
                             value={optionValue}
-                            className="bg-zinc-900"
+                            className="bg-white dark:bg-zinc-900"
                         >
                             {optionLabel}
                         </option>
@@ -1620,7 +1620,7 @@ function FilterField({
 
                 <ChevronDown
                     size={16}
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600"
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 dark:text-zinc-600"
                 />
             </div>
         </div>
@@ -1642,26 +1642,26 @@ function ToastItem({
 }) {
     const icon =
         toast.type === "success" ? (
-            <CheckCircle2 size={18} className="text-emerald-400" />
+            <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400" />
         ) : toast.type === "warning" ? (
-            <AlertTriangle size={18} className="text-amber-400" />
+            <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400" />
         ) : toast.type === "error" ? (
-            <AlertTriangle size={18} className="text-red-400" />
+            <AlertTriangle size={18} className="text-red-600 dark:text-red-400" />
         ) : (
-            <Sparkles size={18} className="text-blue-400" />
+            <Sparkles size={18} className="text-blue-600 dark:text-blue-400" />
         );
 
     return (
-        <div className="pointer-events-auto overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0b] px-5 py-4 shadow-2xl shadow-black">
+        <div className="pointer-events-auto overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b] px-5 py-4 shadow-2xl shadow-black">
             <div className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">{icon}</div>
 
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-white">
+                    <p className="text-sm font-black text-gray-900 dark:text-white">
                         {toast.title}
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-zinc-500">
                         {toast.message}
                     </p>
                 </div>
@@ -1669,7 +1669,7 @@ function ToastItem({
                 <button
                     type="button"
                     onClick={onDismiss}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-white/[0.05] hover:text-white"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 dark:text-zinc-500 hover:bg-white/[0.05] hover:text-gray-900 dark:hover:text-white"
                 >
                     <X size={15} />
                 </button>
@@ -1882,19 +1882,19 @@ function ProfessionalReportModal({
 
     return (
         <div className="fixed inset-0 z-[160] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-md sm:p-6">
-            <div className="my-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl shadow-black">
-                <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5 sm:px-6">
+            <div className="my-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b] shadow-2xl shadow-black">
+                <div className="flex items-start justify-between gap-4 border-b border-gray-200 dark:border-white/10 px-5 py-5 sm:px-6">
                     <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-black">
                             <FileBarChart size={18} />
                         </div>
 
                         <div className="min-w-0">
-                            <h2 className="break-words text-lg font-black text-white">
+                            <h2 className="break-words text-lg font-black text-gray-900 dark:text-white">
                                 Report Preview
                             </h2>
 
-                            <p className="mt-1 text-xs leading-5 text-zinc-600">
+                            <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-zinc-600">
                                 ALIBATON Report
                             </p>
                         </div>
@@ -1918,14 +1918,14 @@ function ProfessionalReportModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-500 transition hover:bg-white/[0.08] hover:text-white"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-gray-500 dark:text-zinc-500 transition hover:bg-white/[0.08] hover:text-gray-900 dark:hover:text-white"
                         >
                             <X size={17} />
                         </button>
                     </div>
                 </div>
 
-                <div className="max-h-[calc(100vh-140px)] overflow-auto bg-black/40 p-3 sm:p-5">
+                <div className="max-h-[calc(100vh-140px)] overflow-auto bg-white dark:bg-black/40 p-3 sm:p-5">
                     <div
                         ref={paperRef}
                         data-pdf-paper
@@ -1936,7 +1936,7 @@ function ProfessionalReportModal({
                         <div className="p-7 sm:p-10">
                             <div className="mb-6 flex flex-col justify-between gap-5 border-b border-slate-200 pb-6 sm:flex-row">
                                 <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-600 dark:text-slate-400">
                                         ALIBATON
                                     </p>
 
@@ -1944,13 +1944,13 @@ function ProfessionalReportModal({
                                         {reportTitle}
                                     </h1>
 
-                                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                                    <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-slate-500">
                                         {report.type} Report
                                     </p>
                                 </div>
 
                                 <div className="text-left sm:text-right">
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-600 dark:text-slate-400">
                                         Report Date
                                     </p>
 
@@ -1958,7 +1958,7 @@ function ProfessionalReportModal({
                                         {formatDateLong(report.generated_on)}
                                     </p>
 
-                                    <p className="mt-1 text-[10px] text-slate-500">
+                                    <p className="mt-1 text-[10px] text-gray-500 dark:text-slate-500">
                                         {report.date_range}
                                     </p>
                                 </div>
@@ -1979,7 +1979,7 @@ function ProfessionalReportModal({
                             />
 
                             <div className="mt-10 border-t border-slate-200 pt-5">
-                                <div className="flex flex-col justify-between gap-2 text-[9px] text-slate-400 sm:flex-row">
+                                <div className="flex flex-col justify-between gap-2 text-[9px] text-gray-600 dark:text-slate-400 sm:flex-row">
                                     <span>
                                         ALIBATON — Heavy Equipment & Logistics
                                     </span>
@@ -1989,7 +1989,7 @@ function ProfessionalReportModal({
                                     </span>
                                 </div>
 
-                                <div className="mt-1 text-[9px] text-slate-400">
+                                <div className="mt-1 text-[9px] text-gray-600 dark:text-slate-400">
                                     info@alibaton.com
                                 </div>
                             </div>
@@ -2021,7 +2021,7 @@ function PaperEntityMeta({
             <div className="text-yellow-600">{icon}</div>
 
             <div>
-                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                <p className="text-[8px] font-black uppercase tracking-widest text-gray-600 dark:text-slate-400">
                     {label}
                 </p>
 
@@ -2047,7 +2047,7 @@ function ReportDocumentBody({
             <div>
                 <DocumentIntro report={report} clientName={clientName} />
 
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-gray-600 dark:text-slate-600">
                     This report does not contain structured report data.
                 </div>
             </div>
@@ -2084,7 +2084,7 @@ function DocumentIntro({
                     {clientName ?? "Executive Report"}
                 </h2>
 
-                <p className="mt-2 text-xs leading-6 text-slate-600">
+                <p className="mt-2 text-xs leading-6 text-gray-600 dark:text-slate-600">
                     This report provides a database-backed overview of ALIBATON
                     records for the selected client/account and reporting
                     period, using the latest available records from the system.
@@ -2273,7 +2273,7 @@ function ModuleBlockCard({
             <div className="grid gap-0 sm:grid-cols-2">
                 {statuses && Object.keys(statuses).length > 0 && (
                     <div className="border-b border-slate-100 p-4 sm:border-b-0 sm:border-r">
-                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                             Status
                         </p>
 
@@ -2283,7 +2283,7 @@ function ModuleBlockCard({
                                     key={status}
                                     className="flex items-center justify-between text-xs"
                                 >
-                                    <span className="font-semibold text-slate-600">
+                                    <span className="font-semibold text-gray-600 dark:text-slate-600">
                                         {humanizeKey(status)}
                                     </span>
 
@@ -2298,7 +2298,7 @@ function ModuleBlockCard({
 
                 {types && Object.keys(types).length > 0 && (
                     <div className="p-4">
-                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                             Type
                         </p>
 
@@ -2308,7 +2308,7 @@ function ModuleBlockCard({
                                     key={type}
                                     className="flex items-center justify-between text-xs"
                                 >
-                                    <span className="font-semibold text-slate-600">
+                                    <span className="font-semibold text-gray-600 dark:text-slate-600">
                                         {humanizeKey(type)}
                                     </span>
 
@@ -2385,7 +2385,7 @@ function ReportFinancialDetails({
                                     key={label}
                                     className="border-b border-slate-100 last:border-0"
                                 >
-                                    <td className="w-1/2 bg-slate-50 px-4 py-3 text-[10px] font-black text-slate-500">
+                                    <td className="w-1/2 bg-slate-50 px-4 py-3 text-[10px] font-black text-gray-500 dark:text-slate-500">
                                         {label}
                                     </td>
 
@@ -2458,7 +2458,7 @@ function ReportRecordsTables({
                 <h4 className="mb-2 flex items-center justify-between text-xs font-black text-slate-800">
                     <span>{label}</span>
 
-                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-black text-slate-500">
+                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-black text-gray-500 dark:text-slate-500">
                         {rows.length}
                     </span>
                 </h4>
@@ -2509,7 +2509,7 @@ function ReportTrends({ parsed }: { parsed: Record<string, unknown> }) {
         <section>
             <DocumentSectionTitle>Monthly Trends</DocumentSectionTitle>
 
-            <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-500">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                 <span>Direction:</span>
 
                 <span
@@ -2538,7 +2538,7 @@ function ReportTrends({ parsed }: { parsed: Record<string, unknown> }) {
                             ].map((label) => (
                                 <th
                                     key={label}
-                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-slate-400 first:text-left"
+                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400 first:text-left"
                                 >
                                     {label}
                                 </th>
@@ -2622,7 +2622,7 @@ function ReportProjections({ parsed }: { parsed: Record<string, unknown> }) {
             <DocumentSectionTitle>Projections</DocumentSectionTitle>
 
             {typeof projections.note === "string" && (
-                <p className="mb-3 text-[10px] italic text-slate-500">
+                <p className="mb-3 text-[10px] italic text-gray-500 dark:text-slate-500">
                     {projections.note}
                 </p>
             )}
@@ -2639,7 +2639,7 @@ function ReportProjections({ parsed }: { parsed: Record<string, unknown> }) {
                             ].map((label) => (
                                 <th
                                     key={label}
-                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-slate-400 first:text-left"
+                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400 first:text-left"
                                 >
                                     {label}
                                 </th>
@@ -2769,11 +2769,11 @@ function BreakdownTable({
                 <table className="w-full text-left">
                     <thead>
                         <tr className="border-b border-slate-200 bg-slate-50">
-                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                 {title}
                             </th>
 
-                            <th className="px-4 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-slate-400">
+                            <th className="px-4 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
                                 Count
                             </th>
                         </tr>
@@ -2806,7 +2806,7 @@ function BreakdownTable({
 function ProfessionalArrayTable({ rows }: { rows: unknown[] }) {
     if (!rows.length) {
         return (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-gray-500 dark:text-slate-500">
                 No records available.
             </div>
         );
@@ -2872,7 +2872,7 @@ function ProfessionalArrayTable({ rows }: { rows: unknown[] }) {
                         {columns.map((column) => (
                             <th
                                 key={column}
-                                className="px-3 py-2.5 text-[8px] font-black uppercase tracking-wider text-slate-400"
+                                className="px-3 py-2.5 text-[8px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400"
                             >
                                 {humanizeKey(column)}
                             </th>
@@ -2943,7 +2943,7 @@ function DocumentSectionTitle({ children }: { children: ReactNode }) {
 function PaperMeta({ label, value }: { label: string; value: string }) {
     return (
         <div>
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[8px] font-black uppercase tracking-widest text-gray-600 dark:text-slate-400">
                 {label}
             </p>
 
@@ -2955,7 +2955,7 @@ function PaperMeta({ label, value }: { label: string; value: string }) {
 function PaperSummaryCard({ label, value }: { label: string; value: string }) {
     return (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[8px] font-black uppercase tracking-widest text-gray-600 dark:text-slate-400">
                 {label}
             </p>
 

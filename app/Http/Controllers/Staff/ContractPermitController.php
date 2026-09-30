@@ -337,7 +337,9 @@ class ContractPermitController extends Controller
             ->map(function (Invoice $invoice) {
                 return [
                     'id' => $invoice->id,
-                    'number' => $invoice->number,
+                    'number' => $invoice->number ?? $invoice->billing_number,
+                    'has_invoice_number' => filled($invoice->number),
+                    'billing_number' => $invoice->billing_number,
                     'client' => $invoice->client,
                     'client_email' => $invoice->client_email,
                     'project' => $invoice->project,

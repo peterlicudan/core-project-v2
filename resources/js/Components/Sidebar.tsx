@@ -15,18 +15,22 @@ import {
     ChevronUp,
     X,
     Menu,
-    Bell,
     FileBarChart,
     TrendingUp,
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
 
+
+import { useTheme } from "../Context/ThemeContext";
+
 export default function Sidebar() {
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [analyticsOpen, setAnalyticsOpen] = useState(false);
+
+    const { isDarkMode } = useTheme();
 
     const page = usePage<any>();
 
@@ -37,22 +41,13 @@ export default function Sidebar() {
     |--------------------------------------------------------------------------
     | EMAIL MASK HELPER
     |--------------------------------------------------------------------------
-    |
-    | jhonpeterlicudan1@gmail.com
-    |   ↓
-    | jhonp********an1@gmail.com
-    |
-    | Rules:
-    | - Keep first 5 characters
-    | - Keep last 3 characters before "@"
-    | - Replace the middle with asterisks
-    |
     */
 
     const maskEmail = (email?: string | null): string => {
         if (!email) return "No email";
 
         const atIndex = email.indexOf("@");
+
         if (atIndex <= 0) return email;
 
         const localPart = email.slice(0, atIndex);
@@ -199,6 +194,36 @@ export default function Sidebar() {
         setAnalyticsOpen((current) => !current);
     };
 
+    /*
+    |--------------------------------------------------------------------------
+    | THEME CLASSES
+    |--------------------------------------------------------------------------
+    */
+
+    const sidebarBackground = isDarkMode
+        ? "bg-black text-white border-yellow-400/10"
+        : "bg-white text-gray-900 border-gray-200";
+
+    const secondaryText = isDarkMode
+        ? "text-slate-400"
+        : "text-gray-600";
+
+    const mutedText = isDarkMode
+        ? "text-slate-500"
+        : "text-gray-500";
+
+    const veryMutedText = isDarkMode
+        ? "text-slate-600"
+        : "text-gray-400";
+
+    const hoverMenu = isDarkMode
+        ? "hover:bg-white/[0.035] hover:text-yellow-400"
+        : "hover:bg-yellow-50 hover:text-yellow-600";
+
+    const tooltipClass = isDarkMode
+        ? "border-white/10 bg-zinc-950 text-white"
+        : "border-gray-200 bg-white text-gray-900";
+
     return (
         <>
             {/* =====================================================
@@ -238,7 +263,7 @@ export default function Sidebar() {
             ====================================================== */}
 
             <header
-                className="
+                className={`
                     fixed
                     left-0
                     right-0
@@ -249,20 +274,24 @@ export default function Sidebar() {
                     items-center
                     justify-between
                     border-b
-                    border-yellow-400/10
-                    bg-black/95
                     px-4
                     shadow-lg
-                    shadow-black/20
                     backdrop-blur-2xl
+                    transition-colors
+                    duration-300
                     md:hidden
-                "
+                    ${
+                        isDarkMode
+                            ? "border-yellow-400/10 bg-black/95 shadow-black/20"
+                            : "border-gray-200 bg-white/95 shadow-gray-200/50"
+                    }
+                `}
             >
                 <div className="flex min-w-0 items-center gap-3">
                     <button
                         type="button"
                         onClick={() => setMobileOpen(true)}
-                        className="
+                        className={`
                             flex
                             h-10
                             w-10
@@ -271,14 +300,13 @@ export default function Sidebar() {
                             justify-center
                             rounded-xl
                             border
-                            border-white/10
-                            bg-white/[0.03]
-                            text-slate-300
                             transition
-                            hover:border-yellow-400/30
-                            hover:bg-yellow-400/10
-                            hover:text-yellow-400
-                        "
+                            ${
+                                isDarkMode
+                                    ? "border-white/10 bg-white/[0.03] text-slate-300 hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-400"
+                                    : "border-gray-200 bg-gray-100 text-gray-600 hover:border-yellow-400/50 hover:bg-yellow-50 hover:text-yellow-600"
+                            }
+                        `}
                         aria-label="Open sidebar"
                     >
                         <Menu size={21} />
@@ -287,7 +315,7 @@ export default function Sidebar() {
                     {/* MOBILE LOGO */}
 
                     <div
-                        className="
+                        className={`
                             flex
                             h-10
                             w-10
@@ -298,10 +326,14 @@ export default function Sidebar() {
                             rounded-xl
                             border
                             border-yellow-400/20
-                            bg-zinc-950
                             shadow-lg
                             shadow-yellow-400/10
-                        "
+                            ${
+                                isDarkMode
+                                    ? "bg-zinc-950"
+                                    : "bg-gray-100"
+                            }
+                        `}
                     >
                         <img
                             src="/images/logo.jpg"
@@ -312,70 +344,33 @@ export default function Sidebar() {
 
                     <div className="min-w-0">
                         <p
-                            className="
+                            className={`
                                 truncate
                                 text-[9px]
                                 font-semibold
                                 uppercase
                                 tracking-[0.16em]
-                                text-slate-500
-                            "
+                                ${mutedText}
+                            `}
                         >
                             Heavy Equipment
                         </p>
 
                         <p
-                            className="
+                            className={`
                                 truncate
                                 text-[8px]
                                 uppercase
                                 tracking-[0.13em]
-                                text-slate-700
-                            "
+                                ${veryMutedText}
+                            `}
                         >
                             Logistics System
                         </p>
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    className="
-                        relative
-                        flex
-                        h-10
-                        w-10
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-xl
-                        border
-                        border-white/10
-                        bg-white/[0.03]
-                        text-slate-400
-                        transition
-                        hover:border-yellow-400/20
-                        hover:bg-yellow-400/10
-                        hover:text-yellow-400
-                    "
-                    aria-label="Notifications"
-                >
-                    <Bell size={19} />
 
-                    <span
-                        className="
-                            absolute
-                            right-1
-                            top-1
-                            h-1.5
-                            w-1.5
-                            rounded-full
-                            bg-yellow-400
-                            shadow
-                            shadow-yellow-400/50
-                        "
-                    />
-                </button>
             </header>
 
             {/* =====================================================
@@ -387,14 +382,18 @@ export default function Sidebar() {
                     type="button"
                     aria-label="Close sidebar"
                     onClick={() => setMobileOpen(false)}
-                    className="
+                    className={`
                         fixed
                         inset-0
                         z-40
-                        bg-black/70
                         backdrop-blur-sm
                         md:hidden
-                    "
+                        ${
+                            isDarkMode
+                                ? "bg-black/70"
+                                : "bg-gray-900/30"
+                        }
+                    `}
                 />
             )}
 
@@ -412,10 +411,7 @@ export default function Sidebar() {
                     h-screen
                     flex-col
                     border-r
-                    border-yellow-400/10
-                    bg-black
-                    text-white
-                    shadow-[20px_0_60px_rgba(0,0,0,0.45)]
+                    shadow-[20px_0_60px_rgba(0,0,0,0.20)]
                     transition-all
                     duration-300
                     ease-in-out
@@ -430,6 +426,8 @@ export default function Sidebar() {
                     md:sticky
                     md:top-0
                     md:translate-x-0
+
+                    ${sidebarBackground}
                 `}
             >
                 {/* =================================================
@@ -443,7 +441,11 @@ export default function Sidebar() {
                         shrink-0
                         items-center
                         border-b
-                        border-yellow-400/10
+                        ${
+                            isDarkMode
+                                ? "border-yellow-400/10"
+                                : "border-gray-200"
+                        }
                         ${
                             collapsed
                                 ? "justify-center px-3"
@@ -460,7 +462,7 @@ export default function Sidebar() {
                         `}
                     >
                         <div
-                            className="
+                            className={`
                                 flex
                                 h-11
                                 w-11
@@ -471,10 +473,14 @@ export default function Sidebar() {
                                 rounded-xl
                                 border
                                 border-yellow-400/20
-                                bg-zinc-950
                                 shadow-lg
                                 shadow-yellow-400/10
-                            "
+                                ${
+                                    isDarkMode
+                                        ? "bg-zinc-950"
+                                        : "bg-gray-100"
+                                }
+                            `}
                         >
                             <img
                                 src="/images/logo.jpg"
@@ -486,26 +492,26 @@ export default function Sidebar() {
                         {!collapsed && (
                             <div className="min-w-0">
                                 <p
-                                    className="
+                                    className={`
                                         truncate
                                         text-[10px]
                                         font-semibold
                                         uppercase
                                         tracking-[0.16em]
-                                        text-slate-400
-                                    "
+                                        ${secondaryText}
+                                    `}
                                 >
                                     Heavy Equipment
                                 </p>
 
                                 <p
-                                    className="
+                                    className={`
                                         truncate
                                         text-[9px]
                                         uppercase
                                         tracking-[0.13em]
-                                        text-slate-600
-                                    "
+                                        ${veryMutedText}
+                                    `}
                                 >
                                     Logistics System
                                 </p>
@@ -516,15 +522,17 @@ export default function Sidebar() {
                     <button
                         type="button"
                         onClick={() => setMobileOpen(false)}
-                        className="
+                        className={`
                             rounded-xl
                             p-2
-                            text-slate-500
                             transition
-                            hover:bg-white/5
-                            hover:text-yellow-400
                             md:hidden
-                        "
+                            ${
+                                isDarkMode
+                                    ? "text-slate-500 hover:bg-white/5 hover:text-yellow-400"
+                                    : "text-gray-400 hover:bg-gray-100 hover:text-yellow-600"
+                            }
+                        `}
                         aria-label="Close sidebar"
                     >
                         <X size={20} />
@@ -538,7 +546,7 @@ export default function Sidebar() {
                 <button
                     type="button"
                     onClick={() => setCollapsed((current) => !current)}
-                    className="
+                    className={`
                         absolute
                         -right-4
                         top-6
@@ -551,22 +559,22 @@ export default function Sidebar() {
                         rounded-full
                         border
                         border-yellow-400/25
-                        bg-black
-                        text-yellow-400
+                        bg-yellow-400
+                        text-black
                         shadow-xl
-                        shadow-black/50
                         transition-all
                         duration-200
                         hover:scale-110
                         hover:border-yellow-400/60
-                        hover:bg-yellow-400
-                        hover:text-black
+                        hover:bg-yellow-300
                         md:flex
-                    "
+                    `}
                     aria-label={
                         collapsed ? "Expand sidebar" : "Collapse sidebar"
                     }
-                    title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    title={
+                        collapsed ? "Expand sidebar" : "Collapse sidebar"
+                    }
                 >
                     {collapsed ? (
                         <ChevronRight size={17} strokeWidth={2.5} />
@@ -582,52 +590,57 @@ export default function Sidebar() {
                 {!collapsed && (
                     <div className="shrink-0 px-4 pt-4">
                         <div
-                            className="
+                            className={`
                                 rounded-2xl
                                 border
-                                border-yellow-400/10
-                                bg-gradient-to-br
-                                from-yellow-400/[0.07]
-                                via-white/[0.025]
-                                to-transparent
                                 px-4
                                 py-3
-                            "
+                                transition-colors
+                                duration-300
+                                ${
+                                    isDarkMode
+                                        ? "border-yellow-400/10 bg-gradient-to-br from-yellow-400/[0.07] via-white/[0.025] to-transparent"
+                                        : "border-yellow-200 bg-gradient-to-br from-yellow-50 via-white to-gray-50"
+                                }
+                            `}
                         >
                             <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <p
-                                        className="
+                                        className={`
                                             text-[9px]
                                             font-semibold
                                             uppercase
                                             tracking-[0.15em]
-                                            text-slate-600
-                                        "
+                                            ${veryMutedText}
+                                        `}
                                     >
                                         Signed in as
                                     </p>
 
                                     <p
-                                        className="
+                                        className={`
                                             mt-1
                                             truncate
                                             text-sm
                                             font-semibold
-                                            text-white
-                                        "
+                                            ${
+                                                isDarkMode
+                                                    ? "text-white"
+                                                    : "text-gray-900"
+                                            }
+                                        `}
                                     >
                                         {user?.name ?? "User"}
                                     </p>
 
-                                    {/* ✅ MASKED EMAIL */}
                                     <p
-                                        className="
+                                        className={`
                                             mt-0.5
                                             truncate
                                             text-[11px]
-                                            text-slate-500
-                                        "
+                                            ${mutedText}
+                                        `}
                                         title={user?.email ?? "No email"}
                                     >
                                         {maskEmail(user?.email)}
@@ -668,15 +681,15 @@ export default function Sidebar() {
                 >
                     {!collapsed && (
                         <p
-                            className="
+                            className={`
                                 mb-2
                                 px-3
                                 text-[9px]
                                 font-bold
                                 uppercase
                                 tracking-[0.18em]
-                                text-slate-600
-                            "
+                                ${veryMutedText}
+                            `}
                         >
                             Main Menu
                         </p>
@@ -717,7 +730,7 @@ export default function Sidebar() {
                                             ${
                                                 active
                                                     ? "bg-yellow-400 font-semibold text-black shadow-[0_8px_25px_rgba(250,204,21,0.14)]"
-                                                    : "text-slate-400 hover:bg-white/[0.035] hover:text-yellow-400"
+                                                    : `${secondaryText} ${hoverMenu}`
                                             }
                                         `}
                                     >
@@ -761,7 +774,7 @@ export default function Sidebar() {
 
                                         {collapsed && (
                                             <span
-                                                className="
+                                                className={`
                                                     pointer-events-none
                                                     absolute
                                                     left-full
@@ -771,19 +784,17 @@ export default function Sidebar() {
                                                     whitespace-nowrap
                                                     rounded-lg
                                                     border
-                                                    border-white/10
-                                                    bg-zinc-950
                                                     px-3
                                                     py-2
                                                     text-xs
                                                     font-semibold
-                                                    text-white
                                                     opacity-0
                                                     shadow-2xl
                                                     transition
                                                     group-hover:opacity-100
                                                     md:block
-                                                "
+                                                    ${tooltipClass}
+                                                `}
                                             >
                                                 {item.name}
                                             </span>
@@ -817,7 +828,7 @@ export default function Sidebar() {
                                     ${
                                         isAnalyticsSection
                                             ? "bg-yellow-400 font-semibold text-black shadow-[0_8px_25px_rgba(250,204,21,0.14)]"
-                                            : "text-slate-400 hover:bg-white/[0.035] hover:text-yellow-400"
+                                            : `${secondaryText} ${hoverMenu}`
                                     }
 
                                     ${collapsed ? "justify-center" : ""}
@@ -839,7 +850,9 @@ export default function Sidebar() {
 
                                 <BarChart3
                                     size={18}
-                                    strokeWidth={isAnalyticsSection ? 2.5 : 2}
+                                    strokeWidth={
+                                        isAnalyticsSection ? 2.5 : 2
+                                    }
                                     className="shrink-0"
                                 />
 
@@ -873,7 +886,7 @@ export default function Sidebar() {
 
                                 {collapsed && (
                                     <span
-                                        className="
+                                        className={`
                                             pointer-events-none
                                             absolute
                                             left-full
@@ -883,19 +896,17 @@ export default function Sidebar() {
                                             whitespace-nowrap
                                             rounded-lg
                                             border
-                                            border-white/10
-                                            bg-zinc-950
                                             px-3
                                             py-2
                                             text-xs
                                             font-semibold
-                                            text-white
                                             opacity-0
                                             shadow-2xl
                                             transition
                                             group-hover:opacity-100
                                             md:block
-                                        "
+                                            ${tooltipClass}
+                                        `}
                                     >
                                         Analytics
                                     </span>
@@ -908,14 +919,18 @@ export default function Sidebar() {
 
                             {!collapsed && analyticsOpen && (
                                 <div
-                                    className="
+                                    className={`
                                         ml-4
                                         mt-1
                                         space-y-1
                                         border-l
-                                        border-yellow-400/15
                                         pl-3
-                                    "
+                                        ${
+                                            isDarkMode
+                                                ? "border-yellow-400/15"
+                                                : "border-yellow-300"
+                                        }
+                                    `}
                                 >
                                     {analyticsItems.map((item) => {
                                         const Icon = item.icon;
@@ -940,8 +955,8 @@ export default function Sidebar() {
 
                                                     ${
                                                         active
-                                                            ? "bg-yellow-400/15 font-semibold text-yellow-400"
-                                                            : "text-slate-500 hover:bg-white/[0.035] hover:text-yellow-400"
+                                                            ? "bg-yellow-400/15 font-semibold text-yellow-500"
+                                                            : `${mutedText} ${hoverMenu}`
                                                     }
                                                 `}
                                             >
@@ -970,7 +985,7 @@ export default function Sidebar() {
 
                     {!collapsed && (
                         <p
-                            className="
+                            className={`
                                 mb-2
                                 mt-7
                                 px-3
@@ -978,8 +993,8 @@ export default function Sidebar() {
                                 font-bold
                                 uppercase
                                 tracking-[0.18em]
-                                text-slate-600
-                            "
+                                ${veryMutedText}
+                            `}
                         >
                             System
                         </p>
@@ -1009,7 +1024,7 @@ export default function Sidebar() {
                                     ${
                                         active
                                             ? "bg-yellow-400 font-semibold text-black shadow-[0_8px_25px_rgba(250,204,21,0.14)]"
-                                            : "text-slate-400 hover:bg-white/[0.035] hover:text-yellow-400"
+                                            : `${secondaryText} ${hoverMenu}`
                                     }
 
                                     ${collapsed ? "justify-center" : ""}
@@ -1043,7 +1058,7 @@ export default function Sidebar() {
 
                                 {collapsed && (
                                     <span
-                                        className="
+                                        className={`
                                             pointer-events-none
                                             absolute
                                             left-full
@@ -1053,19 +1068,17 @@ export default function Sidebar() {
                                             whitespace-nowrap
                                             rounded-lg
                                             border
-                                            border-white/10
-                                            bg-zinc-950
                                             px-3
                                             py-2
                                             text-xs
                                             font-semibold
-                                            text-white
                                             opacity-0
                                             shadow-2xl
                                             transition
                                             group-hover:opacity-100
                                             md:block
-                                        "
+                                            ${tooltipClass}
+                                        `}
                                     >
                                         Settings
                                     </span>
@@ -1080,12 +1093,16 @@ export default function Sidebar() {
                 ====================================================== */}
 
                 <div
-                    className="
+                    className={`
                         shrink-0
                         border-t
-                        border-yellow-400/10
                         p-3
-                    "
+                        ${
+                            isDarkMode
+                                ? "border-yellow-400/10"
+                                : "border-gray-200"
+                        }
+                    `}
                 >
                     <button
                         type="button"
@@ -1100,10 +1117,10 @@ export default function Sidebar() {
                             gap-3
                             rounded-xl
                             px-3
-                            text-red-400
+                            text-red-500
                             transition
                             hover:bg-red-500/10
-                            hover:text-red-300
+                            hover:text-red-400
 
                             ${collapsed ? "justify-center" : ""}
                         `}
@@ -1118,7 +1135,7 @@ export default function Sidebar() {
 
                         {collapsed && (
                             <span
-                                className="
+                                className={`
                                     pointer-events-none
                                     absolute
                                     left-full
@@ -1129,18 +1146,22 @@ export default function Sidebar() {
                                     rounded-lg
                                     border
                                     border-red-500/20
-                                    bg-zinc-950
                                     px-3
                                     py-2
                                     text-xs
                                     font-semibold
-                                    text-red-400
+                                    text-red-500
                                     opacity-0
                                     shadow-2xl
                                     transition
                                     group-hover:opacity-100
                                     md:block
-                                "
+                                    ${
+                                        isDarkMode
+                                            ? "bg-zinc-950"
+                                            : "bg-white"
+                                    }
+                                `}
                             >
                                 Logout
                             </span>
@@ -1155,17 +1176,21 @@ export default function Sidebar() {
 
             {showLogoutModal && (
                 <div
-                    className="
+                    className={`
                         fixed
                         inset-0
                         z-[100]
                         flex
                         items-center
                         justify-center
-                        bg-black/75
                         p-4
                         backdrop-blur-md
-                    "
+                        ${
+                            isDarkMode
+                                ? "bg-black/75"
+                                : "bg-gray-900/35"
+                        }
+                    `}
                     onMouseDown={(event) => {
                         if (event.target === event.currentTarget) {
                             setShowLogoutModal(false);
@@ -1173,17 +1198,21 @@ export default function Sidebar() {
                     }}
                 >
                     <div
-                        className="
+                        className={`
                             w-full
                             max-w-sm
                             rounded-3xl
                             border
-                            border-yellow-400/10
-                            bg-zinc-950
                             p-6
                             shadow-2xl
-                            shadow-black/60
-                        "
+                            transition-colors
+                            duration-300
+                            ${
+                                isDarkMode
+                                    ? "border-yellow-400/10 bg-zinc-950 shadow-black/60"
+                                    : "border-gray-200 bg-white shadow-gray-400/30"
+                            }
+                        `}
                         onMouseDown={(event) => event.stopPropagation()}
                     >
                         <div className="flex items-start justify-between gap-4">
@@ -1194,13 +1223,24 @@ export default function Sidebar() {
                                         font-bold
                                         uppercase
                                         tracking-[0.18em]
-                                        text-yellow-400
+                                        text-yellow-500
                                     "
                                 >
                                     ALIBATON SYSTEM
                                 </p>
 
-                                <h2 className="mt-1 text-xl font-bold text-white">
+                                <h2
+                                    className={`
+                                        mt-1
+                                        text-xl
+                                        font-bold
+                                        ${
+                                            isDarkMode
+                                                ? "text-white"
+                                                : "text-gray-900"
+                                        }
+                                    `}
+                                >
                                     Logout?
                                 </h2>
                             </div>
@@ -1208,14 +1248,16 @@ export default function Sidebar() {
                             <button
                                 type="button"
                                 onClick={() => setShowLogoutModal(false)}
-                                className="
+                                className={`
                                     rounded-xl
                                     p-2
-                                    text-slate-500
                                     transition
-                                    hover:bg-white/5
-                                    hover:text-white
-                                "
+                                    ${
+                                        isDarkMode
+                                            ? "text-slate-500 hover:bg-white/5 hover:text-white"
+                                            : "text-gray-400 hover:bg-gray-100 hover:text-gray-900"
+                                    }
+                                `}
                                 aria-label="Close logout modal"
                             >
                                 <X size={19} />
@@ -1223,12 +1265,16 @@ export default function Sidebar() {
                         </div>
 
                         <p
-                            className="
+                            className={`
                                 mt-4
                                 text-sm
                                 leading-relaxed
-                                text-slate-400
-                            "
+                                ${
+                                    isDarkMode
+                                        ? "text-slate-400"
+                                        : "text-gray-600"
+                                }
+                            `}
                         >
                             Are you sure you want to logout
                             from the ALIBATON system?
@@ -1238,19 +1284,21 @@ export default function Sidebar() {
                             <button
                                 type="button"
                                 onClick={() => setShowLogoutModal(false)}
-                                className="
+                                className={`
                                     flex-1
                                     rounded-xl
                                     border
-                                    border-white/10
                                     px-4
                                     py-2.5
                                     text-sm
                                     font-medium
-                                    text-slate-300
                                     transition
-                                    hover:bg-white/5
-                                "
+                                    ${
+                                        isDarkMode
+                                            ? "border-white/10 text-slate-300 hover:bg-white/5"
+                                            : "border-gray-200 text-gray-700 hover:bg-gray-100"
+                                    }
+                                `}
                             >
                                 Cancel
                             </button>

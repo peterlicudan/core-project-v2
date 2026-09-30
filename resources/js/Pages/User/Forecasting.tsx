@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Head, usePage } from "@inertiajs/react";
 import {
@@ -23,6 +22,7 @@ import {
     YAxis,
 } from "recharts";
 import UserLayout from "../../Layouts/UserLayout";
+
 
 /* ============================================================
 | TYPES
@@ -231,9 +231,33 @@ type BackendForecastResponse = {
         message?: string;
     };
 
-    insights?: string[];
-    forecast_insights?: string[];
-    forecastInsights?: string[];
+    insights?: Array<
+        | string
+        | {
+              title?: string;
+              message?: string;
+              type?: string;
+              value?: number | null;
+          }
+    >;
+    forecast_insights?: Array<
+        | string
+        | {
+              title?: string;
+              message?: string;
+              type?: string;
+              value?: number | null;
+          }
+    >;
+    forecastInsights?: Array<
+        | string
+        | {
+              title?: string;
+              message?: string;
+              type?: string;
+              value?: number | null;
+          }
+    >;
 
     records?: Record<string, number>;
     record_counts?: Record<string, number>;
@@ -286,15 +310,10 @@ const formatCompactValue = (value: number): string => {
     return safeValue.toString();
 };
 
-const clamp = (
-    value: number,
-    min: number,
-    max: number,
-): number => Math.min(max, Math.max(min, value));
+const clamp = (value: number, min: number, max: number): number =>
+    Math.min(max, Math.max(min, value));
 
-const createEmptyMetric = (
-    format: "currency" | "number",
-): ForecastMetric => ({
+const createEmptyMetric = (format: "currency" | "number"): ForecastMetric => ({
     historical: [],
     forecast: [],
     data: [],
@@ -313,8 +332,7 @@ const createEmptyMetric = (
         score: 0,
         label: "Insufficient data",
         level: "low",
-        message:
-            "No completed historical activity is currently available.",
+        message: "No completed historical activity is currently available.",
     },
 
     format,
@@ -427,31 +445,18 @@ const normalizeRow = (
 const normalizeBackendForecast = (
     raw: BackendForecastResponse,
 ): ForecastResponse => {
-    const historicalSource =
-        raw.historical ??
-        raw.history ??
-        raw.actuals ??
-        [];
+    const historicalSource = raw.historical ?? raw.history ?? raw.actuals ?? [];
 
     const forecastSource =
-        raw.forecast ??
-        raw.forecasted_period ??
-        raw.forecastedPeriod ??
-        [];
+        raw.forecast ?? raw.forecasted_period ?? raw.forecastedPeriod ?? [];
 
-    const historical = historicalSource.map((row) =>
-        normalizeRow(row, false),
-    );
+    const historical = historicalSource.map((row) => normalizeRow(row, false));
 
-    const forecast = forecastSource.map((row) =>
-        normalizeRow(row, true),
-    );
+    const forecast = forecastSource.map((row) => normalizeRow(row, true));
 
-    const combinedSource =
-        raw.data ??
+    const combinedSource = raw.data ??
         raw.chart_data ??
-        raw.chartData ??
-        [...historical, ...forecast];
+        raw.chartData ?? [...historical, ...forecast];
 
     const combined = combinedSource.map((row) => {
         const isForecast =
@@ -464,17 +469,11 @@ const normalizeBackendForecast = (
         return normalizeRow(row, isForecast);
     });
 
-    const quality =
-        raw.forecast_quality ??
-        raw.data_quality ??
-        {};
+    const quality = raw.forecast_quality ?? raw.data_quality ?? {};
 
     const score = clamp(
         Number(
-            raw.confidence_score ??
-                raw.confidenceScore ??
-                quality.score ??
-                0,
+            raw.confidence_score ?? raw.confidenceScore ?? quality.score ?? 0,
         ),
         0,
         100,
@@ -496,22 +495,15 @@ const normalizeBackendForecast = (
                   : "low";
 
     const historicalCount = Number(
-        quality.historical_months ??
-            historical.length ??
-            0,
+        quality.historical_months ?? historical.length ?? 0,
     );
 
     const activeCount = Number(
         quality.active_months ??
-            historical.filter(
-                (row) => Number(row.actual ?? 0) > 0,
-            ).length,
+            historical.filter((row) => Number(row.actual ?? 0) > 0).length,
     );
 
-    const historyStart =
-        historical[0]?.date ??
-        historical[0]?.month ??
-        null;
+    const historyStart = historical[0]?.date ?? historical[0]?.month ?? null;
 
     const historyEnd =
         historical[historical.length - 1]?.date ??
@@ -521,15 +513,9 @@ const normalizeBackendForecast = (
     const type = raw.type ?? "revenue";
 
     const backtestSource: Partial<BacktestData> =
-        raw.backtest ??
-        raw.backtest_results ??
-        raw.backtestResults ??
-        {};
+        raw.backtest ?? raw.backtest_results ?? raw.backtestResults ?? {};
 
-    const latestActual =
-        raw.latest_actual ??
-        raw.latestActual ??
-        null;
+    const latestActual = raw.latest_actual ?? raw.latestActual ?? null;
 
     const metric: ForecastMetric = {
         historical,
@@ -543,8 +529,7 @@ const normalizeBackendForecast = (
                 historical
                     .filter(
                         (row) =>
-                            row.actual !== null &&
-                            row.actual !== undefined,
+                            row.actual !== null && row.actual !== undefined,
                     )
                     .slice(-1)[0]?.actual ??
                 0,
@@ -559,26 +544,17 @@ const normalizeBackendForecast = (
         ),
 
         average_forecast: Number(
-            raw.average_forecast ??
-                raw.averageForecast ??
-                0,
+            raw.average_forecast ?? raw.averageForecast ?? 0,
         ),
 
         growth: Number(raw.growth ?? 0),
 
         trend:
-            raw.trend ??
-            raw.trend_direction ??
-            raw.trendDirection ??
-            "stable",
+            raw.trend ?? raw.trend_direction ?? raw.trendDirection ?? "stable",
 
         slope: 0,
 
-        r_squared: Number(
-            raw.r_squared ??
-                raw.rSquared ??
-                0,
-        ),
+        r_squared: Number(raw.r_squared ?? raw.rSquared ?? 0),
 
         confidence: {
             score,
@@ -598,18 +574,11 @@ const normalizeBackendForecast = (
         },
 
         format:
-            type === "invoices" ||
-            type === "contracts"
-                ? "number"
-                : "currency",
+            type === "invoices" || type === "contracts" ? "number" : "currency",
 
         historical_count: historicalCount,
 
-        model:
-            raw.model ??
-            raw.model_name ??
-            raw.modelName ??
-            "Forecast Model",
+        model: raw.model ?? raw.model_name ?? raw.modelName ?? "Forecast Model",
 
         model_description:
             raw.model_description ??
@@ -618,23 +587,13 @@ const normalizeBackendForecast = (
 
         backtest: {
             mae: Number(
-                backtestSource.mae ??
-                    raw.mae ??
-                    quality.backtest_mae ??
-                    0,
+                backtestSource.mae ?? raw.mae ?? quality.backtest_mae ?? 0,
             ),
 
-            rmse: Number(
-                backtestSource.rmse ??
-                    raw.rmse ??
-                    0,
-            ),
+            rmse: Number(backtestSource.rmse ?? raw.rmse ?? 0),
 
             wape: Number(
-                backtestSource.wape ??
-                    raw.wape ??
-                    quality.backtest_wape ??
-                    0,
+                backtestSource.wape ?? raw.wape ?? quality.backtest_wape ?? 0,
             ),
 
             smape: Number(
@@ -644,24 +603,15 @@ const normalizeBackendForecast = (
                     0,
             ),
 
-            folds: Number(
-                backtestSource.folds ??
-                    0,
-            ),
+            folds: Number(backtestSource.folds ?? 0),
         },
     };
 
     const insightMessages =
-        raw.insights ??
-        raw.forecast_insights ??
-        raw.forecastInsights ??
-        [];
+        raw.insights ?? raw.forecast_insights ?? raw.forecastInsights ?? [];
 
     const recordCounts =
-        raw.record_counts ??
-        raw.recordCounts ??
-        raw.records ??
-        {};
+        raw.record_counts ?? raw.recordCounts ?? raw.records ?? {};
 
     return {
         generated_at:
@@ -672,10 +622,7 @@ const normalizeBackendForecast = (
             new Date().toISOString(),
 
         period: Number(
-            raw.period ??
-                raw.forecast_period ??
-                raw.forecastMonths ??
-                6,
+            raw.period ?? raw.forecast_period ?? raw.forecastMonths ?? 6,
         ),
 
         history_months: historicalCount,
@@ -686,91 +633,89 @@ const normalizeBackendForecast = (
 
         requested_type: type,
 
-        revenue:
-            type === "revenue"
-                ? metric
-                : null,
+        revenue: type === "revenue" ? metric : null,
 
-        payments:
-            type === "payments"
-                ? metric
-                : null,
+        payments: type === "payments" ? metric : null,
 
-        invoices:
-            type === "invoices"
-                ? metric
-                : null,
+        invoices: type === "invoices" ? metric : null,
 
-        contracts:
-            type === "contracts"
-                ? metric
-                : null,
+        contracts: type === "contracts" ? metric : null,
 
         summary: {
-            projected_revenue:
-                type === "revenue"
-                    ? metric.projected_total
-                    : 0,
+            projected_revenue: type === "revenue" ? metric.projected_total : 0,
 
             projected_payments:
-                type === "payments"
-                    ? metric.projected_total
-                    : 0,
+                type === "payments" ? metric.projected_total : 0,
 
             projected_invoices:
-                type === "invoices"
-                    ? metric.projected_total
-                    : 0,
+                type === "invoices" ? metric.projected_total : 0,
 
             projected_contracts:
-                type === "contracts"
-                    ? metric.projected_total
-                    : 0,
+                type === "contracts" ? metric.projected_total : 0,
 
-            revenue_growth:
-                type === "revenue"
-                    ? metric.growth
-                    : 0,
+            revenue_growth: type === "revenue" ? metric.growth : 0,
 
-            payment_growth:
-                type === "payments"
-                    ? metric.growth
-                    : 0,
+            payment_growth: type === "payments" ? metric.growth : 0,
 
-            invoice_growth:
-                type === "invoices"
-                    ? metric.growth
-                    : 0,
+            invoice_growth: type === "invoices" ? metric.growth : 0,
 
-            contract_growth:
-                type === "contracts"
-                    ? metric.growth
-                    : 0,
+            contract_growth: type === "contracts" ? metric.growth : 0,
         },
 
-        insights: insightMessages.map(
-            (message, index) => ({
-                type: "info" as const,
+        insights: insightMessages.map((item, index) => {
+            // ✅ Backward-compatible: string O object ang pwedeng i-return
+            // ng backend (structured descriptive/predictive insights).
+            if (typeof item === "string") {
+                return {
+                    type: "info" as const,
+                    metric: type,
+                    title:
+                        index === 0
+                            ? "Forecast Insight"
+                            : "Historical Analysis",
+                    message: item,
+                    value: Number(metric.growth) || 0,
+                };
+            }
 
+            const raw = (item ?? {}) as {
+                title?: string;
+                message?: string;
+                type?: string;
+                value?: number | null;
+            };
+
+            const rawType = String(raw.type ?? "info").toLowerCase();
+
+            let normalizedType: ForecastInsight["type"] = "info";
+
+            if (
+                rawType === "positive" ||
+                rawType === "warning" ||
+                rawType === "neutral"
+            ) {
+                normalizedType = rawType;
+            } else if (rawType === "success") {
+                normalizedType = "positive";
+            } else if (rawType === "error") {
+                normalizedType = "warning";
+            }
+
+            return {
+                type: normalizedType,
                 metric: type,
-
                 title:
-                    index === 0
-                        ? "Forecast Insight"
-                        : "Historical Analysis",
-
-                message,
-
-                value: metric.growth,
-            }),
-        ),
+                    raw.title ??
+                    (index === 0 ? "Forecast Insight" : "Historical Analysis"),
+                message: raw.message ?? "",
+                value: Number(raw.value ?? metric.growth ?? 0),
+            };
+        }),
 
         data_quality: {
-            historical_months_available:
-                historicalCount,
+            historical_months_available: historicalCount,
 
-            has_sufficient_history:
-                historicalCount >= 6,
+            has_sufficient_history: historicalCount >= 6,
 
             message:
                 quality.message ??
@@ -795,35 +740,27 @@ type SourceInfo = {
     column: string;
 };
 
-const getSourceInfo = (
-    type: ForecastType,
-): SourceInfo => {
+const getSourceInfo = (type: ForecastType): SourceInfo => {
     switch (type) {
         case "revenue":
             return {
                 table: "invoices + payments",
-                description:
-                    "Based on approved invoices and received payments",
-                column:
-                    "invoices.amount, payments.amount",
+                description: "Based on approved invoices and received payments",
+                column: "invoices.amount, payments.amount",
             };
 
         case "payments":
             return {
                 table: "payments",
-                description:
-                    "Based on recorded payment transactions",
-                column:
-                    "payments.amount, payments.paid_at",
+                description: "Based on recorded payment transactions",
+                column: "payments.amount, payments.paid_at",
             };
 
         case "invoices":
             return {
                 table: "invoices",
-                description:
-                    "Count of invoices generated per month",
-                column:
-                    "COUNT(invoices.id), invoices.created_at",
+                description: "Count of invoices generated per month",
+                column: "COUNT(invoices.id), invoices.created_at",
             };
 
         case "contracts":
@@ -831,8 +768,7 @@ const getSourceInfo = (
                 table: "job_orders",
                 description:
                     "Count of confirmed job orders (contracts) per month",
-                column:
-                    "COUNT(job_orders.id), job_orders.created_at",
+                column: "COUNT(job_orders.id), job_orders.created_at",
             };
 
         default:
@@ -855,11 +791,7 @@ type DynamicInsight = {
 
     message: string;
 
-    color:
-        | "emerald"
-        | "red"
-        | "blue"
-        | "yellow";
+    color: "emerald" | "red" | "blue" | "yellow";
 };
 
 const buildDynamicInsights = (
@@ -870,31 +802,22 @@ const buildDynamicInsights = (
 ): DynamicInsight[] => {
     const insights: DynamicInsight[] = [];
 
-    const growth =
-        Number(metric.growth) || 0;
+    const growth = Number(metric.growth) || 0;
 
-    const projected =
-        Number(metric.projected_total) || 0;
+    const projected = Number(metric.projected_total) || 0;
 
-    const latest =
-        Number(metric.latest_actual) || 0;
+    const latest = Number(metric.latest_actual) || 0;
 
-    const avg =
-        Number(metric.average_forecast) || 0;
+    const avg = Number(metric.average_forecast) || 0;
 
-    const trend =
-        metric.trend;
+    const trend = metric.trend;
 
-    const confidence =
-        metric.confidence;
+    const confidence = metric.confidence;
 
-    const months =
-        Number(forecastPeriod) || 6;
+    const months = Number(forecastPeriod) || 6;
 
     const fmt = (v: number) =>
-        isCurrency
-            ? formatCurrency(v)
-            : formatNumber(v);
+        isCurrency ? formatCurrency(v) : formatNumber(v);
 
     const typeLabel =
         type === "revenue"
@@ -909,13 +832,11 @@ const buildDynamicInsights = (
         insights.push({
             icon: "up",
 
-            title:
-                `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} trending up`,
+            title: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} trending up`,
 
-            message:
-                `Historical ${typeLabel} shows an upward trend. Projected to grow by ${growth.toFixed(
-                    1,
-                )}% over the next ${months} months. Consider scaling operations and locking in resources to meet demand.`,
+            message: `Historical ${typeLabel} shows an upward trend. Projected to grow by ${growth.toFixed(
+                1,
+            )}% over the next ${months} months. Consider scaling operations and locking in resources to meet demand.`,
 
             color: "emerald",
         });
@@ -923,17 +844,13 @@ const buildDynamicInsights = (
         insights.push({
             icon: "down",
 
-            title:
-                `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} trending down`,
+            title: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} trending down`,
 
-            message:
-                `Historical ${typeLabel} is on a downward trend (${growth.toFixed(
-                    1,
-                )}%). Review recent client activity, follow up on pending ${
-                    type === "payments"
-                        ? "collections"
-                        : "deals"
-                }, and consider promotional strategies to recover momentum.`,
+            message: `Historical ${typeLabel} is on a downward trend (${growth.toFixed(
+                1,
+            )}%). Review recent client activity, follow up on pending ${
+                type === "payments" ? "collections" : "deals"
+            }, and consider promotional strategies to recover momentum.`,
 
             color: "red",
         });
@@ -941,13 +858,11 @@ const buildDynamicInsights = (
         insights.push({
             icon: "stable",
 
-            title:
-                `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} is stable`,
+            title: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} is stable`,
 
-            message:
-                `Historical ${typeLabel} shows a stable pattern. Forecast is steady at ${fmt(
-                    avg,
-                )} per month. Focus on maintaining consistency and identifying growth opportunities.`,
+            message: `Historical ${typeLabel} shows a stable pattern. Forecast is steady at ${fmt(
+                avg,
+            )} per month. Focus on maintaining consistency and identifying growth opportunities.`,
 
             color: "blue",
         });
@@ -956,19 +871,15 @@ const buildDynamicInsights = (
     insights.push({
         icon: "info",
 
-        title:
-            `Projected ${typeLabel} for next ${months} months`,
+        title: `Projected ${typeLabel} for next ${months} months`,
 
-        message:
-            `Total forecast: ${fmt(
-                projected,
-            )} across ${months} months (avg ${fmt(
-                avg,
-            )}/month). ${
-                latest > 0
-                    ? `Latest actual was ${fmt(latest)}.`
-                    : "No recent actual data available."
-            }`,
+        message: `Total forecast: ${fmt(
+            projected,
+        )} across ${months} months (avg ${fmt(avg)}/month). ${
+            latest > 0
+                ? `Latest actual was ${fmt(latest)}.`
+                : "No recent actual data available."
+        }`,
 
         color: "blue",
     });
@@ -1052,10 +963,9 @@ const buildDynamicInsights = (
 
             title: "📊 Moderate confidence",
 
-            message:
-                `Model confidence is ${confidence.score.toFixed(
-                    0,
-                )}%. Forecast is usable for planning but consider collecting more historical data for higher accuracy.`,
+            message: `Model confidence is ${confidence.score.toFixed(
+                0,
+            )}%. Forecast is usable for planning but consider collecting more historical data for higher accuracy.`,
 
             color: "blue",
         });
@@ -1065,10 +975,9 @@ const buildDynamicInsights = (
 
             title: "✅ High confidence forecast",
 
-            message:
-                `Model confidence is high (${confidence.score.toFixed(
-                    0,
-                )}%). This forecast is reliable for planning and budgeting decisions.`,
+            message: `Model confidence is high (${confidence.score.toFixed(
+                0,
+            )}%). This forecast is reliable for planning and budgeting decisions.`,
 
             color: "emerald",
         });
@@ -1098,43 +1007,22 @@ function ForecastTooltip(props: {
     forecastType: ForecastType;
     recordCounts?: Record<string, number>;
 }) {
-    const {
-        active,
-        payload,
-        label,
-        isCurrency,
-        forecastType,
-        recordCounts,
-    } = props;
+    const { active, payload, label, isCurrency, forecastType, recordCounts } =
+        props;
 
-    if (
-        !active ||
-        !payload ||
-        payload.length === 0
-    ) {
+    if (!active || !payload || payload.length === 0) {
         return null;
     }
 
-    const actual =
-        payload.find(
-            (item) =>
-                item.dataKey === "actual",
-        );
+    const actual = payload.find((item) => item.dataKey === "actual");
 
-    const forecast =
-        payload.find(
-            (item) =>
-                item.dataKey === "forecast",
-        );
+    const forecast = payload.find((item) => item.dataKey === "forecast");
 
-    const actualValue =
-        actual?.value ?? null;
+    const actualValue = actual?.value ?? null;
 
-    const forecastValue =
-        forecast?.value ?? null;
+    const forecastValue = forecast?.value ?? null;
 
-    const source =
-        getSourceInfo(forecastType);
+    const source = getSourceInfo(forecastType);
 
     const countKey =
         forecastType === "payments"
@@ -1145,78 +1033,63 @@ function ForecastTooltip(props: {
                 ? "revenue_records"
                 : "invoices";
 
-    const recordCount =
-        recordCounts?.[countKey];
+    const recordCount = recordCounts?.[countKey];
 
     return (
-        <div className="min-w-[240px] max-w-[300px] rounded-xl border border-slate-700 bg-slate-950 p-3 shadow-2xl">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="min-w-[240px] max-w-[300px] rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 p-3 shadow-2xl">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                 {label}
             </p>
 
-            {actualValue !== null &&
-                actualValue !== undefined && (
-                    <div className="mb-2 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-sm bg-blue-500" />
+            {actualValue !== null && actualValue !== undefined && (
+                <div className="mb-2 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-sm bg-blue-500" />
 
-                            <span className="text-[11px] text-slate-400">
-                                Actual
-                            </span>
-                        </div>
-
-                        <span className="text-xs font-bold text-white">
-                            {isCurrency
-                                ? formatCurrency(
-                                      Number(actualValue),
-                                  )
-                                : formatNumber(
-                                      Number(actualValue),
-                                  )}
+                        <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                            Actual
                         </span>
                     </div>
-                )}
 
-            {forecastValue !== null &&
-                forecastValue !== undefined && (
-                    <div className="mb-2 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-sm bg-emerald-400" />
+                    <span className="text-xs font-bold text-gray-900 dark:text-white">
+                        {isCurrency
+                            ? formatCurrency(Number(actualValue))
+                            : formatNumber(Number(actualValue))}
+                    </span>
+                </div>
+            )}
 
-                            <span className="text-[11px] text-slate-400">
-                                Forecast
-                            </span>
-                        </div>
+            {forecastValue !== null && forecastValue !== undefined && (
+                <div className="mb-2 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-sm bg-emerald-400" />
 
-                        <span className="text-xs font-bold text-emerald-400">
-                            {isCurrency
-                                ? formatCurrency(
-                                      Number(
-                                          forecastValue,
-                                      ),
-                                  )
-                                : formatNumber(
-                                      Number(
-                                          forecastValue,
-                                      ),
-                                  )}
+                        <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                            Forecast
                         </span>
                     </div>
-                )}
 
-            <div className="mt-2 border-t border-slate-800 pt-2">
-                <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-yellow-400">
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {isCurrency
+                            ? formatCurrency(Number(forecastValue))
+                            : formatNumber(Number(forecastValue))}
+                    </span>
+                </div>
+            )}
+
+            <div className="mt-2 border-t border-gray-200 dark:border-slate-800 pt-2">
+                <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
                     📊 Data Source
                 </p>
 
-                <p className="text-[10px] leading-tight text-slate-300">
+                <p className="text-[10px] leading-tight text-gray-700 dark:text-slate-300">
                     Table:{" "}
-                    <span className="font-mono font-semibold text-yellow-400">
+                    <span className="font-mono font-semibold text-yellow-600 dark:text-yellow-400">
                         {source.table}
                     </span>
                 </p>
 
-                <p className="mt-0.5 text-[9px] leading-tight text-slate-500">
+                <p className="mt-0.5 text-[9px] leading-tight text-gray-500 dark:text-slate-500">
                     {source.description}
                 </p>
 
@@ -1225,8 +1098,8 @@ function ForecastTooltip(props: {
                 </p>
 
                 {recordCount !== undefined && (
-                    <p className="mt-1 text-[10px] text-slate-400">
-                        <span className="font-bold text-white">
+                    <p className="mt-1 text-[10px] text-gray-500 dark:text-slate-400">
+                        <span className="font-bold text-gray-900 dark:text-white">
                             {recordCount}
                         </span>{" "}
                         records analyzed
@@ -1249,28 +1122,16 @@ function SimpleValueTooltip(props: {
     forecastType: ForecastType;
     recordCounts?: Record<string, number>;
 }) {
-    const {
-        active,
-        payload,
-        label,
-        isCurrency,
-        forecastType,
-        recordCounts,
-    } = props;
+    const { active, payload, label, isCurrency, forecastType, recordCounts } =
+        props;
 
-    if (
-        !active ||
-        !payload ||
-        payload.length === 0
-    ) {
+    if (!active || !payload || payload.length === 0) {
         return null;
     }
 
-    const value =
-        payload[0]?.value ?? 0;
+    const value = payload[0]?.value ?? 0;
 
-    const source =
-        getSourceInfo(forecastType);
+    const source = getSourceInfo(forecastType);
 
     const countKey =
         forecastType === "payments"
@@ -1281,29 +1142,24 @@ function SimpleValueTooltip(props: {
                 ? "revenue_records"
                 : "invoices";
 
-    const recordCount =
-        recordCounts?.[countKey];
+    const recordCount = recordCounts?.[countKey];
 
     return (
-        <div className="min-w-[220px] max-w-[260px] rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 shadow-2xl">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="min-w-[220px] max-w-[260px] rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-3 py-2 shadow-2xl">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                 {label}
             </p>
 
-            <p className="text-xs font-bold text-emerald-400">
+            <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                 {isCurrency
-                    ? formatCurrency(
-                          Number(value),
-                      )
-                    : formatNumber(
-                          Number(value),
-                      )}
+                    ? formatCurrency(Number(value))
+                    : formatNumber(Number(value))}
             </p>
 
-            <div className="mt-1.5 border-t border-slate-800 pt-1.5">
-                <p className="text-[9px] text-slate-500">
+            <div className="mt-1.5 border-t border-gray-200 dark:border-slate-800 pt-1.5">
+                <p className="text-[9px] text-gray-500 dark:text-slate-500">
                     Source:{" "}
-                    <span className="font-mono font-semibold text-yellow-400">
+                    <span className="font-mono font-semibold text-yellow-600 dark:text-yellow-400">
                         {source.table}
                     </span>
                 </p>
@@ -1313,8 +1169,8 @@ function SimpleValueTooltip(props: {
                 </p>
 
                 {recordCount !== undefined && (
-                    <p className="mt-0.5 text-[9px] text-slate-400">
-                        <span className="font-bold text-white">
+                    <p className="mt-0.5 text-[9px] text-gray-500 dark:text-slate-400">
+                        <span className="font-bold text-gray-900 dark:text-white">
                             {recordCount}
                         </span>{" "}
                         records
@@ -1335,38 +1191,27 @@ function PercentChangeTooltip(props: {
     label?: string;
     forecastType: ForecastType;
 }) {
-    const {
-        active,
-        payload,
-        label,
-        forecastType,
-    } = props;
+    const { active, payload, label, forecastType } = props;
 
-    if (
-        !active ||
-        !payload ||
-        payload.length === 0
-    ) {
+    if (!active || !payload || payload.length === 0) {
         return null;
     }
 
-    const value =
-        Number(payload[0]?.value ?? 0);
+    const value = Number(payload[0]?.value ?? 0);
 
-    const isPositive =
-        value >= 0;
+    const isPositive = value >= 0;
 
     return (
-        <div className="min-w-[200px] rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 shadow-2xl">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="min-w-[200px] rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-3 py-2 shadow-2xl">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                 {label}
             </p>
 
             <p
                 className={`text-xs font-bold ${
                     isPositive
-                        ? "text-emerald-400"
-                        : "text-red-400"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
                 }`}
             >
                 {isPositive ? "+" : ""}
@@ -1385,302 +1230,184 @@ function PercentChangeTooltip(props: {
 ============================================================ */
 
 function Forecasting() {
-    const page =
-        usePage<PageProps>();
+    const page = usePage<PageProps>();
 
-    const initialForecast =
-        page.props.forecasting;
+    const initialForecast = page.props.forecasting;
 
-    const [
-        forecastType,
-        setForecastType,
-    ] = useState<ForecastType>(
-        "revenue",
+    const [forecastType, setForecastType] = useState<ForecastType>("revenue");
+
+    const [forecastPeriod, setForecastPeriod] = useState<ForecastPeriod>("6");
+
+    const [forecastData, setForecastData] = useState<ForecastResponse>(() =>
+        initialForecast
+            ? normalizeBackendForecast(initialForecast)
+            : emptyForecastResponse(),
     );
 
-    const [
-        forecastPeriod,
-        setForecastPeriod,
-    ] = useState<ForecastPeriod>(
-        "6",
-    );
+    const [loading, setLoading] = useState(false);
 
-    const [
-        forecastData,
-        setForecastData,
-    ] = useState<ForecastResponse>(
-        () =>
-            initialForecast
-                ? normalizeBackendForecast(
-                      initialForecast,
-                  )
-                : emptyForecastResponse(),
-    );
+    const [error, setError] = useState<string | null>(null);
 
-    const [
-        loading,
-        setLoading,
-    ] = useState(false);
-
-    const [
-        error,
-        setError,
-    ] = useState<string | null>(
-        null,
-    );
-
-    const [
-        lastRefreshed,
-        setLastRefreshed,
-    ] = useState<Date>(
-        new Date(),
-    );
+    const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
     /* ========================================================
     | LOAD FORECAST
     ======================================================== */
 
-    const loadForecast =
-        useCallback(
-            async (
-                type: ForecastType,
-                period: ForecastPeriod,
-            ) => {
-                setLoading(true);
-                setError(null);
+    const loadForecast = useCallback(
+        async (type: ForecastType, period: ForecastPeriod) => {
+            setLoading(true);
+            setError(null);
 
-                try {
-                    const params =
-                        new URLSearchParams();
+            try {
+                const params = new URLSearchParams();
 
-                    params.set(
-                        "type",
-                        type,
+                params.set("type", type);
+
+                params.set("period", period);
+
+                params.set("_ts", Date.now().toString());
+
+                const response = await fetch(
+                    `/forecasting/data?${params.toString()}`,
+                    {
+                        method: "GET",
+
+                        headers: {
+                            Accept: "application/json",
+
+                            "X-Requested-With": "XMLHttpRequest",
+
+                            "Cache-Control": "no-cache, no-store, max-age=0",
+                        },
+
+                        credentials: "same-origin",
+
+                        cache: "no-store",
+                    },
+                );
+
+                if (!response.ok) {
+                    let serverMessage = "";
+
+                    try {
+                        const body = await response.json();
+
+                        serverMessage = body?.message ?? "";
+                    } catch {}
+
+                    throw new Error(
+                        serverMessage ||
+                            `Forecast request failed with status ${response.status}.`,
                     );
-
-                    params.set(
-                        "period",
-                        period,
-                    );
-
-                    params.set(
-                        "_ts",
-                        Date.now().toString(),
-                    );
-
-                    const response =
-                        await fetch(
-                            `/forecasting/data?${params.toString()}`,
-                            {
-                                method: "GET",
-
-                                headers: {
-                                    Accept:
-                                        "application/json",
-
-                                    "X-Requested-With":
-                                        "XMLHttpRequest",
-
-                                    "Cache-Control":
-                                        "no-cache, no-store, max-age=0",
-                                },
-
-                                credentials:
-                                    "same-origin",
-
-                                cache:
-                                    "no-store",
-                            },
-                        );
-
-                    if (!response.ok) {
-                        let serverMessage =
-                            "";
-
-                        try {
-                            const body =
-                                await response.json();
-
-                            serverMessage =
-                                body?.message ??
-                                "";
-                        } catch {}
-
-                        throw new Error(
-                            serverMessage ||
-                                `Forecast request failed with status ${response.status}.`,
-                        );
-                    }
-
-                    const result =
-                        (await response.json()) as ForecastApiResponse;
-
-                    if (
-                        !result ||
-                        typeof result !==
-                            "object"
-                    ) {
-                        throw new Error(
-                            "The forecasting server returned an invalid response.",
-                        );
-                    }
-
-                    if (
-                        result.success ===
-                        false
-                    ) {
-                        throw new Error(
-                            result.message ??
-                                "The forecasting server could not generate the forecast.",
-                        );
-                    }
-
-                    const payload =
-                        result.data &&
-                        typeof result.data ===
-                            "object" &&
-                        !Array.isArray(
-                            result.data,
-                        )
-                            ? {
-                                  ...(result.data as BackendForecastResponse),
-
-                                  type:
-                                      (
-                                          result.data as BackendForecastResponse
-                                      ).type ??
-                                      result.type,
-
-                                  period:
-                                      (
-                                          result.data as BackendForecastResponse
-                                      ).period ??
-                                      result.period,
-                              }
-                            : result;
-
-                    const normalized =
-                        normalizeBackendForecast(
-                            payload,
-                        );
-
-                    if (
-                        normalized.requested_type !==
-                        type
-                    ) {
-                        normalized.requested_type =
-                            type;
-                    }
-
-                    setForecastData(
-                        normalized,
-                    );
-
-                    setLastRefreshed(
-                        new Date(),
-                    );
-                } catch (err) {
-                    console.error(
-                        "Forecasting error:",
-                        err,
-                    );
-
-                    setError(
-                        err instanceof Error
-                            ? err.message
-                            : "Unable to load forecasting data.",
-                    );
-                } finally {
-                    setLoading(false);
                 }
-            },
-            [],
-        );
+
+                const result = (await response.json()) as ForecastApiResponse;
+
+                if (!result || typeof result !== "object") {
+                    throw new Error(
+                        "The forecasting server returned an invalid response.",
+                    );
+                }
+
+                if (result.success === false) {
+                    throw new Error(
+                        result.message ??
+                            "The forecasting server could not generate the forecast.",
+                    );
+                }
+
+                const payload =
+                    result.data &&
+                    typeof result.data === "object" &&
+                    !Array.isArray(result.data)
+                        ? {
+                              ...(result.data as BackendForecastResponse),
+
+                              type:
+                                  (result.data as BackendForecastResponse)
+                                      .type ?? result.type,
+
+                              period:
+                                  (result.data as BackendForecastResponse)
+                                      .period ?? result.period,
+                          }
+                        : result;
+
+                const normalized = normalizeBackendForecast(payload);
+
+                if (normalized.requested_type !== type) {
+                    normalized.requested_type = type;
+                }
+
+                setForecastData(normalized);
+
+                setLastRefreshed(new Date());
+            } catch (err) {
+                console.error("Forecasting error:", err);
+
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : "Unable to load forecasting data.",
+                );
+            } finally {
+                setLoading(false);
+            }
+        },
+        [],
+    );
 
     /* ========================================================
     | LOAD ON FILTER CHANGE
     ======================================================== */
 
     useEffect(() => {
-        loadForecast(
-            forecastType,
-            forecastPeriod,
-        );
-    }, [
-        forecastType,
-        forecastPeriod,
-        loadForecast,
-    ]);
+        loadForecast(forecastType, forecastPeriod);
+    }, [forecastType, forecastPeriod, loadForecast]);
 
-    /* ========================================================
-    | AUTO REFRESH 30 SECONDS
-    ======================================================== */
+    /*
+|--------------------------------------------------------------------------
+| ✅ AUTO-REFRESH DISABLED — Manual "Run Forecast" button na lang
+|--------------------------------------------------------------------------
+*/
 
-    useEffect(() => {
-        const interval =
-            window.setInterval(
-                () => {
-                    loadForecast(
-                        forecastType,
-                        forecastPeriod,
-                    );
-                },
-                30_000,
-            );
-
-        return () =>
-            window.clearInterval(
-                interval,
-            );
-    }, [
-        forecastType,
-        forecastPeriod,
-        loadForecast,
-    ]);
-
-    const handleGenerate =
-        () =>
-            loadForecast(
-                forecastType,
-                forecastPeriod,
-            );
+    // useEffect(() => {
+    //     const interval = window.setInterval(() => {
+    //         try {
+    //             loadForecast(forecastType, forecastPeriod);
+    //         } catch (err) {
+    //             console.error("Forecast auto-refresh failed:", err);
+    //         }
+    //     }, 30_000);
+    //
+    //     return () => window.clearInterval(interval);
+    // }, [forecastType, forecastPeriod, loadForecast]);
+    const handleGenerate = () => loadForecast(forecastType, forecastPeriod);
 
     /* ========================================================
     | ACTIVE METRIC
     ======================================================== */
 
-    const activeMetric =
-        useMemo<ForecastMetric>(
-            () => {
-                const metric =
-                    forecastType ===
-                    "revenue"
-                        ? forecastData.revenue
-                        : forecastType ===
-                            "payments"
-                          ? forecastData.payments
-                          : forecastType ===
-                              "invoices"
-                            ? forecastData.invoices
-                            : forecastData.contracts;
+    const activeMetric = useMemo<ForecastMetric>(() => {
+        const metric =
+            forecastType === "revenue"
+                ? forecastData.revenue
+                : forecastType === "payments"
+                  ? forecastData.payments
+                  : forecastType === "invoices"
+                    ? forecastData.invoices
+                    : forecastData.contracts;
 
-                return (
-                    metric ??
-                    createEmptyMetric(
-                        forecastType ===
-                            "revenue" ||
-                        forecastType ===
-                            "payments"
-                            ? "currency"
-                            : "number",
-                    )
-                );
-            },
-            [
-                forecastData,
-                forecastType,
-            ],
+        return (
+            metric ??
+            createEmptyMetric(
+                forecastType === "revenue" || forecastType === "payments"
+                    ? "currency"
+                    : "number",
+            )
         );
+    }, [forecastData, forecastType]);
 
     const forecastLabel =
         forecastType === "revenue"
@@ -1692,219 +1419,131 @@ function Forecasting() {
                 : "Contracts";
 
     const isCurrency =
-        forecastType ===
-            "revenue" ||
-        forecastType ===
-            "payments";
+        forecastType === "revenue" || forecastType === "payments";
 
     /* ========================================================
     | CHART DATA
     ======================================================== */
 
-    const chartData =
-        useMemo(() => {
-            const rows =
-                activeMetric.data ??
-                [];
+    const chartData = useMemo(() => {
+        const rows = activeMetric.data ?? [];
 
-            if (!rows.length) {
-                return [];
-            }
+        if (!rows.length) {
+            return [];
+        }
 
-            return rows.map(
-                (item) => ({
-                    ...item,
+        return rows.map((item) => ({
+            ...item,
 
-                    actual:
-                        item.actual !==
-                            null &&
-                        item.actual !==
-                            undefined
-                            ? Number(
-                                  item.actual,
-                              )
-                            : undefined,
+            actual:
+                item.actual !== null && item.actual !== undefined
+                    ? Number(item.actual)
+                    : undefined,
 
-                    forecast:
-                        item.forecast !==
-                            null &&
-                        item.forecast !==
-                            undefined
-                            ? Number(
-                                  item.forecast,
-                              )
-                            : undefined,
-                }),
-            );
-        }, [activeMetric]);
+            forecast:
+                item.forecast !== null && item.forecast !== undefined
+                    ? Number(item.forecast)
+                    : undefined,
+        }));
+    }, [activeMetric]);
 
-    const projectedValues =
-        useMemo(() => {
-            return (
-                activeMetric.forecast ??
-                []
+    const projectedValues = useMemo(() => {
+        return (activeMetric.forecast ?? [])
+            .filter(
+                (item) => item.forecast !== null && item.forecast !== undefined,
             )
-                .filter(
-                    (item) =>
-                        item.forecast !==
-                            null &&
-                        item.forecast !==
-                            undefined,
-                )
-                .slice(
-                    0,
-                    Number(
-                        forecastPeriod,
-                    ),
-                );
-        }, [
-            activeMetric,
-            forecastPeriod,
-        ]);
+            .slice(0, Number(forecastPeriod));
+    }, [activeMetric, forecastPeriod]);
 
-    const latestActual =
-        Number(
-            activeMetric.latest_actual,
-        ) || 0;
+    const latestActual = Number(activeMetric.latest_actual) || 0;
 
     const confidence =
-        activeMetric.confidence ??
-        createEmptyMetric(
-            "currency",
-        ).confidence;
+        activeMetric.confidence ?? createEmptyMetric("currency").confidence;
 
     const dataQuality =
-        forecastData.data_quality ??
-        emptyForecastResponse()
-            .data_quality;
+        forecastData.data_quality ?? emptyForecastResponse().data_quality;
 
     const recordCounts =
-        forecastData.record_counts ??
-        forecastData.records ??
-        {};
+        forecastData.record_counts ?? forecastData.records ?? {};
 
     /* ========================================================
     | DYNAMIC INSIGHTS
     ======================================================== */
 
-    const dynamicInsights =
-        useMemo(() => {
-            return buildDynamicInsights(
-                forecastType,
-                activeMetric,
-                forecastPeriod,
-                isCurrency,
-            );
-        }, [
+    const dynamicInsights = useMemo(() => {
+        return buildDynamicInsights(
             forecastType,
             activeMetric,
             forecastPeriod,
             isCurrency,
-        ]);
+        );
+    }, [forecastType, activeMetric, forecastPeriod, isCurrency]);
 
-  const insights = useMemo(() => {
-    const backendInsights = forecastData.insights ?? [];
+    const insights = useMemo(() => {
+        const backendInsights = forecastData.insights ?? [];
 
-    const dynamic = dynamicInsights.map((d, i) => ({
-        type:
-            d.color === "emerald"
-                ? "positive" as const
-                : d.color === "red"
-                  ? "warning" as const
-                  : "info" as const,
-        metric: forecastType,
-        title: d.title,
-        message: d.message,
-        value: i,
-    }));
+        const dynamic = dynamicInsights.map((d, i) => ({
+            type:
+                d.color === "emerald"
+                    ? ("positive" as const)
+                    : d.color === "red"
+                      ? ("warning" as const)
+                      : ("info" as const),
+            metric: forecastType,
+            title: d.title,
+            message: d.message,
+            value: i,
+        }));
 
-    return [...backendInsights, ...dynamic];
-}, [forecastData.insights, dynamicInsights, forecastType]);
+        return [...backendInsights, ...dynamic];
+    }, [forecastData.insights, dynamicInsights, forecastType]);
 
-    const formatYAxis =
-        (value: number) =>
-            isCurrency
-                ? formatCompactValue(
-                      value,
-                  )
-                : formatNumber(value);
+    const formatYAxis = (value: number) =>
+        isCurrency ? formatCompactValue(value) : formatNumber(value);
 
     /* ========================================================
     | HISTORICAL BAR DATA
     ======================================================== */
 
-    const historicalBarData =
-        activeMetric.historical
-            .slice(-12)
-            .map((item) => ({
-                label: item.label,
+    const historicalBarData = activeMetric.historical
+        .slice(-12)
+        .map((item) => ({
+            label: item.label,
 
-                actual:
-                    Number(
-                        item.actual,
-                    ) || 0,
-            }));
+            actual: Number(item.actual) || 0,
+        }));
 
     /* ========================================================
     | MOM DATA
     ======================================================== */
 
-    const monthOverMonthData =
-        projectedValues.map(
-            (item, index) => {
-                const prev =
-                    index === 0
-                        ? latestActual
-                        : Number(
-                              projectedValues[
-                                  index - 1
-                              ]
-                                  .forecast,
-                          ) || 0;
+    const monthOverMonthData = projectedValues.map((item, index) => {
+        const prev =
+            index === 0
+                ? latestActual
+                : Number(projectedValues[index - 1].forecast) || 0;
 
-                const current =
-                    Number(
-                        item.forecast,
-                    ) || 0;
+        const current = Number(item.forecast) || 0;
 
-                const change =
-                    prev > 0
-                        ? ((current -
-                              prev) /
-                              prev) *
-                          100
-                        : 0;
+        const change = prev > 0 ? ((current - prev) / prev) * 100 : 0;
 
-                return {
-                    label:
-                        item.label,
+        return {
+            label: item.label,
 
-                    change:
-                        Number(
-                            change.toFixed(
-                                2,
-                            ),
-                        ),
-                };
-            },
-        );
+            change: Number(change.toFixed(2)),
+        };
+    });
 
     /* ========================================================
     | INSIGHT ICON
     ======================================================== */
 
-    const getInsightIcon = (
-        type: string,
-    ) => {
-        if (
-            type === "positive"
-        ) {
+    const getInsightIcon = (type: string) => {
+        if (type === "positive") {
             return ArrowUpRight;
         }
 
-        if (
-            type === "warning"
-        ) {
+        if (type === "warning") {
             return AlertTriangle;
         }
 
@@ -1915,28 +1554,20 @@ function Forecasting() {
     | INSIGHT COLOR
     ======================================================== */
 
-    const getInsightColor = (
-        type: string,
-    ) => {
-        if (
-            type === "positive"
-        ) {
-            return "bg-emerald-400/10 text-emerald-400";
+    const getInsightColor = (type: string) => {
+        if (type === "positive") {
+            return "bg-emerald-400/10 text-emerald-600 dark:text-emerald-400";
         }
 
-        if (
-            type === "warning"
-        ) {
-            return "bg-amber-400/10 text-amber-400";
+        if (type === "warning") {
+            return "bg-amber-400/10 text-amber-600 dark:text-amber-400";
         }
 
-        if (
-            type === "neutral"
-        ) {
-            return "bg-slate-400/10 text-slate-400";
+        if (type === "neutral") {
+            return "bg-slate-400/10 text-gray-500 dark:text-slate-400";
         }
 
-        return "bg-blue-400/10 text-blue-400";
+        return "bg-blue-400/10 text-blue-600 dark:text-blue-400";
     };
 
     /* ========================================================
@@ -1947,67 +1578,46 @@ function Forecasting() {
         <>
             <Head title="Forecast Analytics" />
 
-            <div className="min-h-screen bg-black p-4 font-sans text-white sm:p-6">
+            <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 dark:bg-black dark:text-white sm:p-6">
                 {/* ====================================================
-                HEADER
-                ==================================================== */}
+HEADER
+==================================================== */}
 
                 <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                     <div>
                         <div className="mb-2 flex items-center gap-2">
                             <div className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)]" />
 
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-400">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-600 dark:text-yellow-400">
                                 ALIBATON ANALYTICS
                             </span>
                         </div>
 
-                        <h1 className="text-2xl font-black tracking-tight text-white">
+                        <h1 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">
                             Forecast Analytics
                         </h1>
 
-                        <p className="mt-1 max-w-2xl text-sm text-slate-400">
-                            View predictive insights and forecasted trends based on live
-                            financial, payment, invoice, and contract records.
+                        <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-slate-400">
+                            View predictive insights and forecasted trends based
+                            on live financial, payment, invoice, and contract
+                            records.
                         </p>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="hidden text-right text-[10px] text-slate-500 sm:block">
+
+
+                        <div className="hidden text-right text-[10px] text-gray-500 dark:text-slate-500 sm:block">
                             <p>
                                 Last updated:{" "}
-                                {lastRefreshed.toLocaleTimeString(
-                                    "en-PH",
-                                )}
+                                {lastRefreshed.toLocaleTimeString("en-PH")}
                             </p>
 
                             <p className="flex items-center justify-end gap-1">
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-
-                                Auto-refresh 30s
+                                Manual refresh enabled
                             </p>
                         </div>
-
-                        <button
-                            onClick={
-                                handleGenerate
-                            }
-                            disabled={loading}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-yellow-400/30 bg-yellow-400 px-5 py-2.5 text-sm font-black text-black shadow-lg shadow-yellow-400/10 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <RefreshCw
-                                size={16}
-                                className={
-                                    loading
-                                        ? "animate-spin"
-                                        : ""
-                                }
-                            />
-
-                            {loading
-                                ? "Updating..."
-                                : "Run Forecast"}
-                        </button>
                     </div>
                 </div>
 
@@ -2019,15 +1629,15 @@ function Forecasting() {
                     <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-900/70 bg-red-950/40 p-4">
                         <AlertTriangle
                             size={18}
-                            className="mt-0.5 shrink-0 text-red-400"
+                            className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
                         />
 
                         <div className="min-w-0">
-                            <p className="text-sm font-bold text-red-300">
+                            <p className="text-sm font-bold text-red-600 dark:text-red-300">
                                 Forecasting data could not be loaded
                             </p>
 
-                            <p className="mt-1 break-words text-xs text-red-400">
+                            <p className="mt-1 break-words text-xs text-red-600 dark:text-red-400">
                                 {error}
                             </p>
                         </div>
@@ -2038,24 +1648,21 @@ function Forecasting() {
                 FILTERS
                 ==================================================== */}
 
-                <section className="mb-5 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-xl">
+                <section className="mb-5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xl">
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                         <div>
-                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Forecast Type
                             </label>
 
                             <select
-                                value={
-                                    forecastType
-                                }
+                                value={forecastType}
                                 onChange={(e) =>
                                     setForecastType(
-                                        e.target
-                                            .value as ForecastType,
+                                        e.target.value as ForecastType,
                                     )
                                 }
-                                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-medium text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
+                                className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-3 py-2 text-xs font-medium text-gray-900 dark:text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
                             >
                                 <option value="revenue">
                                     Revenue Forecast
@@ -2076,63 +1683,50 @@ function Forecasting() {
                         </div>
 
                         <div>
-                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Period
                             </label>
 
                             <select
-                                value={
-                                    forecastPeriod
-                                }
+                                value={forecastPeriod}
                                 onChange={(e) =>
                                     setForecastPeriod(
-                                        e.target
-                                            .value as ForecastPeriod,
+                                        e.target.value as ForecastPeriod,
                                     )
                                 }
-                                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-medium text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
+                                className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-3 py-2 text-xs font-medium text-gray-900 dark:text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
                             >
-                                <option value="3">
-                                    Next 3 Months
-                                </option>
+                                <option value="3">Next 3 Months</option>
 
-                                <option value="6">
-                                    Next 6 Months
-                                </option>
+                                <option value="6">Next 6 Months</option>
 
-                                <option value="12">
-                                    Next 12 Months
-                                </option>
+                                <option value="12">Next 12 Months</option>
                             </select>
                         </div>
 
                         <div>
-                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Project
                             </label>
 
                             <select
                                 disabled
-                                className="w-full cursor-not-allowed rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-600"
+                                className="w-full cursor-not-allowed rounded-lg border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-600"
                             >
-                                <option>
-                                    All Projects
-                                </option>
+                                <option>All Projects</option>
                             </select>
                         </div>
 
                         <div>
-                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Client
                             </label>
 
                             <select
                                 disabled
-                                className="w-full cursor-not-allowed rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-600"
+                                className="w-full cursor-not-allowed rounded-lg border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-600"
                             >
-                                <option>
-                                    All Clients
-                                </option>
+                                <option>All Clients</option>
                             </select>
                         </div>
                     </div>
@@ -2145,14 +1739,14 @@ function Forecasting() {
                 <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
                     {/* FORECAST CHART */}
 
-                    <div className="col-span-1 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl xl:col-span-2">
+                    <div className="col-span-1 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl xl:col-span-2">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
-                                <h2 className="text-sm font-black text-white">
+                                <h2 className="text-sm font-black text-gray-900 dark:text-white">
                                     {forecastLabel} Forecast
                                 </h2>
 
-                                <p className="mt-0.5 text-[10px] text-slate-500">
+                                <p className="mt-0.5 text-[10px] text-gray-500 dark:text-slate-500">
                                     Historical actuals vs model forecast
                                 </p>
                             </div>
@@ -2161,7 +1755,7 @@ function Forecasting() {
                                 <div className="flex items-center gap-1.5">
                                     <span className="h-2 w-2 rounded-sm bg-blue-500" />
 
-                                    <span className="text-slate-400">
+                                    <span className="text-gray-500 dark:text-slate-400">
                                         Actual
                                     </span>
                                 </div>
@@ -2169,7 +1763,7 @@ function Forecasting() {
                                 <div className="flex items-center gap-1.5">
                                     <span className="h-2 w-2 rounded-sm bg-emerald-400" />
 
-                                    <span className="text-slate-400">
+                                    <span className="text-gray-500 dark:text-slate-400">
                                         Forecast
                                     </span>
                                 </div>
@@ -2177,29 +1771,23 @@ function Forecasting() {
                         </div>
 
                         <div className="h-[280px] w-full">
-                            {chartData.length ===
-                            0 ? (
-                                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-800">
+                            {chartData.length === 0 ? (
+                                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 dark:border-slate-800">
                                     <div className="text-center">
                                         <AlertTriangle
                                             size={22}
                                             className="mx-auto mb-2 text-slate-600"
                                         />
 
-                                        <p className="text-xs font-semibold text-slate-500">
+                                        <p className="text-xs font-semibold text-gray-500 dark:text-slate-500">
                                             No historical data available.
                                         </p>
                                     </div>
                                 </div>
                             ) : (
-                                <ResponsiveContainer
-                                    width="100%"
-                                    height="100%"
-                                >
+                                <ResponsiveContainer width="100%" height="100%">
                                     <ComposedChart
-                                        data={
-                                            chartData
-                                        }
+                                        data={chartData}
                                         margin={{
                                             top: 10,
                                             right: 10,
@@ -2209,19 +1797,13 @@ function Forecasting() {
                                     >
                                         <CartesianGrid
                                             stroke="#1e293b"
-                                            vertical={
-                                                false
-                                            }
+                                            vertical={false}
                                         />
 
                                         <XAxis
                                             dataKey="label"
-                                            axisLine={
-                                                false
-                                            }
-                                            tickLine={
-                                                false
-                                            }
+                                            axisLine={false}
+                                            tickLine={false}
                                             tick={{
                                                 fill: "#64748b",
                                                 fontSize: 10,
@@ -2230,36 +1812,22 @@ function Forecasting() {
                                         />
 
                                         <YAxis
-                                            axisLine={
-                                                false
-                                            }
-                                            tickLine={
-                                                false
-                                            }
+                                            axisLine={false}
+                                            tickLine={false}
                                             tick={{
                                                 fill: "#64748b",
                                                 fontSize: 10,
                                             }}
-                                            tickFormatter={
-                                                formatYAxis
-                                            }
-                                            width={
-                                                70
-                                            }
+                                            tickFormatter={formatYAxis}
+                                            width={70}
                                         />
 
                                         <Tooltip
                                             content={
                                                 <ForecastTooltip
-                                                    isCurrency={
-                                                        isCurrency
-                                                    }
-                                                    forecastType={
-                                                        forecastType
-                                                    }
-                                                    recordCounts={
-                                                        recordCounts
-                                                    }
+                                                    isCurrency={isCurrency}
+                                                    forecastType={forecastType}
+                                                    recordCounts={recordCounts}
                                                 />
                                             }
                                         />
@@ -2267,15 +1835,8 @@ function Forecasting() {
                                         <Bar
                                             dataKey="actual"
                                             fill="#3b82f6"
-                                            barSize={
-                                                26
-                                            }
-                                            radius={[
-                                                3,
-                                                3,
-                                                0,
-                                                0,
-                                            ]}
+                                            barSize={26}
+                                            radius={[3, 3, 0, 0]}
                                             name="Actual"
                                         />
 
@@ -2283,9 +1844,7 @@ function Forecasting() {
                                             type="monotone"
                                             dataKey="forecast"
                                             stroke="#34d399"
-                                            strokeWidth={
-                                                2
-                                            }
+                                            strokeWidth={2}
                                             dot={{
                                                 r: 3,
                                                 fill: "#34d399",
@@ -2306,98 +1865,62 @@ function Forecasting() {
 
                     {/* KEY INSIGHTS */}
 
-                    <div className="col-span-1 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                        <h2 className="mb-4 flex items-center gap-1.5 text-sm font-black text-white">
+                    <div className="col-span-1 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                        <h2 className="mb-4 flex items-center gap-1.5 text-sm font-black text-gray-900 dark:text-white">
                             <Sparkles
                                 size={14}
-                                className="text-yellow-400"
+                                className="text-yellow-600 dark:text-yellow-400"
                             />
-
                             Key Forecast Insights
-
-                            <span className="ml-auto rounded-full bg-yellow-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-yellow-400">
-                                {
-                                    forecastLabel
-                                }
+                            <span className="ml-auto rounded-full bg-yellow-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
+                                {forecastLabel}
                             </span>
                         </h2>
 
                         <div className="max-h-[340px] space-y-3 overflow-y-auto pr-1">
-                            {insights.length >
-                            0 ? (
-                                insights
-                                    .slice(
-                                        0,
-                                        6,
-                                    )
-                                    .map(
-                                        (
-                                            insight,
-                                            idx,
-                                        ) => {
-                                            const Icon =
-                                                getInsightIcon(
-                                                    insight.type,
-                                                );
+                            {insights.length > 0 ? (
+                                insights.slice(0, 6).map((insight, idx) => {
+                                    const Icon = getInsightIcon(insight.type);
 
-                                            const colorClass =
-                                                getInsightColor(
-                                                    insight.type,
-                                                );
+                                    const colorClass = getInsightColor(
+                                        insight.type,
+                                    );
 
-                                            return (
-                                                <div
-                                                    key={
-                                                        idx
-                                                    }
-                                                    className="flex gap-2"
-                                                >
-                                                    <div
-                                                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${colorClass}`}
-                                                    >
-                                                        <Icon
-                                                            size={
-                                                                11
-                                                            }
-                                                        />
-                                                    </div>
+                                    return (
+                                        <div key={idx} className="flex gap-2">
+                                            <div
+                                                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${colorClass}`}
+                                            >
+                                                <Icon size={11} />
+                                            </div>
 
-                                                    <div className="min-w-0">
-                                                        <p className="text-[11px] font-bold leading-tight text-white">
-                                                            {
-                                                                insight.title
-                                                            }
-                                                        </p>
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-bold leading-tight text-gray-900 dark:text-white">
+                                                    {insight.title}
+                                                </p>
 
-                                                        <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-                                                            {
-                                                                insight.message
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        },
-                                    )
+                                                <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                                    {insight.message}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })
                             ) : (
                                 <div className="flex gap-2">
-                                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-400/10 text-slate-400">
-                                        <BarChart3
-                                            size={
-                                                11
-                                            }
-                                        />
+                                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-400/10 text-gray-500 dark:text-slate-400">
+                                        <BarChart3 size={11} />
                                     </div>
 
                                     <div>
-                                        <p className="text-[11px] font-bold leading-tight text-white">
+                                        <p className="text-[11px] font-bold leading-tight text-gray-900 dark:text-white">
                                             Insufficient data
                                         </p>
 
-                                        <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-                                            At least 6 months of historical records
-                                            are needed to generate meaningful
-                                            forecasts.
+                                        <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                            At least 6 months of historical
+                                            records are needed to generate
+                                            meaningful forecasts.
                                         </p>
                                     </div>
                                 </div>
@@ -2413,28 +1936,22 @@ function Forecasting() {
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     {/* HISTORICAL ACTIVITY */}
 
-                    <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                        <h3 className="mb-4 text-xs font-black text-white">
+                    <div className="flex flex-col rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                        <h3 className="mb-4 text-xs font-black text-gray-900 dark:text-white">
                             Historical Activity (Last 12 Months)
                         </h3>
 
                         <div className="h-[180px] w-full">
-                            {historicalBarData.length ===
-                            0 ? (
+                            {historicalBarData.length === 0 ? (
                                 <div className="flex h-full items-center justify-center">
                                     <p className="text-xs text-slate-600">
                                         No historical data.
                                     </p>
                                 </div>
                             ) : (
-                                <ResponsiveContainer
-                                    width="100%"
-                                    height="100%"
-                                >
+                                <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
-                                        data={
-                                            historicalBarData
-                                        }
+                                        data={historicalBarData}
                                         margin={{
                                             top: 5,
                                             right: 5,
@@ -2444,19 +1961,13 @@ function Forecasting() {
                                     >
                                         <CartesianGrid
                                             stroke="#1e293b"
-                                            vertical={
-                                                false
-                                            }
+                                            vertical={false}
                                         />
 
                                         <XAxis
                                             dataKey="label"
-                                            axisLine={
-                                                false
-                                            }
-                                            tickLine={
-                                                false
-                                            }
+                                            axisLine={false}
+                                            tickLine={false}
                                             tick={{
                                                 fill: "#64748b",
                                                 fontSize: 9,
@@ -2464,33 +1975,21 @@ function Forecasting() {
                                         />
 
                                         <YAxis
-                                            axisLine={
-                                                false
-                                            }
-                                            tickLine={
-                                                false
-                                            }
+                                            axisLine={false}
+                                            tickLine={false}
                                             tick={{
                                                 fill: "#64748b",
                                                 fontSize: 10,
                                             }}
-                                            tickFormatter={
-                                                formatYAxis
-                                            }
+                                            tickFormatter={formatYAxis}
                                         />
 
                                         <Tooltip
                                             content={
                                                 <SimpleValueTooltip
-                                                    isCurrency={
-                                                        isCurrency
-                                                    }
-                                                    forecastType={
-                                                        forecastType
-                                                    }
-                                                    recordCounts={
-                                                        recordCounts
-                                                    }
+                                                    isCurrency={isCurrency}
+                                                    forecastType={forecastType}
+                                                    recordCounts={recordCounts}
                                                 />
                                             }
                                         />
@@ -2498,12 +1997,7 @@ function Forecasting() {
                                         <Bar
                                             dataKey="actual"
                                             fill="#3b82f6"
-                                            radius={[
-                                                4,
-                                                4,
-                                                0,
-                                                0,
-                                            ]}
+                                            radius={[4, 4, 0, 0]}
                                             name="Actual"
                                         />
                                     </BarChart>
@@ -2511,38 +2005,29 @@ function Forecasting() {
                             )}
                         </div>
 
-                        <div className="mt-auto border-t border-slate-800 pt-3 text-center text-[10px] text-slate-600">
-                            {
-                                historicalBarData.length
-                            }{" "}
-                            historical periods
+                        <div className="mt-auto border-t border-gray-200 dark:border-slate-800 pt-3 text-center text-[10px] text-slate-600">
+                            {historicalBarData.length} historical periods
                         </div>
                     </div>
 
                     {/* MOM */}
 
-                    <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                        <h3 className="mb-4 text-xs font-black text-white">
+                    <div className="flex flex-col rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                        <h3 className="mb-4 text-xs font-black text-gray-900 dark:text-white">
                             Month-over-Month Change (%)
                         </h3>
 
                         <div className="h-[180px] w-full">
-                            {monthOverMonthData.length ===
-                            0 ? (
+                            {monthOverMonthData.length === 0 ? (
                                 <div className="flex h-full items-center justify-center">
                                     <p className="text-xs text-slate-600">
                                         No MoM data.
                                     </p>
                                 </div>
                             ) : (
-                                <ResponsiveContainer
-                                    width="100%"
-                                    height="100%"
-                                >
+                                <ResponsiveContainer width="100%" height="100%">
                                     <LineChart
-                                        data={
-                                            monthOverMonthData
-                                        }
+                                        data={monthOverMonthData}
                                         margin={{
                                             top: 5,
                                             right: 5,
@@ -2552,19 +2037,13 @@ function Forecasting() {
                                     >
                                         <CartesianGrid
                                             stroke="#1e293b"
-                                            vertical={
-                                                false
-                                            }
+                                            vertical={false}
                                         />
 
                                         <XAxis
                                             dataKey="label"
-                                            axisLine={
-                                                false
-                                            }
-                                            tickLine={
-                                                false
-                                            }
+                                            axisLine={false}
+                                            tickLine={false}
                                             tick={{
                                                 fill: "#64748b",
                                                 fontSize: 9,
@@ -2572,29 +2051,19 @@ function Forecasting() {
                                         />
 
                                         <YAxis
-                                            axisLine={
-                                                false
-                                            }
-                                            tickLine={
-                                                false
-                                            }
+                                            axisLine={false}
+                                            tickLine={false}
                                             tick={{
                                                 fill: "#64748b",
                                                 fontSize: 10,
                                             }}
-                                            tickFormatter={(
-                                                v,
-                                            ) =>
-                                                `${v}%`
-                                            }
+                                            tickFormatter={(v) => `${v}%`}
                                         />
 
                                         <Tooltip
                                             content={
                                                 <PercentChangeTooltip
-                                                    forecastType={
-                                                        forecastType
-                                                    }
+                                                    forecastType={forecastType}
                                                 />
                                             }
                                         />
@@ -2603,9 +2072,7 @@ function Forecasting() {
                                             type="monotone"
                                             dataKey="change"
                                             stroke="#facc15"
-                                            strokeWidth={
-                                                2
-                                            }
+                                            strokeWidth={2}
                                             dot={{
                                                 r: 3,
                                                 fill: "#facc15",
@@ -2616,11 +2083,8 @@ function Forecasting() {
                             )}
                         </div>
 
-                        <div className="mt-auto border-t border-slate-800 pt-3 text-center text-[10px] text-slate-600">
-                            {
-                                monthOverMonthData.length
-                            }{" "}
-                            forecast periods
+                        <div className="mt-auto border-t border-gray-200 dark:border-slate-800 pt-3 text-center text-[10px] text-slate-600">
+                            {monthOverMonthData.length} forecast periods
                         </div>
                     </div>
 
@@ -2628,46 +2092,43 @@ function Forecasting() {
                     STATIC FORECAST NOTES
                     ================================================= */}
 
-                    <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                        <h3 className="mb-4 flex items-center gap-2 text-xs font-black text-white">
+                    <div className="flex flex-col rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                        <h3 className="mb-4 flex items-center gap-2 text-xs font-black text-gray-900 dark:text-white">
                             <Lightbulb
                                 size={14}
-                                className="text-yellow-400"
+                                className="text-yellow-600 dark:text-yellow-400"
                             />
-
                             Forecast Notes
                         </h3>
 
-                        <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                        <div className="flex-1 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-4">
                             <div className="flex items-start gap-3">
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-400/10 text-yellow-400">
-                                    <BarChart3
-                                        size={
-                                            15
-                                        }
-                                    />
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
+                                    <BarChart3 size={15} />
                                 </div>
 
                                 <div>
-                                    <p className="text-xs font-semibold text-white">
+                                    <p className="text-xs font-semibold text-gray-900 dark:text-white">
                                         Forecasting Overview
                                     </p>
 
-                                    <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
-                                        Forecast results are generated from historical
-                                        ALIBATON records and are intended to help identify
-                                        future trends and support planning.
+                                    <p className="mt-1.5 text-[11px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                        Forecast results are generated from
+                                        historical ALIBATON records and are
+                                        intended to help identify future trends
+                                        and support planning.
                                     </p>
 
-                                    <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-                                        Forecast accuracy may improve as more completed
-                                        historical transactions are recorded in the system.
+                                    <p className="mt-3 text-[11px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                        Forecast accuracy may improve as more
+                                        completed historical transactions are
+                                        recorded in the system.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="mt-4 border-t border-slate-800 pt-3 text-center text-[10px] text-slate-600">
+                        <div className="mt-4 border-t border-gray-200 dark:border-slate-800 pt-3 text-center text-[10px] text-slate-600">
                             Based on available historical records
                         </div>
                     </div>
@@ -2677,49 +2138,41 @@ function Forecasting() {
                 DATABASE STATUS
                 ==================================================== */}
 
-                <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-xl">
+                <div className="mt-5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xl">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2">
                             <div
                                 className={`flex h-6 w-6 items-center justify-center rounded-full ${
                                     dataQuality.has_sufficient_history
-                                        ? "bg-emerald-400/10 text-emerald-400"
-                                        : "bg-amber-400/10 text-amber-400"
+                                        ? "bg-emerald-400/10 text-emerald-600 dark:text-emerald-400"
+                                        : "bg-amber-400/10 text-amber-600 dark:text-amber-400"
                                 }`}
                             >
-                                <CheckCircle2
-                                    size={13}
-                                />
+                                <CheckCircle2 size={13} />
                             </div>
 
                             <div>
-                                <p className="text-[11px] font-semibold text-white">
+                                <p className="text-[11px] font-semibold text-gray-900 dark:text-white">
                                     {loading
                                         ? "Updating system data..."
                                         : "Connected to ALIBATON live database"}
                                 </p>
 
-                                <p className="text-[10px] text-slate-500">
-                                    {
-                                        dataQuality.message
-                                    }
+                                <p className="text-[10px] text-gray-500 dark:text-slate-500">
+                                    {dataQuality.message}
                                 </p>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-3 text-[9px] text-slate-600">
-                            <span>
-                                Source: Live DB
-                            </span>
+                            <span>Source: Live DB</span>
 
                             <span>
                                 Last generated:{" "}
                                 {forecastData.generated_at
                                     ? new Date(
                                           forecastData.generated_at,
-                                      ).toLocaleString(
-                                          "en-PH",
-                                      )
+                                      ).toLocaleString("en-PH")
                                     : "—"}
                             </span>
                         </div>
@@ -2734,13 +2187,6 @@ function Forecasting() {
 | LAYOUT
 ============================================================ */
 
-Forecasting.layout = (
-    page: React.ReactNode,
-) => (
-    <UserLayout>
-        {page}
-    </UserLayout>
-);
+Forecasting.layout = (page: React.ReactNode) => <UserLayout>{page}</UserLayout>;
 
 export default Forecasting;
-

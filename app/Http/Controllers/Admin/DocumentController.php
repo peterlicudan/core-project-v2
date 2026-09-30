@@ -8,9 +8,11 @@ use App\Models\DocumentAccessRequest;
 use App\Models\DocumentAttachment;
 use App\Models\User;
 use App\Notifications\DocumentAccessRequested;
+use App\Notifications\DocumentAssignedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use ZipArchive;
@@ -352,6 +354,9 @@ class DocumentController extends Controller
             return back()->with('error', 'The document record could not be created.');
         }
 
+        // ✅ NOTIFY: Send notification sa assigned staff / all staff
+        $this->notifyStaffAboutDocument($document);
+
         $category = $validated['document_type'] === 'company' ? 'Company' : 'Client';
         $locked = ($validated['is_locked'] ?? false) ? ' (Locked)' : '';
         $count = count($storedFiles);
@@ -368,6 +373,44 @@ class DocumentController extends Controller
             'success',
             "{$category} document ({$fileText}) uploaded successfully and is available to all staff.{$locked}"
         );
+    }
+
+    /**
+     * ============================================================
+     * HELPER — Notify staff about newly uploaded document
+     * ============================================================
+     */
+    private function notifyStaffAboutDocument(Document $document): void
+    {
+        try {
+            // 1️⃣ Kung may specific assignee → notify lang yung staff
+            if ($document->assigned_to) {
+                $staff = User::find($document->assigned_to);
+
+                if ($staff && $staff->role === 'staff') {
+                    $staff->notify(
+                        new DocumentAssignedNotification($document)
+                    );
+                }
+
+                return;
+            }
+
+            // 2️⃣ Kung company document at walang assignee → notify lahat ng staff
+            if ($document->document_type === 'company') {
+                $allStaff = User::query()
+                    ->where('role', 'staff')
+                    ->get();
+
+                foreach ($allStaff as $staff) {
+                    $staff->notify(
+                        new DocumentAssignedNotification($document)
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('Document notification failed: ' . $e->getMessage());
+        }
     }
 
     /**

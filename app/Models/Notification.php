@@ -21,7 +21,8 @@ class Notification extends Model
     ];
 
     protected $casts = [
-        'data' => 'array',
+        // ✅ REMOVED: 'data' => 'array' — kasi may manual json_encode() sa controllers
+        // Kung naka-cast as array, nag-do-doble yung encoding
         'read_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -33,6 +34,28 @@ class Notification extends Model
     public function notifiable()
     {
         return $this->morphTo();
+    }
+
+    /**
+     * ✅ HELPER: Get decoded data as array
+     *
+     * Gamitin ito sa controllers para consistent:
+     * $data = $notification->decoded_data;
+     */
+    public function getDecodedDataAttribute(): array
+    {
+        $data = $this->data;
+
+        if (is_array($data)) {
+            return $data;
+        }
+
+        if (is_string($data)) {
+            $decoded = json_decode($data, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 
     /**

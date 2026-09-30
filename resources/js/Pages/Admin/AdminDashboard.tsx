@@ -174,7 +174,7 @@ function getStatusClass(status: unknown) {
         normalized.includes("verified") ||
         normalized.includes("compliant")
     ) {
-        return "border-green-400/15 bg-green-400/10 text-green-300";
+        return "border-green-400/15 bg-green-400/10 text-green-700 dark:text-green-300";
     }
     if (
         normalized.includes("pending") ||
@@ -184,7 +184,7 @@ function getStatusClass(status: unknown) {
         normalized.includes("submitted") ||
         normalized.includes("review")
     ) {
-        return "border-yellow-400/15 bg-yellow-400/10 text-yellow-300";
+        return "border-yellow-400/15 bg-yellow-400/10 text-yellow-700 dark:text-yellow-300";
     }
     if (
         normalized.includes("reject") ||
@@ -193,9 +193,9 @@ function getStatusClass(status: unknown) {
         normalized.includes("non compliant") ||
         normalized.includes("non-compliant")
     ) {
-        return "border-red-400/15 bg-red-400/10 text-red-300";
+        return "border-red-400/15 bg-red-400/10 text-red-700 dark:text-red-300";
     }
-    return "border-white/10 bg-white/5 text-white/45";
+    return "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-500 dark:text-white/45";
 }
 
 /*
@@ -278,8 +278,8 @@ function RecordsListBody({
 }) {
     if (records.length === 0) {
         return (
-            <div className="m-2 rounded-lg border border-dashed border-white/10 bg-white/[0.015] px-3 py-3 text-center">
-                <p className="text-[10px] text-white/35">
+            <div className="m-2 rounded-lg border border-dashed border-gray-200 dark:border-white/10 bg-white/[0.015] px-3 py-3 text-center">
+                <p className="text-[10px] text-gray-500 dark:text-white/35">
                     No underlying records available
                 </p>
             </div>
@@ -294,14 +294,14 @@ function RecordsListBody({
             {records.map((record, index) => (
                 <div
                     key={`${record.id}-${index}`}
-                    className="rounded-lg border border-white/[0.05] bg-white/[0.02] px-2 py-1.5 transition hover:border-white/10 hover:bg-white/[0.04]"
+                    className="rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-2 py-1.5 transition hover:border-gray-200 dark:hover:border-white/10 hover:bg-white dark:hover:bg-white/[0.04]"
                 >
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-[10px] font-bold text-white/85">
+                            <p className="truncate text-[10px] font-bold text-gray-600 dark:text-white/85">
                                 {getRecordTitle(moduleKey, record)}
                             </p>
-                            <p className="truncate text-[8px] text-white/35">
+                            <p className="truncate text-[8px] text-gray-500 dark:text-white/35">
                                 {getRecordSubtitle(moduleKey, record)}
                             </p>
                         </div>
@@ -317,7 +317,7 @@ function RecordsListBody({
                     </div>
 
                     {(record.amount != null || record.created_at) && (
-                        <div className="mt-1 flex items-center justify-between gap-2 text-[8px] text-white/30">
+                        <div className="mt-1 flex items-center justify-between gap-2 text-[8px] text-gray-400 dark:text-white/30">
                             <span className="truncate">
                                 {record.amount != null
                                     ? formatCurrency(record.amount)
@@ -406,7 +406,7 @@ function RichTooltip({
 
     return (
         <div
-            className="pointer-events-auto fixed z-[300] w-[300px] overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0b]/98 shadow-2xl backdrop-blur-xl sm:w-[320px]"
+            className="pointer-events-auto fixed z-[300] w-[300px] overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b]/98 shadow-2xl backdrop-blur-xl sm:w-[320px]"
             style={
                 left !== undefined && top !== undefined
                     ? { left, top }
@@ -416,10 +416,10 @@ function RichTooltip({
             {/* HEADER */}
             <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[10px] font-black uppercase tracking-wider text-yellow-400">
+                    <p className="truncate text-[10px] font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
                         {label || point.name || "Data"}
                     </p>
-                    <p className="mt-0.5 text-[9px] text-white/35">
+                    <p className="mt-0.5 text-[9px] text-gray-500 dark:text-white/35">
                         {records.length > 0
                             ? `${records.length} record${
                                   records.length !== 1 ? "s" : ""
@@ -428,7 +428,7 @@ function RichTooltip({
                     </p>
                 </div>
                 <div className="rounded-md border border-yellow-400/20 bg-yellow-400/10 px-2 py-1">
-                    <span className="text-[11px] font-black text-yellow-300">
+                    <span className="text-[11px] font-black text-yellow-700 dark:text-yellow-300">
                         {formatNumber(total)}
                     </span>
                 </div>
@@ -438,7 +438,7 @@ function RichTooltip({
 
             {/* FOOTER HINT */}
             <div className="border-t border-white/[0.07] px-3 py-1.5 text-center">
-                <p className="text-[8px] font-bold uppercase tracking-wider text-white/25">
+                <p className="text-[8px] font-bold uppercase tracking-wider text-gray-400 dark:text-white/25">
                     Click the chart point to pin 📌
                 </p>
             </div>
@@ -476,19 +476,19 @@ function PinnedRecordsPanel({
 
     return (
         <div
-            className={`absolute z-40 w-[300px] overflow-hidden rounded-xl border border-yellow-400/40 bg-[#0b0b0b]/98 shadow-2xl ring-2 ring-yellow-400/20 backdrop-blur-xl sm:w-[320px] ${positionClass}`}
+            className={`absolute z-40 w-[300px] overflow-hidden rounded-xl border border-yellow-400/40 bg-white dark:bg-[#0b0b0b]/98 shadow-2xl ring-2 ring-yellow-400/20 backdrop-blur-xl sm:w-[320px] ${positionClass}`}
             onMouseDown={(e) => e.stopPropagation()}
         >
             {/* HEADER */}
             <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] px-3 py-2">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                        <Pin className="h-2.5 w-2.5 shrink-0 text-yellow-400" />
-                        <p className="truncate text-[10px] font-black uppercase tracking-wider text-yellow-400">
+                        <Pin className="h-2.5 w-2.5 shrink-0 text-yellow-600 dark:text-yellow-400" />
+                        <p className="truncate text-[10px] font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
                             {label || "Data"}
                         </p>
                     </div>
-                    <p className="mt-0.5 text-[9px] text-white/35">
+                    <p className="mt-0.5 text-[9px] text-gray-500 dark:text-white/35">
                         {records.length} record
                         {records.length !== 1 ? "s" : ""} · pinned
                     </p>
@@ -496,7 +496,7 @@ function PinnedRecordsPanel({
 
                 <div className="flex shrink-0 items-center gap-1">
                     <div className="rounded-md border border-yellow-400/20 bg-yellow-400/10 px-2 py-1">
-                        <span className="text-[11px] font-black text-yellow-300">
+                        <span className="text-[11px] font-black text-yellow-700 dark:text-yellow-300">
                             {formatNumber(total)}
                         </span>
                     </div>
@@ -506,7 +506,7 @@ function PinnedRecordsPanel({
                             e.stopPropagation();
                             onClose();
                         }}
-                        className="flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/50 transition hover:border-red-400/30 hover:bg-red-400/10 hover:text-red-300"
+                        className="flex h-6 w-6 items-center justify-center rounded-md border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-gray-500 dark:text-white/50 transition hover:border-red-400/30 hover:bg-red-400/10 hover:text-red-700 dark:hover:text-red-300"
                         title="Unpin (Esc)"
                     >
                         <X className="h-3 w-3" />
@@ -518,7 +518,7 @@ function PinnedRecordsPanel({
 
             {/* FOOTER HINT */}
             <div className="border-t border-white/[0.07] px-3 py-1.5 text-center">
-                <p className="text-[8px] font-bold uppercase tracking-wider text-yellow-400/70">
+                <p className="text-[8px] font-bold uppercase tracking-wider text-yellow-600/70 dark:text-yellow-400/70">
                     📌 Pinned — click ✕ or press Esc to unpin
                 </p>
             </div>
@@ -824,7 +824,7 @@ function ModuleChart({
                                 verticalAlign="bottom"
                                 iconType="circle"
                                 formatter={(value) => (
-                                    <span className="text-[9px] text-white/50">
+                                    <span className="text-[9px] text-gray-500 dark:text-white/50">
                                         {value}
                                     </span>
                                 )}
@@ -1301,16 +1301,16 @@ function CompactRecordRow({
 }) {
     if (module === "staff" || module === "clients") {
         return (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-white/80">
+                    <p className="truncate text-[11px] font-bold text-gray-600 dark:text-white/80">
                         {record.name || "Unnamed"}
                     </p>
-                    <p className="truncate text-[9px] text-white/30">
+                    <p className="truncate text-[9px] text-gray-400 dark:text-white/30">
                         {record.email || "No email"}
                     </p>
                 </div>
-                <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-white/35">
+                <span className="shrink-0 rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-white/35">
                     {normalizeStatus(record.role)}
                 </span>
             </div>
@@ -1319,12 +1319,12 @@ function CompactRecordRow({
 
     if (module === "invoices") {
         return (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-white/80">
+                    <p className="truncate text-[11px] font-bold text-gray-600 dark:text-white/80">
                         {record.number || `Invoice #${record.id}`}
                     </p>
-                    <p className="truncate text-[9px] text-white/30">
+                    <p className="truncate text-[9px] text-gray-400 dark:text-white/30">
                         {record.client || "No client"}
                     </p>
                 </div>
@@ -1336,7 +1336,7 @@ function CompactRecordRow({
                     >
                         {normalizeStatus(record.status)}
                     </span>
-                    <span className="text-[10px] font-black text-yellow-300">
+                    <span className="text-[10px] font-black text-yellow-700 dark:text-yellow-300">
                         {formatCurrency(record.amount)}
                     </span>
                 </div>
@@ -1346,12 +1346,12 @@ function CompactRecordRow({
 
     if (module === "payments") {
         return (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-white/80">
+                    <p className="truncate text-[11px] font-bold text-gray-600 dark:text-white/80">
                         {record.receipt_number || `Payment #${record.id}`}
                     </p>
-                    <p className="truncate text-[9px] text-white/30">
+                    <p className="truncate text-[9px] text-gray-400 dark:text-white/30">
                         {record.client || "No client"}
                     </p>
                 </div>
@@ -1363,7 +1363,7 @@ function CompactRecordRow({
                     >
                         {normalizeStatus(record.status)}
                     </span>
-                    <span className="text-[10px] font-black text-yellow-300">
+                    <span className="text-[10px] font-black text-yellow-700 dark:text-yellow-300">
                         {formatCurrency(record.amount)}
                     </span>
                 </div>
@@ -1373,12 +1373,12 @@ function CompactRecordRow({
 
     if (module === "job_orders") {
         return (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-white/80">
+                    <p className="truncate text-[11px] font-bold text-gray-600 dark:text-white/80">
                         {record.number || `Job Order #${record.id}`}
                     </p>
-                    <p className="truncate text-[9px] text-white/30">
+                    <p className="truncate text-[9px] text-gray-400 dark:text-white/30">
                         {record.client || "No client"}
                     </p>
                 </div>
@@ -1390,7 +1390,7 @@ function CompactRecordRow({
                     >
                         {normalizeStatus(record.status)}
                     </span>
-                    <span className="text-[10px] font-black text-yellow-300">
+                    <span className="text-[10px] font-black text-yellow-700 dark:text-yellow-300">
                         {formatCurrency(record.amount)}
                     </span>
                 </div>
@@ -1400,14 +1400,14 @@ function CompactRecordRow({
 
     if (module === "contracts" || module === "contract_permits") {
         return (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-white/80">
+                    <p className="truncate text-[11px] font-bold text-gray-600 dark:text-white/80">
                         {record.contract_no ||
                             record.number ||
                             `Record #${record.id}`}
                     </p>
-                    <p className="truncate text-[9px] text-white/30">
+                    <p className="truncate text-[9px] text-gray-400 dark:text-white/30">
                         {record.client || "No client"}
                     </p>
                 </div>
@@ -1426,14 +1426,14 @@ function CompactRecordRow({
 
     if (module === "documents") {
         return (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-white/80">
+                    <p className="truncate text-[11px] font-bold text-gray-600 dark:text-white/80">
                         {record.title ||
                             record.file_name ||
                             `Document #${record.id}`}
                     </p>
-                    <p className="truncate text-[9px] text-white/30">
+                    <p className="truncate text-[9px] text-gray-400 dark:text-white/30">
                         {record.file_name || "No file name"}
                     </p>
                 </div>
@@ -1450,12 +1450,12 @@ function CompactRecordRow({
 
     if (module === "compliance") {
         return (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white dark:bg-white/[0.02] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-bold text-white/80">
+                    <p className="truncate text-[11px] font-bold text-gray-600 dark:text-white/80">
                         {record.title || `Compliance #${record.id}`}
                     </p>
-                    <p className="truncate text-[9px] text-white/30">
+                    <p className="truncate text-[9px] text-gray-400 dark:text-white/30">
                         {record.type || "Compliance record"}
                     </p>
                 </div>
@@ -1517,18 +1517,18 @@ function ModuleDetails({
                 }
             }}
         >
-            <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-visible rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl shadow-black/50">
+            <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-visible rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b] shadow-2xl shadow-black/50">
                 {/* HEADER */}
                 <div className="flex shrink-0 items-center justify-between rounded-t-3xl border-b border-white/[0.07] px-4 py-3 sm:px-5">
                     <div className="flex min-w-0 items-center gap-2.5">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10">
-                            <Icon className="h-4 w-4 text-yellow-400" />
+                            <Icon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-yellow-400">
+                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-yellow-600 dark:text-yellow-400">
                                 Database Records
                             </p>
-                            <h2 className="truncate text-sm font-black text-white sm:text-base">
+                            <h2 className="truncate text-sm font-black text-gray-900 dark:text-white sm:text-base">
                                 {selectedModule.label}
                             </h2>
                         </div>
@@ -1536,7 +1536,7 @@ function ModuleDetails({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/45 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-500 dark:text-white/45 transition hover:border-gray-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white"
                     >
                         <X className="h-3.5 w-3.5" />
                     </button>
@@ -1548,21 +1548,21 @@ function ModuleDetails({
                         {/* LEFT — DATA */}
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
-                                <div className="rounded-lg border border-white/[0.06] bg-white/[0.025] p-2.5">
-                                    <p className="text-[8px] font-black uppercase tracking-wider text-white/25">
+                                <div className="rounded-lg border border-white/[0.06] bg-white dark:bg-white/[0.025] p-2.5">
+                                    <p className="text-[8px] font-black uppercase tracking-wider text-gray-400 dark:text-white/25">
                                         Total
                                     </p>
-                                    <p className="mt-0.5 text-lg font-black text-white">
+                                    <p className="mt-0.5 text-lg font-black text-gray-900 dark:text-white">
                                         {formatNumber(selectedModule.count)}
                                     </p>
                                 </div>
 
                                 {selectedModule.key === "staff" && (
                                     <div className="rounded-lg border border-green-400/10 bg-green-400/[0.025] p-2.5">
-                                        <p className="text-[8px] font-black uppercase tracking-wider text-green-400/60">
+                                        <p className="text-[8px] font-black uppercase tracking-wider text-green-600/60 dark:text-green-400/60">
                                             Online
                                         </p>
-                                        <p className="mt-0.5 text-lg font-black text-green-300">
+                                        <p className="mt-0.5 text-lg font-black text-green-700 dark:text-green-300">
                                             {formatNumber(stats.online_staff)}
                                         </p>
                                     </div>
@@ -1570,10 +1570,10 @@ function ModuleDetails({
 
                                 {selectedModule.key === "invoices" && (
                                     <div className="rounded-lg border border-yellow-400/10 bg-yellow-400/[0.025] p-2.5">
-                                        <p className="text-[8px] font-black uppercase tracking-wider text-yellow-400/60">
+                                        <p className="text-[8px] font-black uppercase tracking-wider text-yellow-600/60 dark:text-yellow-400/60">
                                             Value
                                         </p>
-                                        <p className="mt-0.5 truncate text-sm font-black text-yellow-300">
+                                        <p className="mt-0.5 truncate text-sm font-black text-yellow-700 dark:text-yellow-300">
                                             {formatCurrency(stats.invoice_total)}
                                         </p>
                                     </div>
@@ -1581,10 +1581,10 @@ function ModuleDetails({
 
                                 {selectedModule.key === "payments" && (
                                     <div className="rounded-lg border border-yellow-400/10 bg-yellow-400/[0.025] p-2.5">
-                                        <p className="text-[8px] font-black uppercase tracking-wider text-yellow-400/60">
+                                        <p className="text-[8px] font-black uppercase tracking-wider text-yellow-600/60 dark:text-yellow-400/60">
                                             Value
                                         </p>
-                                        <p className="mt-0.5 truncate text-sm font-black text-yellow-300">
+                                        <p className="mt-0.5 truncate text-sm font-black text-yellow-700 dark:text-yellow-300">
                                             {formatCurrency(stats.payment_total)}
                                         </p>
                                     </div>
@@ -1592,10 +1592,10 @@ function ModuleDetails({
 
                                 {selectedModule.key === "documents" && (
                                     <div className="rounded-lg border border-red-400/10 bg-red-400/[0.025] p-2.5">
-                                        <p className="text-[8px] font-black uppercase tracking-wider text-red-400/60">
+                                        <p className="text-[8px] font-black uppercase tracking-wider text-red-600/60 dark:text-red-400/60">
                                             Expired
                                         </p>
-                                        <p className="mt-0.5 text-lg font-black text-red-300">
+                                        <p className="mt-0.5 text-lg font-black text-red-700 dark:text-red-300">
                                             {formatNumber(
                                                 stats.expired_documents,
                                             )}
@@ -1605,10 +1605,10 @@ function ModuleDetails({
 
                                 {selectedModule.key === "compliance" && (
                                     <div className="rounded-lg border border-red-400/10 bg-red-400/[0.025] p-2.5">
-                                        <p className="text-[8px] font-black uppercase tracking-wider text-red-400/60">
+                                        <p className="text-[8px] font-black uppercase tracking-wider text-red-600/60 dark:text-red-400/60">
                                             Overdue
                                         </p>
-                                        <p className="mt-0.5 text-lg font-black text-red-300">
+                                        <p className="mt-0.5 text-lg font-black text-red-700 dark:text-red-300">
                                             {formatNumber(
                                                 stats.overdue_compliance,
                                             )}
@@ -1619,20 +1619,20 @@ function ModuleDetails({
 
                             <div>
                                 <div className="mb-1.5 flex items-center justify-between">
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-white/40">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-white/40">
                                         Records ({records.length})
                                     </p>
                                     {records.length > 5 && (
-                                        <p className="text-[9px] text-white/25">
+                                        <p className="text-[9px] text-gray-400 dark:text-white/25">
                                             Showing 5 of {records.length}
                                         </p>
                                     )}
                                 </div>
 
                                 {visibleRecords.length === 0 ? (
-                                    <div className="flex min-h-[80px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.015] px-4 text-center">
-                                        <FolderOpen className="h-4 w-4 text-white/25" />
-                                        <p className="mt-1.5 text-[10px] font-bold text-white/50">
+                                    <div className="flex min-h-[80px] flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 dark:border-white/10 bg-white/[0.015] px-4 text-center">
+                                        <FolderOpen className="h-4 w-4 text-gray-400 dark:text-white/25" />
+                                        <p className="mt-1.5 text-[10px] font-bold text-gray-500 dark:text-white/50">
                                             No records
                                         </p>
                                     </div>
@@ -1655,19 +1655,19 @@ function ModuleDetails({
                         {/* RIGHT — CHART */}
                         <div>
                             <div className="mb-1.5 flex items-center gap-1.5">
-                                <BarChart3 className="h-3.5 w-3.5 text-yellow-400" />
-                                <p className="text-[9px] font-black uppercase tracking-wider text-white/40">
+                                <BarChart3 className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
+                                <p className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-white/40">
                                     {chartTitle[selectedModule.key]}
                                 </p>
                             </div>
-                            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5">
+                            <div className="rounded-lg border border-white/[0.06] bg-white dark:bg-white/[0.02] p-2.5">
                                 <ModuleChart
                                     moduleKey={selectedModule.key}
                                     records={records}
                                     stats={stats}
                                 />
                             </div>
-                            <p className="mt-2 text-center text-[9px] text-white/25">
+                            <p className="mt-2 text-center text-[9px] text-gray-400 dark:text-white/25">
                                 💡 Hover to preview · Click a point to pin the
                                 records list here
                             </p>
@@ -1677,14 +1677,14 @@ function ModuleDetails({
 
                 {/* FOOTER */}
                 <div className="flex shrink-0 items-center justify-between gap-3 rounded-b-3xl border-t border-white/[0.07] px-4 py-2.5">
-                    <p className="text-[9px] text-white/25">
+                    <p className="text-[9px] text-gray-400 dark:text-white/25">
                         Showing {visibleRecords.length} of{" "}
                         {formatNumber(selectedModule.count)} records
                     </p>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-bold text-white/55 transition hover:border-yellow-400/20 hover:bg-yellow-400/[0.05] hover:text-white"
+                        className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] px-3 py-1.5 text-[10px] font-bold text-gray-500 dark:text-white/55 transition hover:border-yellow-400/20 hover:bg-yellow-400/[0.05] hover:text-gray-900 dark:hover:text-white"
                     >
                         Close
                     </button>
@@ -1713,22 +1713,22 @@ function StatCard({
         <button
             type="button"
             onClick={onClick}
-            className="group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3.5 text-left shadow-xl shadow-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:border-yellow-400/25 hover:bg-yellow-400/[0.035] focus:outline-none focus:ring-2 focus:ring-yellow-400/30 sm:p-4"
+            className="group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-white dark:bg-white/[0.025] p-3.5 text-left shadow-xl shadow-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:border-yellow-400/25 hover:bg-yellow-400/[0.035] focus:outline-none focus:ring-2 focus:ring-yellow-400/30 sm:p-4"
         >
             <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-yellow-400/[0.045] blur-3xl transition group-hover:bg-yellow-400/[0.09]" />
             <div className="relative flex items-start justify-between gap-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-yellow-400/10 bg-yellow-400/[0.08]">
-                    <Icon className="h-4 w-4 text-yellow-400" />
+                    <Icon className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
-                <ChevronRight className="h-4 w-4 text-white/15 transition group-hover:translate-x-0.5 group-hover:text-yellow-400/60" />
+                <ChevronRight className="h-4 w-4 text-gray-400 dark:text-white/15 transition group-hover:translate-x-0.5 group-hover:text-yellow-600/60 dark:group-hover:text-yellow-400/60" />
             </div>
-            <p className="relative mt-4 truncate text-[9px] font-black uppercase tracking-[0.14em] text-white/30">
+            <p className="relative mt-4 truncate text-[9px] font-black uppercase tracking-[0.14em] text-gray-400 dark:text-white/30">
                 {module.shortLabel}
             </p>
-            <p className="relative mt-1 truncate text-2xl font-black tracking-tight text-white">
+            <p className="relative mt-1 truncate text-2xl font-black tracking-tight text-gray-900 dark:text-white">
                 {formatNumber(module.count)}
             </p>
-            <p className="relative mt-1 truncate text-[10px] text-white/25">
+            <p className="relative mt-1 truncate text-[10px] text-gray-400 dark:text-white/25">
                 {module.description}
             </p>
         </button>
@@ -1755,17 +1755,17 @@ function ActivityRow({
     return (
         <div className="flex items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.018] p-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10">
-                <Icon className="h-3.5 w-3.5 text-yellow-400" />
+                <Icon className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
             </div>
             <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-white/70">
+                <p className="truncate text-xs font-bold text-gray-600 dark:text-white/70">
                     {title}
                 </p>
-                <p className="mt-0.5 truncate text-[9px] text-white/25">
+                <p className="mt-0.5 truncate text-[9px] text-gray-400 dark:text-white/25">
                     {type}
                 </p>
             </div>
-            <span className="shrink-0 text-[9px] text-white/20">{date}</span>
+            <span className="shrink-0 text-[9px] text-gray-400 dark:text-white/20">{date}</span>
         </div>
     );
 }
@@ -1788,17 +1788,17 @@ function DashboardAreaChart({ data }: { data: any[] }) {
     return (
         <div
             ref={containerRef}
-            className="relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5"
+            className="relative rounded-3xl border border-white/[0.08] bg-white dark:bg-white/[0.02] p-4 sm:p-5"
         >
             <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10">
-                    <BarChart3 className="h-4 w-4 text-yellow-400" />
+                    <BarChart3 className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
-                    <h2 className="text-sm font-black text-white">
+                    <h2 className="text-sm font-black text-gray-900 dark:text-white">
                         Database Records
                     </h2>
-                    <p className="mt-0.5 text-[10px] text-white/25">
+                    <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
                         Hover a point to preview · click to pin
                     </p>
                 </div>
@@ -1934,17 +1934,17 @@ function ModuleDistributionPie({
     return (
         <div
             ref={containerRef}
-            className="relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5"
+            className="relative rounded-3xl border border-white/[0.08] bg-white dark:bg-white/[0.02] p-4 sm:p-5"
         >
             <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10">
-                    <Activity className="h-4 w-4 text-yellow-400" />
+                    <Activity className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
-                    <h2 className="text-sm font-black text-white">
+                    <h2 className="text-sm font-black text-gray-900 dark:text-white">
                         Module Distribution
                     </h2>
-                    <p className="mt-0.5 text-[10px] text-white/25">
+                    <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
                         Hover a slice — click to pin
                     </p>
                 </div>
@@ -2001,7 +2001,7 @@ function ModuleDistributionPie({
                             verticalAlign="bottom"
                             iconType="circle"
                             formatter={(value) => (
-                                <span className="text-[9px] text-white/40">
+                                <span className="text-[9px] text-gray-500 dark:text-white/40">
                                     {value}
                                 </span>
                             )}
@@ -2009,10 +2009,10 @@ function ModuleDistributionPie({
                     </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 text-center">
-                    <p className="text-2xl font-black text-white">
+                    <p className="text-2xl font-black text-gray-900 dark:text-white">
                         {formatNumber(totalRecords)}
                     </p>
-                    <p className="text-[8px] font-black uppercase tracking-wider text-white/20">
+                    <p className="text-[8px] font-black uppercase tracking-wider text-gray-400 dark:text-white/20">
                         Records
                     </p>
                 </div>
@@ -2058,17 +2058,17 @@ function StatusBreakdownChart({ data }: { data: any[] }) {
     return (
         <div
             ref={containerRef}
-            className="relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5"
+            className="relative rounded-3xl border border-white/[0.08] bg-white dark:bg-white/[0.02] p-4 sm:p-5"
         >
             <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10">
-                    <TrendingUp className="h-4 w-4 text-yellow-400" />
+                    <TrendingUp className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
-                    <h2 className="text-sm font-black text-white">
+                    <h2 className="text-sm font-black text-gray-900 dark:text-white">
                         Status Breakdown
                     </h2>
-                    <p className="mt-0.5 text-[10px] text-white/25">
+                    <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
                         Paid vs Overdue vs Valid vs Expired — hover to inspect,
                         click to pin
                     </p>
@@ -2217,17 +2217,17 @@ function ModuleProgressRadial({ data }: { data: any[] }) {
     return (
         <div
             ref={containerRef}
-            className="relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5"
+            className="relative rounded-3xl border border-white/[0.08] bg-white dark:bg-white/[0.02] p-4 sm:p-5"
         >
             <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10">
-                    <Activity className="h-4 w-4 text-yellow-400" />
+                    <Activity className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
-                    <h2 className="text-sm font-black text-white">
+                    <h2 className="text-sm font-black text-gray-900 dark:text-white">
                         Module Progress
                     </h2>
-                    <p className="mt-0.5 text-[10px] text-white/25">
+                    <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
                         Radial view per module — hover to see records, click to
                         pin
                     </p>
@@ -2315,17 +2315,17 @@ function ComplianceRadial({ data }: { data: any[] }) {
     return (
         <div
             ref={containerRef}
-            className="relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5"
+            className="relative rounded-3xl border border-white/[0.08] bg-white dark:bg-white/[0.02] p-4 sm:p-5"
         >
             <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10">
-                    <ShieldCheck className="h-4 w-4 text-yellow-400" />
+                    <ShieldCheck className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
-                    <h2 className="text-sm font-black text-white">
+                    <h2 className="text-sm font-black text-gray-900 dark:text-white">
                         Compliance Health
                     </h2>
-                    <p className="mt-0.5 text-[10px] text-white/25">
+                    <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
                         Compliant vs Overdue — hover to inspect, click to pin
                     </p>
                 </div>
@@ -2856,14 +2856,14 @@ export default function AdminDashboard() {
                             <div className="min-w-0">
                                 <div className="mb-2 flex items-center gap-2">
                                     <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.9)]" />
-                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-yellow-400 sm:text-[10px]">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-yellow-600 dark:text-yellow-400 sm:text-[10px]">
                                         ALIBATON Administration
                                     </p>
                                 </div>
-                                <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+                                <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white sm:text-4xl">
                                     Admin Dashboard
                                 </h1>
-                                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-white/30 sm:text-sm">
+                                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-gray-400 dark:text-white/30 sm:text-sm">
                                     Centralized database overview for ALIBATON
                                     Heavy Equipment & Logistics. Hover any
                                     chart to preview records — click a point to
@@ -2876,18 +2876,18 @@ export default function AdminDashboard() {
 
                     {/* TOP SUMMARY */}
                     <section className="mb-5 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+                        <div className="rounded-2xl border border-white/[0.07] bg-white dark:bg-white/[0.02] p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-white/25">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 dark:text-white/25">
                                         Total System Records
                                     </p>
-                                    <p className="mt-1 text-2xl font-black text-white">
+                                    <p className="mt-1 text-2xl font-black text-gray-900 dark:text-white">
                                         {formatNumber(totalRecords)}
                                     </p>
                                 </div>
                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10">
-                                    <Activity className="h-4 w-4 text-yellow-400" />
+                                    <Activity className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                                 </div>
                             </div>
                         </div>
@@ -2895,15 +2895,15 @@ export default function AdminDashboard() {
                         <div className="rounded-2xl border border-green-400/10 bg-green-400/[0.025] p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-green-400/60">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-green-600/60 dark:text-green-400/60">
                                         Online Staff
                                     </p>
-                                    <p className="mt-1 text-2xl font-black text-green-300">
+                                    <p className="mt-1 text-2xl font-black text-green-700 dark:text-green-300">
                                         {formatNumber(safeStats.online_staff)}
                                     </p>
                                 </div>
                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-400/10">
-                                    <Users className="h-4 w-4 text-green-400" />
+                                    <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
                                 </div>
                             </div>
                         </div>
@@ -2911,10 +2911,10 @@ export default function AdminDashboard() {
                         <div className="rounded-2xl border border-red-400/10 bg-red-400/[0.025] p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-red-400/60">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-red-600/60 dark:text-red-400/60">
                                         Attention Required
                                     </p>
-                                    <p className="mt-1 text-2xl font-black text-red-300">
+                                    <p className="mt-1 text-2xl font-black text-red-700 dark:text-red-300">
                                         {formatNumber(
                                             safeStats.overdue_invoices +
                                                 safeStats.expired_documents +
@@ -2923,7 +2923,7 @@ export default function AdminDashboard() {
                                     </p>
                                 </div>
                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-400/10">
-                                    <ShieldCheck className="h-4 w-4 text-red-400" />
+                                    <ShieldCheck className="h-4 w-4 text-red-600 dark:text-red-400" />
                                 </div>
                             </div>
                         </div>
@@ -2933,16 +2933,16 @@ export default function AdminDashboard() {
                     <section>
                         <div className="mb-3 flex items-end justify-between gap-3">
                             <div>
-                                <h2 className="text-sm font-black text-white">
+                                <h2 className="text-sm font-black text-gray-900 dark:text-white">
                                     System Overview
                                 </h2>
-                                <p className="mt-1 text-[10px] text-white/25">
+                                <p className="mt-1 text-[10px] text-gray-400 dark:text-white/25">
                                     Click any module to view its data and chart.
                                     Hover on chart points for records — click to
                                     pin.
                                 </p>
                             </div>
-                            <span className="hidden text-[9px] font-black uppercase tracking-wider text-white/20 sm:block">
+                            <span className="hidden text-[9px] font-black uppercase tracking-wider text-gray-400 dark:text-white/20 sm:block">
                                 {modules.length} Modules
                             </span>
                         </div>
@@ -2979,22 +2979,22 @@ export default function AdminDashboard() {
                     <section className="mt-5 grid gap-5 xl:grid-cols-[1fr_1.25fr]">
                         <ComplianceRadial data={complianceRadial} />
 
-                        <div className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5">
+                        <div className="rounded-3xl border border-white/[0.08] bg-white dark:bg-white/[0.02] p-4 sm:p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10">
-                                        <Clock3 className="h-4 w-4 text-yellow-400" />
+                                        <Clock3 className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                                     </div>
                                     <div>
-                                        <h2 className="text-sm font-black text-white">
+                                        <h2 className="text-sm font-black text-gray-900 dark:text-white">
                                             Recent Activity
                                         </h2>
-                                        <p className="mt-0.5 text-[10px] text-white/25">
+                                        <p className="mt-0.5 text-[10px] text-gray-400 dark:text-white/25">
                                             Latest database records
                                         </p>
                                     </div>
                                 </div>
-                                <Activity className="h-4 w-4 text-white/15" />
+                                <Activity className="h-4 w-4 text-gray-400 dark:text-white/15" />
                             </div>
 
                             <div className="mt-4 max-h-[280px] space-y-2 overflow-y-auto pr-1">
@@ -3006,10 +3006,10 @@ export default function AdminDashboard() {
                                         />
                                     ))
                                 ) : (
-                                    <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-white/10">
+                                    <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
                                         <div className="text-center">
-                                            <Clock3 className="mx-auto h-5 w-5 text-white/15" />
-                                            <p className="mt-2 text-xs font-bold text-white/35">
+                                            <Clock3 className="mx-auto h-5 w-5 text-gray-400 dark:text-white/15" />
+                                            <p className="mt-2 text-xs font-bold text-gray-500 dark:text-white/35">
                                                 No recent activity
                                             </p>
                                         </div>
@@ -3024,13 +3024,13 @@ export default function AdminDashboard() {
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-400/10">
-                                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                                 </div>
                                 <div>
-                                    <p className="text-[11px] font-bold text-white/70">
+                                    <p className="text-[11px] font-bold text-gray-600 dark:text-white/70">
                                         ALIBATON Administration System
                                     </p>
-                                    <p className="mt-0.5 text-[9px] text-white/20">
+                                    <p className="mt-0.5 text-[9px] text-gray-400 dark:text-white/20">
                                         Dashboard values are loaded from the
                                         current database. Hover on charts to
                                         preview records — click to pin.
@@ -3039,7 +3039,7 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="h-1.5 w-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
-                                <span className="text-[9px] font-black uppercase tracking-wider text-green-300">
+                                <span className="text-[9px] font-black uppercase tracking-wider text-green-700 dark:text-green-300">
                                     Operational
                                 </span>
                             </div>

@@ -11,6 +11,7 @@ import React, {
 import { Head } from "@inertiajs/react";
 import UserLayout from "../../Layouts/UserLayout";
 
+
 import {
     AlertTriangle,
     Bot,
@@ -239,6 +240,26 @@ function getCsrfToken(): string {
             .querySelector('meta[name="csrf-token"]')
             ?.getAttribute("content") ?? ""
     );
+}
+
+/*
+|--------------------------------------------------------------------------
+| ✅ Fresh CSRF — XSRF-TOKEN cookie (sine-set ng Laravel sa bawat response)
+|--------------------------------------------------------------------------
+*/
+
+function getXsrfCookieToken(): string {
+    const cookie = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("XSRF-TOKEN="));
+
+    if (!cookie) return "";
+
+    try {
+        return decodeURIComponent(cookie.split("=").slice(1).join("="));
+    } catch {
+        return "";
+    }
 }
 
 function humanizeKey(key: string): string {
@@ -1609,7 +1630,10 @@ export default function Reports() {
                     headers: {
                         "Content-Type": "application/json",
                         Accept: "application/json",
-                        "X-CSRF-TOKEN": getCsrfToken(),
+                        // ✅ Fresh token mula sa cookie; fallback sa meta tag
+                        ...(getXsrfCookieToken()
+                            ? { "X-XSRF-TOKEN": getXsrfCookieToken() }
+                            : { "X-CSRF-TOKEN": getCsrfToken() }),
                         "X-Requested-With": "XMLHttpRequest",
                     },
                     credentials: "same-origin",
@@ -1698,10 +1722,10 @@ export default function Reports() {
             <Head title="Reports" />
 
             <UserLayout>
-                <div className="min-h-screen bg-slate-950 text-white">
-                    <div className="mx-auto w-full max-w-[1600px] bg-[#090000] px-4 py-6 sm:px-6 lg:px-8">
+                <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white">
+                    <div className="mx-auto w-full max-w-[1600px] bg-gray-50 px-4 py-6 dark:bg-[#090000] sm:px-6 lg:px-8">
                         {/* HEADER */}
-                        <section className="mb-6 overflow-hidden rounded-3xl border border-yellow-400/20 bg-gradient-to-br from-slate-900 via-slate-900 to-black shadow-2xl">
+                        <section className="mb-6 rounded-3xl border border-yellow-400/20 bg-gradient-to-br from-white via-white to-gray-100 dark:from-slate-900 dark:via-slate-900 dark:to-black shadow-2xl">
                             <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
                                 <div className="flex items-start gap-4">
                                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-yellow-400 text-black shadow-lg shadow-yellow-400/20">
@@ -1714,13 +1738,13 @@ export default function Reports() {
                                                 Reports
                                             </h1>
 
-                                            <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-yellow-400">
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
                                                 <Sparkles size={11} />
                                                 AI Assisted
                                             </span>
                                         </div>
 
-                                        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500 sm:text-sm">
+                                        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-gray-500 dark:text-slate-500 sm:text-sm">
                                             View and manage database-backed
                                             system reports across all
                                             operational modules.
@@ -1728,27 +1752,32 @@ export default function Reports() {
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={() => void fetchReports()}
-                                    disabled={loading}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-xs font-bold text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-400 disabled:opacity-50"
-                                >
-                                    <RefreshCw
-                                        size={14}
-                                        className={
-                                            loading ? "animate-spin" : ""
-                                        }
-                                    />
-                                    Refresh
-                                </button>
+                                {/* ✅ RIGHT SIDE: BELL + REFRESH */}
+                                <div className="flex items-center gap-3">
+
+
+                                    <button
+                                        type="button"
+                                        onClick={() => void fetchReports()}
+                                        disabled={loading}
+                                        className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-4 py-2.5 text-xs font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400 disabled:opacity-50"
+                                    >
+                                        <RefreshCw
+                                            size={14}
+                                            className={
+                                                loading ? "animate-spin" : ""
+                                            }
+                                        />
+                                        Refresh
+                                    </button>
+                                </div>
                             </div>
                         </section>
 
                         {/* FILTERS */}
                         <form
                             onSubmit={handleGenerate}
-                            className="mb-6 rounded-3xl border border-slate-800 bg-slate-900 p-4 shadow-xl sm:p-5"
+                            className="mb-6 rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xl sm:p-5"
                         >
                             <div className="grid gap-4 lg:grid-cols-4">
                                 <FilterField
@@ -1820,7 +1849,7 @@ export default function Reports() {
                                         disabled={loading}
                                         className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition ${
                                             hasDuplicate
-                                                ? "border border-amber-400/30 bg-amber-400/10 text-amber-400"
+                                                ? "border border-amber-400/30 bg-amber-400/10 text-amber-600 dark:text-amber-400"
                                                 : "bg-yellow-400 text-black hover:bg-yellow-300"
                                         } disabled:cursor-not-allowed disabled:opacity-60`}
                                     >
@@ -1846,12 +1875,12 @@ export default function Reports() {
                                 <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-2">
                                     <AlertTriangle
                                         size={13}
-                                        className="mt-0.5 shrink-0 text-amber-400"
+                                        className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
                                     />
 
-                                    <p className="text-[11px] leading-5 text-amber-200/80">
+                                    <p className="text-[11px] leading-5 text-amber-700/80 dark:text-amber-200/80">
                                         An existing report{" "}
-                                        <span className="font-bold text-amber-200">
+                                        <span className="font-bold text-amber-700 dark:text-amber-200">
                                             "{matchingRow?.name}"
                                         </span>{" "}
                                         already uses the same type, client, and
@@ -1863,19 +1892,19 @@ export default function Reports() {
 
                         {/* REPORTS */}
                         <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-                            <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-xl">
-                                <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+                            <div className="overflow-hidden rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl">
+                                <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-5 py-4">
                                     <div className="flex items-center gap-2">
                                         <FileText
                                             size={16}
-                                            className="text-yellow-400"
+                                            className="text-yellow-600 dark:text-yellow-400"
                                         />
                                         <h2 className="text-sm font-black">
                                             All Reports
                                         </h2>
                                     </div>
 
-                                    <span className="rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1 text-[9px] font-bold text-slate-500">
+                                    <span className="rounded-full border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-2.5 py-1 text-[9px] font-bold text-gray-500 dark:text-slate-500">
                                         {rows.length} reports
                                     </span>
                                 </div>
@@ -1883,7 +1912,7 @@ export default function Reports() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full min-w-[850px] text-left">
                                         <thead>
-                                            <tr className="border-b border-slate-800 bg-slate-950">
+                                            <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
                                                 {[
                                                     "Report Name",
                                                     "Client",
@@ -1894,7 +1923,7 @@ export default function Reports() {
                                                 ].map((label) => (
                                                     <th
                                                         key={label}
-                                                        className="px-4 py-3 text-[9px] font-black uppercase tracking-wider text-slate-500"
+                                                        className="px-4 py-3 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500"
                                                     >
                                                         {label}
                                                     </th>
@@ -1907,11 +1936,11 @@ export default function Reports() {
                                                 <tr>
                                                     <td
                                                         colSpan={6}
-                                                        className="px-4 py-10 text-center text-xs text-slate-500"
+                                                        className="px-4 py-10 text-center text-xs text-gray-500 dark:text-slate-500"
                                                     >
                                                         <RefreshCw
                                                             size={18}
-                                                            className="mx-auto mb-2 animate-spin text-yellow-400"
+                                                            className="mx-auto mb-2 animate-spin text-yellow-600 dark:text-yellow-400"
                                                         />
                                                         Loading reports...
                                                     </td>
@@ -1920,7 +1949,7 @@ export default function Reports() {
                                                 <tr>
                                                     <td
                                                         colSpan={6}
-                                                        className="px-4 py-10 text-center text-xs text-slate-500"
+                                                        className="px-4 py-10 text-center text-xs text-gray-500 dark:text-slate-500"
                                                     >
                                                         No reports found.
                                                     </td>
@@ -1940,12 +1969,12 @@ export default function Reports() {
                                                     return (
                                                         <tr
                                                             key={row.id}
-                                                            className="border-b border-slate-800/60 transition hover:bg-slate-950/60"
+                                                            className="border-b border-gray-200 dark:border-slate-800/60 transition hover:bg-gray-50 dark:hover:bg-slate-950/60"
                                                         >
-                                                            <td className="px-4 py-3 text-xs font-bold text-slate-200">
+                                                            <td className="px-4 py-3 text-xs font-bold text-gray-800 dark:text-slate-200">
                                                                 <div className="flex items-center gap-2">
                                                                     {row.ai_generated && (
-                                                                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-yellow-400/15 text-yellow-400">
+                                                                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-yellow-400/15 text-yellow-600 dark:text-yellow-400">
                                                                             <Sparkles
                                                                                 size={
                                                                                     10
@@ -1973,29 +2002,29 @@ export default function Reports() {
                                                             </td>
 
                                                             <td className="px-4 py-3">
-                                                                <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+                                                                <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400">
                                                                     <User
                                                                         size={
                                                                             12
                                                                         }
-                                                                        className="text-yellow-400"
+                                                                        className="text-yellow-600 dark:text-yellow-400"
                                                                     />
                                                                     {rowClient ||
                                                                         "All Clients"}
                                                                 </span>
                                                             </td>
 
-                                                            <td className="px-4 py-3 text-xs text-slate-400">
+                                                            <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400">
                                                                 {row.type ||
                                                                     row.report_type ||
                                                                     "All"}
                                                             </td>
 
-                                                            <td className="px-4 py-3 text-xs text-slate-400">
+                                                            <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400">
                                                                 {row.date_range}
                                                             </td>
 
-                                                            <td className="px-4 py-3 text-xs text-slate-400">
+                                                            <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400">
                                                                 {formatDateDisplay(
                                                                     row.generated_on,
                                                                 )}
@@ -2010,7 +2039,7 @@ export default function Reports() {
                                                                                 row,
                                                                             )
                                                                         }
-                                                                        className="rounded-lg p-1.5 text-slate-500 hover:bg-yellow-400/10 hover:text-yellow-400"
+                                                                        className="rounded-lg p-1.5 text-gray-500 dark:text-slate-500 hover:bg-yellow-400/10 hover:text-yellow-600 dark:hover:text-yellow-400"
                                                                         title="View"
                                                                     >
                                                                         <Eye
@@ -2027,7 +2056,7 @@ export default function Reports() {
                                                                                 row,
                                                                             )
                                                                         }
-                                                                        className="rounded-lg p-1.5 text-slate-500 hover:bg-yellow-400/10 hover:text-yellow-400"
+                                                                        className="rounded-lg p-1.5 text-gray-500 dark:text-slate-500 hover:bg-yellow-400/10 hover:text-yellow-600 dark:hover:text-yellow-400"
                                                                         title="Download PDF"
                                                                     >
                                                                         <Download
@@ -2047,7 +2076,7 @@ export default function Reports() {
                                                                                 row.id,
                                                                             )
                                                                         }
-                                                                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white"
+                                                                        className="rounded-lg p-1.5 text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                                                                         title="More"
                                                                     >
                                                                         <MoreVertical
@@ -2068,12 +2097,12 @@ export default function Reports() {
                             </div>
 
                             {/* SUMMARY */}
-                            <aside className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
+                            <aside className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
                                 <h3 className="mb-4 text-sm font-black">
                                     About Reports
                                 </h3>
 
-                                <p className="text-xs leading-6 text-slate-400">
+                                <p className="text-xs leading-6 text-gray-500 dark:text-slate-400">
                                     This section provides a quick overview of
                                     the reports generated within the system.
                                     Reports may include financial, operational,
@@ -2082,7 +2111,7 @@ export default function Reports() {
                                     available system records.
                                 </p>
 
-                                <p className="mt-4 text-xs leading-6 text-slate-500">
+                                <p className="mt-4 text-xs leading-6 text-gray-500 dark:text-slate-500">
                                     Generated reports can be reviewed, viewed,
                                     and downloaded from the reports table.
                                     AI-assisted reports may also provide
@@ -2117,7 +2146,7 @@ export default function Reports() {
                     <Bot size={24} />
 
                     {hasNewReply && (
-                        <span className="absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full border-2 border-slate-950 bg-red-500" />
+                        <span className="absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full border-2 border-gray-200 dark:border-slate-950 bg-red-500" />
                     )}
 
                     <span className="absolute inset-0 -z-10 animate-ping rounded-full bg-yellow-400/40" />
@@ -2133,11 +2162,11 @@ export default function Reports() {
 
                 {/* AI DRAWER */}
                 <aside
-                    className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-[440px] flex-col border-l border-yellow-400/20 bg-slate-900 shadow-2xl transition-transform duration-300 ${
+                    className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-[440px] flex-col border-l border-yellow-400/20 bg-white dark:bg-slate-900 shadow-2xl transition-transform duration-300 ${
                         aiOpen ? "translate-x-0" : "translate-x-full"
                     }`}
                 >
-                    <div className="border-b border-slate-800 bg-gradient-to-r from-yellow-400/[0.08] to-transparent p-4">
+                    <div className="border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-yellow-400/[0.08] to-transparent p-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400 text-black">
@@ -2162,7 +2191,7 @@ export default function Reports() {
                                 <button
                                     type="button"
                                     onClick={clearAI}
-                                    className="rounded-lg p-2 text-slate-600 hover:bg-slate-800 hover:text-white"
+                                    className="rounded-lg p-2 text-slate-600 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                                     title="Clear chat"
                                 >
                                     <X size={14} />
@@ -2171,7 +2200,7 @@ export default function Reports() {
                                 <button
                                     type="button"
                                     onClick={() => setAiOpen(false)}
-                                    className="rounded-lg p-2 text-slate-600 hover:bg-slate-800 hover:text-white"
+                                    className="rounded-lg p-2 text-slate-600 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                                 >
                                     <ChevronDown size={16} />
                                 </button>
@@ -2186,14 +2215,14 @@ export default function Reports() {
                                 className={
                                     item.sender === "user"
                                         ? "ml-6 rounded-2xl rounded-br-md bg-yellow-400 p-3 text-black"
-                                        : "mr-3 rounded-2xl rounded-bl-md border border-slate-800 bg-slate-950 p-3"
+                                        : "mr-3 rounded-2xl rounded-bl-md border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-3"
                                 }
                             >
                                 <p
                                     className={
                                         item.sender === "user"
                                             ? "whitespace-pre-line text-xs leading-5"
-                                            : "whitespace-pre-line text-xs leading-5 text-slate-400"
+                                            : "whitespace-pre-line text-xs leading-5 text-gray-500 dark:text-slate-400"
                                     }
                                 >
                                     {item.message}
@@ -2202,11 +2231,11 @@ export default function Reports() {
                         ))}
 
                         {aiTyping && (
-                            <div className="mr-3 rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <div className="mr-3 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-3">
+                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-500">
                                     <Sparkles
                                         size={13}
-                                        className="animate-pulse text-yellow-400"
+                                        className="animate-pulse text-yellow-600 dark:text-yellow-400"
                                     />
                                     ALIBATON AI is analyzing your records...
                                 </div>
@@ -2216,24 +2245,24 @@ export default function Reports() {
                         <div ref={chatEndRef} />
                     </div>
 
-                    <div className="border-t border-slate-800 p-4">
+                    <div className="border-t border-gray-200 dark:border-slate-800 p-4">
                         <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-600">
                             Quick Questions
                         </p>
 
                         <div className="mb-3 flex flex-wrap gap-1.5">
-                           {[
-    "Alibaton Summary",
-    "Summarize my reports list",
-    "Show me my AI-generated reports",
-    "What is the forecast?",
-].map((question) => (
+                            {[
+                                "Alibaton Summary",
+                                "Summarize my reports list",
+                                "Show me my AI-generated reports",
+                                "What is the forecast?",
+                            ].map((question) => (
                                 <button
                                     key={question}
                                     type="button"
                                     disabled={aiTyping}
                                     onClick={() => void askAI(question)}
-                                    className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-left text-[9px] font-bold text-slate-500 hover:border-yellow-400/30 hover:text-yellow-400 disabled:opacity-50"
+                                    className="rounded-lg border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-2.5 py-1.5 text-left text-[9px] font-bold text-gray-500 dark:text-slate-500 hover:border-yellow-400/30 hover:text-yellow-600 dark:hover:text-yellow-400 disabled:opacity-50"
                                 >
                                     {question}
                                 </button>
@@ -2245,7 +2274,7 @@ export default function Reports() {
                                 event.preventDefault();
                                 void askAI(aiInput);
                             }}
-                            className="rounded-2xl border border-slate-700 bg-slate-950 p-2"
+                            className="rounded-2xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 p-2"
                         >
                             <textarea
                                 value={aiInput}
@@ -2254,10 +2283,10 @@ export default function Reports() {
                                 }
                                 placeholder="Ask about your records..."
                                 rows={3}
-                                className="w-full resize-none bg-transparent px-2 py-1 text-xs text-white outline-none placeholder:text-slate-700"
+                                className="w-full resize-none bg-transparent px-2 py-1 text-xs text-gray-900 dark:text-white outline-none placeholder:text-slate-700"
                             />
 
-                            <div className="flex items-center justify-between border-t border-slate-800 pt-2">
+                            <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-800 pt-2">
                                 <span className="px-2 text-[9px] text-slate-700">
                                     {reportType}
                                 </span>
@@ -2294,16 +2323,16 @@ export default function Reports() {
                                     left: menuPosition.left,
                                     zIndex: 100,
                                 }}
-                                className="w-44 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl"
+                                className="w-44 overflow-hidden rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl"
                             >
                                 <button
                                     type="button"
                                     onClick={() => handleView(row)}
-                                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-slate-300 hover:bg-slate-800"
+                                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
                                 >
                                     <Eye
                                         size={13}
-                                        className="text-yellow-400"
+                                        className="text-yellow-600 dark:text-yellow-400"
                                     />
                                     View Report
                                 </button>
@@ -2311,21 +2340,21 @@ export default function Reports() {
                                 <button
                                     type="button"
                                     onClick={() => handleDownload(row)}
-                                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-slate-300 hover:bg-slate-800"
+                                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
                                 >
                                     <Download
                                         size={13}
-                                        className="text-yellow-400"
+                                        className="text-yellow-600 dark:text-yellow-400"
                                     />
                                     Download PDF
                                 </button>
 
-                                <div className="border-t border-slate-800" />
+                                <div className="border-t border-gray-200 dark:border-slate-800" />
 
                                 <button
                                     type="button"
                                     onClick={() => handleDelete(row)}
-                                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-500/10"
+                                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-500/10"
                                 >
                                     <Trash2 size={13} />
                                     Delete
@@ -2360,26 +2389,26 @@ export default function Reports() {
                 {/* DELETE CONFIRMATION */}
                 {deletingReport && (
                     <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                        <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-2xl">
+                        <div className="w-full max-w-md rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xl">
                             <div className="mb-4 flex items-start gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400">
                                     <Trash2 size={18} />
                                 </div>
 
                                 <div>
-                                    <h3 className="text-sm font-black text-white">
+                                    <h3 className="text-sm font-black text-gray-900 dark:text-white">
                                         Delete Report
                                     </h3>
 
-                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                    <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-slate-500">
                                         Are you sure you want to remove this
                                         report? This action cannot be undone.
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="mb-5 rounded-xl border border-slate-800 bg-slate-950 p-3">
-                                <p className="text-xs font-bold text-slate-300">
+                            <div className="mb-5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-3">
+                                <p className="text-xs font-bold text-gray-700 dark:text-slate-300">
                                     {deletingReport.name}
                                 </p>
 
@@ -2393,7 +2422,7 @@ export default function Reports() {
                                 <button
                                     type="button"
                                     onClick={() => setDeletingReport(null)}
-                                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-white"
+                                    className="rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-4 py-2.5 text-xs font-bold text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
                                 >
                                     Cancel
                                 </button>
@@ -2442,7 +2471,7 @@ function FilterField({
 
             <div className="relative">
                 {icon && (
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-yellow-400">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-yellow-600 dark:text-yellow-400">
                         {icon}
                     </span>
                 )}
@@ -2450,7 +2479,7 @@ function FilterField({
                 <select
                     value={value}
                     onChange={(event) => onChange(event.target.value)}
-                    className={`w-full appearance-none rounded-xl border border-slate-700 bg-slate-950 py-2.5 pr-9 text-xs font-bold text-slate-300 outline-none transition focus:border-yellow-400/50 ${
+                    className={`w-full appearance-none rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-2.5 pr-9 text-xs font-bold text-gray-700 dark:text-slate-300 outline-none transition focus:border-yellow-400/50 ${
                         icon ? "pl-9" : "pl-3"
                     }`}
                 >
@@ -2458,7 +2487,7 @@ function FilterField({
                         <option
                             key={optionValue}
                             value={optionValue}
-                            className="bg-slate-950"
+                            className="bg-gray-50 dark:bg-slate-950"
                         >
                             {optionLabel}
                         </option>
@@ -2696,15 +2725,15 @@ function ProfessionalReportModal({
     return (
         <div className="fixed inset-0 z-[160] overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:p-6">
             <div className="mx-auto flex min-h-full max-w-6xl items-start justify-center py-4 sm:py-8">
-                <div className="w-full overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-5">
+                <div className="w-full overflow-hidden rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-4 py-3 sm:px-5">
                         <div className="flex min-w-0 items-center gap-3">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-black">
                                 <FileBarChart size={17} />
                             </div>
 
                             <div className="min-w-0">
-                                <h2 className="truncate text-sm font-black text-white">
+                                <h2 className="truncate text-sm font-black text-gray-900 dark:text-white">
                                     Report Preview
                                 </h2>
 
@@ -2735,7 +2764,7 @@ function ProfessionalReportModal({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="rounded-xl p-2 text-slate-500 hover:bg-slate-800 hover:text-white"
+                                className="rounded-xl p-2 text-gray-500 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                             >
                                 <X size={16} />
                             </button>
@@ -2753,7 +2782,7 @@ function ProfessionalReportModal({
                             <div className="p-7 sm:p-10">
                                 <div className="mb-6 flex flex-col justify-between gap-5 border-b border-slate-200 pb-6 sm:flex-row">
                                     <div>
-                                        <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 dark:text-slate-400">
                                             ALIBATON
                                         </p>
 
@@ -2761,13 +2790,13 @@ function ProfessionalReportModal({
                                             {reportTitle}
                                         </h1>
 
-                                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                                        <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-slate-500">
                                             {report.type} Report
                                         </p>
                                     </div>
 
                                     <div className="text-left sm:text-right">
-                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-slate-400">
                                             Report Date
                                         </p>
 
@@ -2777,7 +2806,7 @@ function ProfessionalReportModal({
                                             )}
                                         </p>
 
-                                        <p className="mt-1 text-[10px] text-slate-500">
+                                        <p className="mt-1 text-[10px] text-gray-500 dark:text-slate-500">
                                             {report.date_range}
                                         </p>
                                     </div>
@@ -2798,7 +2827,7 @@ function ProfessionalReportModal({
                                 />
 
                                 <div className="mt-10 border-t border-slate-200 pt-5">
-                                    <div className="flex flex-col justify-between gap-2 text-[9px] text-slate-400 sm:flex-row">
+                                    <div className="flex flex-col justify-between gap-2 text-[9px] text-gray-500 dark:text-slate-400 sm:flex-row">
                                         <span>
                                             ALIBATON — Heavy Equipment &
                                             Logistics
@@ -2809,7 +2838,7 @@ function ProfessionalReportModal({
                                         </span>
                                     </div>
 
-                                    <div className="mt-1 text-[9px] text-slate-400">
+                                    <div className="mt-1 text-[9px] text-gray-500 dark:text-slate-400">
                                         info@alibaton.com
                                     </div>
                                 </div>
@@ -2842,7 +2871,7 @@ function PaperEntityMeta({
             <div className="text-yellow-600">{icon}</div>
 
             <div>
-                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                <p className="text-[8px] font-black uppercase tracking-widest text-gray-500 dark:text-slate-400">
                     {label}
                 </p>
 
@@ -3132,7 +3161,7 @@ function ModuleBlockCard({
             <div className="grid gap-0 sm:grid-cols-2">
                 {statuses && Object.keys(statuses).length > 0 && (
                     <div className="border-b border-slate-100 p-4 sm:border-b-0 sm:border-r">
-                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                             Status
                         </p>
                         <ul className="space-y-1.5">
@@ -3155,7 +3184,7 @@ function ModuleBlockCard({
 
                 {types && Object.keys(types).length > 0 && (
                     <div className="p-4">
-                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                        <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                             Type
                         </p>
                         <ul className="space-y-1.5">
@@ -3247,7 +3276,7 @@ function ReportFinancialDetails({
                                     key={label}
                                     className="border-b border-slate-100 last:border-0"
                                 >
-                                    <td className="w-1/2 bg-slate-50 px-4 py-3 text-[10px] font-black text-slate-500">
+                                    <td className="w-1/2 bg-slate-50 px-4 py-3 text-[10px] font-black text-gray-500 dark:text-slate-500">
                                         {label}
                                     </td>
                                     <td className="px-4 py-3 text-xs font-semibold text-slate-700">
@@ -3320,7 +3349,7 @@ function ReportRecordsTables({ parsed }: { parsed: Record<string, unknown> }) {
             <div key={key}>
                 <h4 className="mb-2 flex items-center justify-between text-xs font-black text-slate-800">
                     <span>{label}</span>
-                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-black text-slate-500">
+                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-black text-gray-500 dark:text-slate-500">
                         {rows.length}
                     </span>
                 </h4>
@@ -3377,7 +3406,7 @@ function ReportTrends({ parsed }: { parsed: Record<string, unknown> }) {
         <section>
             <DocumentSectionTitle>Monthly Trends</DocumentSectionTitle>
 
-            <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-500">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                 <span>Direction:</span>
                 <span
                     className={
@@ -3405,7 +3434,7 @@ function ReportTrends({ parsed }: { parsed: Record<string, unknown> }) {
                             ].map((label) => (
                                 <th
                                     key={label}
-                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-slate-400 first:text-left"
+                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400 first:text-left"
                                 >
                                     {label}
                                 </th>
@@ -3490,7 +3519,7 @@ function ReportProjections({ parsed }: { parsed: Record<string, unknown> }) {
             <DocumentSectionTitle>Projections</DocumentSectionTitle>
 
             {typeof projections.note === "string" && (
-                <p className="mb-3 text-[10px] italic text-slate-500">
+                <p className="mb-3 text-[10px] italic text-gray-500 dark:text-slate-500">
                     {projections.note}
                 </p>
             )}
@@ -3507,7 +3536,7 @@ function ReportProjections({ parsed }: { parsed: Record<string, unknown> }) {
                             ].map((label) => (
                                 <th
                                     key={label}
-                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-slate-400 first:text-left"
+                                    className="px-3 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400 first:text-left"
                                 >
                                     {label}
                                 </th>
@@ -3641,10 +3670,10 @@ function BreakdownTable({
                 <table className="w-full text-left">
                     <thead>
                         <tr className="border-b border-slate-200 bg-slate-50">
-                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                            <th className="px-4 py-2.5 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                 {title}
                             </th>
-                            <th className="px-4 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-slate-400">
+                            <th className="px-4 py-2.5 text-right text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                 Count
                             </th>
                         </tr>
@@ -3681,7 +3710,7 @@ function BreakdownTable({
 function ProfessionalArrayTable({ rows }: { rows: unknown[] }) {
     if (!rows.length) {
         return (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-gray-500 dark:text-slate-500">
                 No records available.
             </div>
         );
@@ -3751,7 +3780,7 @@ function ProfessionalArrayTable({ rows }: { rows: unknown[] }) {
                         {columns.map((column) => (
                             <th
                                 key={column}
-                                className="px-3 py-2.5 text-[8px] font-black uppercase tracking-wider text-slate-400"
+                                className="px-3 py-2.5 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400"
                             >
                                 {humanizeKey(column)}
                             </th>
@@ -3844,7 +3873,7 @@ function DocumentSectionTitle({ children }: { children: ReactNode }) {
 function PaperMeta({ label, value }: { label: string; value: string }) {
     return (
         <div>
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[8px] font-black uppercase tracking-widest text-gray-500 dark:text-slate-400">
                 {label}
             </p>
 
@@ -3862,7 +3891,7 @@ function PaperMeta({ label, value }: { label: string; value: string }) {
 function PaperSummaryCard({ label, value }: { label: string; value: string }) {
     return (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+            <p className="text-[8px] font-black uppercase tracking-widest text-gray-500 dark:text-slate-400">
                 {label}
             </p>
 
@@ -3886,26 +3915,35 @@ function ToastItem({
 }) {
     const icon =
         toast.type === "success" ? (
-            <CheckCircle2 size={15} className="text-emerald-400" />
+            <CheckCircle2
+                size={15}
+                className="text-emerald-600 dark:text-emerald-400"
+            />
         ) : toast.type === "warning" ? (
-            <AlertTriangle size={15} className="text-amber-400" />
+            <AlertTriangle
+                size={15}
+                className="text-amber-600 dark:text-amber-400"
+            />
         ) : toast.type === "error" ? (
-            <AlertTriangle size={15} className="text-red-400" />
+            <AlertTriangle
+                size={15}
+                className="text-red-600 dark:text-red-400"
+            />
         ) : (
-            <Sparkles size={15} className="text-blue-400" />
+            <Sparkles size={15} className="text-blue-600 dark:text-blue-400" />
         );
 
     return (
-        <div className="pointer-events-auto rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-2xl">
+        <div className="pointer-events-auto rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xl">
             <div className="flex items-start gap-2.5">
                 <div className="mt-0.5">{icon}</div>
 
                 <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black text-white">
+                    <p className="text-xs font-black text-gray-900 dark:text-white">
                         {toast.title}
                     </p>
 
-                    <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                    <p className="mt-1 text-[10px] leading-4 text-gray-500 dark:text-slate-500">
                         {toast.message}
                     </p>
 
@@ -3916,7 +3954,7 @@ function ToastItem({
                                 toast.action?.onClick();
                                 onDismiss();
                             }}
-                            className="mt-2 text-[10px] font-black text-yellow-400 hover:text-yellow-300"
+                            className="mt-2 text-[10px] font-black text-yellow-600 dark:text-yellow-400 hover:text-yellow-600 dark:hover:text-yellow-300"
                         >
                             {toast.action.label}
                         </button>
@@ -3926,7 +3964,7 @@ function ToastItem({
                 <button
                     type="button"
                     onClick={onDismiss}
-                    className="rounded-lg p-1 text-slate-600 hover:bg-slate-800 hover:text-white"
+                    className="rounded-lg p-1 text-slate-600 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                 >
                     <X size={12} />
                 </button>
@@ -3955,14 +3993,14 @@ function SummaryCard({
     color: "yellow" | "blue" | "purple" | "green";
 }) {
     const colorClasses: Record<string, string> = {
-        yellow: "bg-yellow-400/10 text-yellow-400 border-yellow-400/10",
-        blue: "bg-blue-400/10 text-blue-400 border-blue-400/10",
-        purple: "bg-purple-400/10 text-purple-400 border-purple-400/10",
-        green: "bg-emerald-400/10 text-emerald-400 border-emerald-400/10",
+        yellow: "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 border-yellow-400/10",
+        blue: "bg-blue-400/10 text-blue-600 dark:text-blue-400 border-blue-400/10",
+        purple: "bg-purple-400/10 text-purple-600 dark:text-purple-400 border-purple-400/10",
+        green: "bg-emerald-400/10 text-emerald-600 dark:text-emerald-400 border-emerald-400/10",
     };
 
     return (
-        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+        <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-3">
             <div className="flex items-start justify-between gap-3">
                 <div
                     className={`flex h-9 w-9 items-center justify-center rounded-xl border ${colorClasses[color]}`}
@@ -3973,7 +4011,9 @@ function SummaryCard({
                 {delta !== 0 && (
                     <span
                         className={`text-[9px] font-black ${
-                            delta > 0 ? "text-emerald-400" : "text-red-400"
+                            delta > 0
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-red-600 dark:text-red-400"
                         }`}
                     >
                         {delta > 0 ? "+" : ""}
@@ -3986,7 +4026,7 @@ function SummaryCard({
                 {label}
             </p>
 
-            <p className="mt-1 text-xl font-black text-white">
+            <p className="mt-1 text-xl font-black text-gray-900 dark:text-white">
                 {formatNumber(value)}
             </p>
         </div>

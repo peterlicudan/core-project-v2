@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/*
+|--------------------------------------------------------------------------
+| DARK MODE VARIANT
+|--------------------------------------------------------------------------
+|
+| By default Tailwind v4's `dark:` variant follows the OS setting
+| (`prefers-color-scheme`). We need it to follow OUR OWN theme toggle
+| instead, which adds/removes the `.dark` class on <html>.
+|
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
 
 @keyframes galleryMove {
 

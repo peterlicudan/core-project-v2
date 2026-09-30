@@ -18,8 +18,11 @@ import {
     X,
     UserRoundCog,
     AlertTriangle,
+    Sun,
+    Moon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTheme } from "../../Context/ThemeContext";
 
 type AdminSidebarProps = {
     collapsed?: boolean;
@@ -39,6 +42,8 @@ export default function AdminSidebar({
     const [internalCollapsed, setInternalCollapsed] = useState(false);
 
     const [mobileOpen, setMobileOpen] = useState(false);
+
+    const { isDarkMode, toggleTheme } = useTheme();
 
     // ✅ LAGING SARADO SA SIMULA
     const [userManagementOpen, setUserManagementOpen] = useState(false);
@@ -332,7 +337,7 @@ export default function AdminSidebar({
                     ${
                         active
                             ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/10"
-                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                     }
                     ${collapsed ? "lg:justify-center" : ""}
                 `}
@@ -358,7 +363,7 @@ export default function AdminSidebar({
                         ${
                             active
                                 ? "text-black"
-                                : "text-gray-500 group-hover:text-yellow-400"
+                                : "text-gray-500 group-hover:text-yellow-600 dark:group-hover:text-yellow-400"
                         }
                     `}
                 />
@@ -387,13 +392,13 @@ export default function AdminSidebar({
                             whitespace-nowrap
                             rounded-lg
                             border
-                            border-white/10
-                            bg-black
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-black
                             px-3
                             py-2
                             text-xs
                             font-medium
-                            text-white
+                            text-gray-900 dark:text-white
                             opacity-0
                             shadow-xl
                             transition
@@ -459,7 +464,7 @@ export default function AdminSidebar({
                     justify-between
                     border-b
                     border-yellow-400/10
-                    bg-black
+                    bg-white dark:bg-black
                     px-4
                     shadow-lg
                     shadow-black/30
@@ -509,7 +514,7 @@ export default function AdminSidebar({
                                 text-sm
                                 font-black
                                 tracking-widest
-                                text-yellow-400
+                                text-yellow-600 dark:text-yellow-400
                             "
                         >
                             ALIBATON
@@ -528,30 +533,57 @@ export default function AdminSidebar({
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={openMobileSidebar}
-                    className="
-                        flex
-                        h-10
-                        w-10
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-xl
-                        border
-                        border-white/10
-                        bg-white/5
-                        text-gray-300
-                        transition
-                        hover:border-yellow-400/30
-                        hover:bg-yellow-400/10
-                        hover:text-yellow-400
-                    "
-                    aria-label="Open admin menu"
-                >
-                    <Menu size={22} />
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={toggleTheme}
+                        className="
+                            flex
+                            h-10
+                            w-10
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-xl
+                            border
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-white/5
+                            text-gray-700 dark:text-gray-300
+                            transition
+                            hover:border-yellow-400/30
+                            hover:bg-yellow-400/10
+                            hover:text-yellow-600 dark:hover:text-yellow-400
+                        "
+                        aria-label="Toggle theme"
+                    >
+                        {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={openMobileSidebar}
+                        className="
+                            flex
+                            h-10
+                            w-10
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-xl
+                            border
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-white/5
+                            text-gray-700 dark:text-gray-300
+                            transition
+                            hover:border-yellow-400/30
+                            hover:bg-yellow-400/10
+                            hover:text-yellow-600 dark:hover:text-yellow-400
+                        "
+                        aria-label="Open admin menu"
+                    >
+                        <Menu size={22} />
+                    </button>
+                </div>
             </div>
 
             {/* ============================================================
@@ -589,8 +621,8 @@ export default function AdminSidebar({
                     flex-col
                     border-r
                     border-yellow-400/10
-                    bg-black
-                    text-white
+                    bg-white dark:bg-black
+                    text-gray-900 dark:text-white
                     shadow-2xl
                     shadow-black/60
                     transition-all
@@ -614,7 +646,7 @@ export default function AdminSidebar({
                         shrink-0
                         items-center
                         border-b
-                        border-white/10
+                        border-gray-200 dark:border-white/10
                         px-4
                     "
                 >
@@ -666,7 +698,7 @@ export default function AdminSidebar({
                                         text-lg
                                         font-black
                                         tracking-widest
-                                        text-yellow-400
+                                        text-yellow-600 dark:text-yellow-400
                                     "
                                 >
                                     ALIBATON
@@ -694,10 +726,10 @@ export default function AdminSidebar({
                         className="
                             rounded-lg
                             p-2
-                            text-gray-400
+                            text-gray-600 dark:text-gray-400
                             transition
-                            hover:bg-white/10
-                            hover:text-yellow-400
+                            hover:bg-gray-200 dark:hover:bg-white/10
+                            hover:text-yellow-600 dark:hover:text-yellow-400
                             lg:hidden
                         "
                         aria-label="Close admin menu"
@@ -727,7 +759,7 @@ export default function AdminSidebar({
                         border
                         border-yellow-400/30
                         bg-black
-                        text-yellow-400
+                        text-yellow-600 dark:text-yellow-400
                         shadow-lg
                         shadow-black/50
                         transition-all
@@ -830,8 +862,8 @@ export default function AdminSidebar({
                                     duration-200
                                     ${
                                         userManagementActive
-                                            ? "bg-yellow-400/10 text-yellow-400"
-                                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                            ? "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                                     }
                                     ${collapsed ? "lg:justify-center" : ""}
                                 `}
@@ -854,7 +886,7 @@ export default function AdminSidebar({
                                     strokeWidth={userManagementActive ? 2.5 : 2}
                                     className="
                                         shrink-0
-                                        text-yellow-400
+                                        text-yellow-600 dark:text-yellow-400
                                     "
                                 />
 
@@ -898,13 +930,13 @@ export default function AdminSidebar({
                                             whitespace-nowrap
                                             rounded-lg
                                             border
-                                            border-white/10
-                                            bg-black
+                                            border-gray-200 dark:border-white/10
+                                            bg-white dark:bg-black
                                             px-3
                                             py-2
                                             text-xs
                                             font-medium
-                                            text-white
+                                            text-gray-900 dark:text-white
                                             opacity-0
                                             shadow-xl
                                             transition
@@ -1018,8 +1050,8 @@ export default function AdminSidebar({
                                     duration-200
                                     ${
                                         analyticsActive
-                                            ? "bg-yellow-400/10 text-yellow-400"
-                                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                            ? "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                                     }
                                     ${collapsed ? "lg:justify-center" : ""}
                                 `}
@@ -1042,7 +1074,7 @@ export default function AdminSidebar({
                                     strokeWidth={analyticsActive ? 2.5 : 2}
                                     className="
                                         shrink-0
-                                        text-yellow-400
+                                        text-yellow-600 dark:text-yellow-400
                                     "
                                 />
 
@@ -1082,13 +1114,13 @@ export default function AdminSidebar({
                                             whitespace-nowrap
                                             rounded-lg
                                             border
-                                            border-white/10
-                                            bg-black
+                                            border-gray-200 dark:border-white/10
+                                            bg-white dark:bg-black
                                             px-3
                                             py-2
                                             text-xs
                                             font-medium
-                                            text-white
+                                            text-gray-900 dark:text-white
                                             opacity-0
                                             shadow-xl
                                             transition
@@ -1147,7 +1179,7 @@ export default function AdminSidebar({
                     className="
                         shrink-0
                         border-t
-                        border-white/10
+                        border-gray-200 dark:border-white/10
                         p-3
                     "
                 >
@@ -1159,7 +1191,7 @@ export default function AdminSidebar({
                                 items-center
                                 gap-3
                                 rounded-xl
-                                bg-white/5
+                                bg-gray-50 dark:bg-white/5
                                 p-3
                             "
                         >
@@ -1195,7 +1227,7 @@ export default function AdminSidebar({
                                         truncate
                                         text-sm
                                         font-semibold
-                                        text-white
+                                        text-gray-900 dark:text-white
                                     "
                                 >
                                     Administrator
@@ -1214,6 +1246,81 @@ export default function AdminSidebar({
                         </div>
                     )}
 
+                    {/* THEME TOGGLE */}
+
+                    <button
+                        type="button"
+                        onClick={toggleTheme}
+                        className={`
+                            group
+                            relative
+                            mb-1
+                            flex
+                            min-h-11
+                            w-full
+                            items-center
+                            gap-3
+                            rounded-xl
+                            px-3
+                            py-3
+                            text-gray-600
+                            transition
+                            hover:bg-gray-100
+                            hover:text-gray-900
+                            dark:text-gray-400
+                            dark:hover:bg-white/5
+                            dark:hover:text-white
+                            ${collapsed ? "lg:justify-center" : ""}
+                        `}
+                        title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+                    >
+                        {isDarkMode ? (
+                            <Sun size={20} className="shrink-0" />
+                        ) : (
+                            <Moon size={20} className="shrink-0" />
+                        )}
+
+                        <span
+                            className={`
+                                text-sm
+                                font-medium
+                                ${collapsed ? "lg:hidden" : ""}
+                            `}
+                        >
+                            {isDarkMode ? "Light Mode" : "Dark Mode"}
+                        </span>
+
+                        {collapsed && (
+                            <span
+                                className="
+                                    pointer-events-none
+                                    absolute
+                                    left-full
+                                    z-[70]
+                                    ml-3
+                                    hidden
+                                    whitespace-nowrap
+                                    rounded-lg
+                                    border
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-black
+                                    px-3
+                                    py-2
+                                    text-xs
+                                    font-medium
+                                    text-gray-900 dark:text-white
+                                    opacity-0
+                                    shadow-xl
+                                    transition
+                                    group-hover:opacity-100
+                                    lg:block
+                                "
+                            >
+                                {isDarkMode ? "Light Mode" : "Dark Mode"}
+                            </span>
+                        )}
+                    </button>
+
                     {/* LOGOUT */}
 
                     <button
@@ -1230,10 +1337,10 @@ export default function AdminSidebar({
                             rounded-xl
                             px-3
                             py-3
-                            text-gray-400
+                            text-gray-600 dark:text-gray-400
                             transition
                             hover:bg-red-500/10
-                            hover:text-red-400
+                            hover:text-red-600 dark:hover:text-red-400
                             ${collapsed ? "lg:justify-center" : ""}
                         `}
                         title="Logout"
@@ -1268,12 +1375,12 @@ export default function AdminSidebar({
                                     rounded-lg
                                     border
                                     border-red-500/20
-                                    bg-black
+                                    bg-white dark:bg-black
                                     px-3
                                     py-2
                                     text-xs
                                     font-medium
-                                    text-red-400
+                                    text-red-600 dark:text-red-400
                                     opacity-0
                                     shadow-xl
                                     transition
@@ -1313,8 +1420,8 @@ export default function AdminSidebar({
                             max-w-md
                             rounded-2xl
                             border
-                            border-white/10
-                            bg-zinc-900
+                            border-gray-200 dark:border-white/10
+                            bg-white dark:bg-zinc-900
                             p-6
                             shadow-2xl
                             shadow-black/60
@@ -1336,7 +1443,7 @@ export default function AdminSidebar({
                             >
                                 <AlertTriangle
                                     size={24}
-                                    className="text-red-400"
+                                    className="text-red-600 dark:text-red-400"
                                 />
                             </div>
 
@@ -1345,7 +1452,7 @@ export default function AdminSidebar({
                                     className="
                                         text-lg
                                         font-bold
-                                        text-white
+                                        text-gray-900 dark:text-white
                                     "
                                 >
                                     Confirm Logout
@@ -1356,7 +1463,7 @@ export default function AdminSidebar({
                                         mt-2
                                         text-sm
                                         leading-relaxed
-                                        text-gray-400
+                                        text-gray-600 dark:text-gray-400
                                     "
                                 >
                                     Are you sure you want to logout from your
@@ -1380,15 +1487,15 @@ export default function AdminSidebar({
                                 className="
                                     rounded-xl
                                     border
-                                    border-white/10
-                                    bg-white/5
+                                    border-gray-200 dark:border-white/10
+                                    bg-white dark:bg-white/5
                                     px-5
                                     py-2.5
                                     text-sm
                                     font-semibold
-                                    text-white
+                                    text-gray-900 dark:text-white
                                     transition
-                                    hover:bg-white/10
+                                    hover:bg-gray-200 dark:hover:bg-white/10
                                 "
                             >
                                 Cancel
@@ -1404,7 +1511,7 @@ export default function AdminSidebar({
                                     py-2.5
                                     text-sm
                                     font-semibold
-                                    text-white
+                                    text-gray-900 dark:text-white
                                     transition
                                     hover:bg-red-600
                                 "

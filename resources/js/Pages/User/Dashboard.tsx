@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
+import { useTheme } from "../../Context/ThemeContext";
 
 import {
     Activity,
@@ -36,6 +37,7 @@ import {
 } from "recharts";
 
 import UserLayout from "../../Layouts/UserLayout";
+
 
 /*
 |--------------------------------------------------------------------------
@@ -220,7 +222,6 @@ const MODULE_COLORS: Record<OverviewType, string> = {
     compliances: "#a78bfa",
 };
 
-/* ✅ Show scrollbar kapag lagpas 4 records */
 const SCROLL_RECORD_THRESHOLD = 4;
 
 /*
@@ -490,7 +491,7 @@ const getStatusClass = (status?: string): string => {
         normalized.includes("verified") ||
         normalized.includes("compliant")
     ) {
-        return "border-emerald-400/20 bg-emerald-400/10 text-emerald-400";
+        return "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400";
     }
 
     if (
@@ -499,7 +500,7 @@ const getStatusClass = (status?: string): string => {
         normalized.includes("partial") ||
         normalized.includes("expiring")
     ) {
-        return "border-yellow-400/20 bg-yellow-400/10 text-yellow-400";
+        return "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400";
     }
 
     if (
@@ -507,10 +508,10 @@ const getStatusClass = (status?: string): string => {
         normalized.includes("expired") ||
         normalized.includes("overdue")
     ) {
-        return "border-red-400/20 bg-red-400/10 text-red-400";
+        return "border-red-400/20 bg-red-400/10 text-red-600 dark:text-red-400";
     }
 
-    return "border-slate-700 bg-slate-800 text-slate-300";
+    return "border-gray-300 bg-gray-100 text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
 };
 
 const uniqueRecords = <T extends { id?: number | string }>(
@@ -547,7 +548,7 @@ const buildRecordUrl = (module: OverviewType, record: ModuleRecord): string => {
 
 /*
 |--------------------------------------------------------------------------
-| DETAILED TOOLTIP — SCROLLABLE
+| DETAILED TOOLTIP
 |--------------------------------------------------------------------------
 */
 
@@ -569,10 +570,10 @@ function DetailedTooltipContent({
     totalLabel?: string;
 }) {
     return (
-        <div className="w-[320px] max-w-[90vw] rounded-2xl border border-slate-700 bg-[#111827]/98 shadow-2xl backdrop-blur-xl">
+        <div className="w-[320px] max-w-[90vw] rounded-2xl border border-gray-200 bg-white/98 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-[#111827]/98">
             {label && (
-                <div className="border-b border-slate-800 px-4 py-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <div className="border-b border-gray-200 px-4 py-2.5 dark:border-slate-800">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500">
                         {label}
                     </p>
                 </div>
@@ -580,7 +581,9 @@ function DetailedTooltipContent({
 
             {records.length === 0 ? (
                 <div className="px-4 py-4">
-                    <p className="text-xs text-slate-500">No records</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500">
+                        No records
+                    </p>
                 </div>
             ) : (
                 <div className="max-h-[300px] overflow-y-auto px-3 py-3 [scrollbar-width:thin] [scrollbar-color:rgba(250,204,21,0.4)_transparent]">
@@ -588,7 +591,7 @@ function DetailedTooltipContent({
                         {records.map((record, index) => (
                             <div
                                 key={`${record.label}-${index}`}
-                                className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2"
+                                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/70"
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span
@@ -611,17 +614,17 @@ function DetailedTooltipContent({
                                     )}
                                 </div>
 
-                                <p className="mt-1 truncate text-xs font-bold text-white">
+                                <p className="mt-1 truncate text-xs font-bold text-gray-900 dark:text-white">
                                     {record.label}
                                 </p>
 
                                 <div className="mt-1 flex items-center justify-between gap-3">
-                                    <span className="truncate text-[10px] text-slate-400">
+                                    <span className="truncate text-[10px] text-gray-500 dark:text-slate-400">
                                         {record.client}
                                     </span>
 
                                     {record.amount !== null && (
-                                        <span className="shrink-0 text-[10px] font-bold text-yellow-300">
+                                        <span className="shrink-0 text-[10px] font-bold text-yellow-600 dark:text-yellow-300">
                                             {formatCurrency(record.amount)}
                                         </span>
                                     )}
@@ -633,8 +636,8 @@ function DetailedTooltipContent({
             )}
 
             {totalLabel && (
-                <div className="border-t border-slate-800 px-4 py-2">
-                    <p className="text-[10px] font-bold text-white">
+                <div className="border-t border-gray-200 px-4 py-2 dark:border-slate-800">
+                    <p className="text-[10px] font-bold text-gray-900 dark:text-white">
                         {totalLabel}
                     </p>
                 </div>
@@ -693,19 +696,19 @@ function SystemOverview({
     ];
 
     return (
-        <section className="mb-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl sm:p-7">
+        <section className="mb-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl shadow-gray-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20 sm:p-7">
             <div className="mb-6">
                 <div className="mb-2 flex items-center gap-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10">
-                        <BarChart3 size={20} className="text-yellow-400" />
+                        <BarChart3 size={20} className="text-yellow-500 dark:text-yellow-400" />
                     </div>
 
-                    <h2 className="text-xl font-bold text-white">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                         System Overview
                     </h2>
                 </div>
 
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-gray-500 dark:text-slate-400">
                     Select a module to view its actual records.
                 </p>
             </div>
@@ -721,18 +724,18 @@ function SystemOverview({
                             onClick={() => onSelect(item.key)}
                             className="group text-left"
                         >
-                            <div className="h-full rounded-2xl border border-slate-800 bg-slate-950/50 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-yellow-400/30 hover:bg-slate-950 hover:shadow-lg hover:shadow-yellow-400/5">
+                            <div className="h-full rounded-2xl border border-gray-200 bg-gray-50 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-yellow-400/30 hover:bg-white hover:shadow-lg hover:shadow-yellow-400/5 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-slate-950">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-xs font-medium text-slate-500">
+                                        <p className="truncate text-xs font-medium text-gray-500 dark:text-slate-500">
                                             {item.label}
                                         </p>
 
-                                        <p className="mt-2 text-3xl font-bold text-white">
+                                        <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                                             {item.value.toLocaleString()}
                                         </p>
 
-                                        <p className="mt-1 truncate text-xs text-slate-500">
+                                        <p className="mt-1 truncate text-xs text-gray-400 dark:text-slate-500">
                                             {item.description}
                                         </p>
                                     </div>
@@ -753,21 +756,21 @@ function SystemOverview({
                                     </div>
                                 </div>
 
-                                <div className="mt-5 flex items-center justify-between border-t border-slate-800 pt-4">
-                                    <span className="text-[11px] font-medium text-slate-500">
+                                <div className="mt-5 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-slate-800">
+                                    <span className="text-[11px] font-medium text-gray-400 dark:text-slate-500">
                                         View records
                                     </span>
 
                                     <ChevronRight
                                         size={16}
-                                        className="text-slate-600 transition-all group-hover:translate-x-1 group-hover:text-yellow-400"
+                                        className="text-gray-300 transition-all group-hover:translate-x-1 group-hover:text-yellow-500 dark:text-slate-600 dark:group-hover:text-yellow-400"
                                     />
                                 </div>
 
                                 <Link
                                     href={MODULE_ROUTES[item.key]}
                                     onClick={(event) => event.stopPropagation()}
-                                    className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-yellow-400 transition hover:text-yellow-300"
+                                    className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-yellow-600 transition hover:text-yellow-500 dark:text-yellow-400 dark:hover:text-yellow-300"
                                 >
                                     <ExternalLink size={11} />
                                     Open module page
@@ -857,8 +860,8 @@ function RecordDrawer({
                 className="absolute inset-0 h-full w-full bg-black/70 backdrop-blur-sm"
             />
 
-            <aside className="absolute right-0 top-0 flex h-full w-full max-w-2xl flex-col border-l border-slate-800 bg-[#0a0a0a] shadow-2xl">
-                <div className="shrink-0 border-b border-slate-800 bg-slate-900 px-5 py-5 sm:px-6">
+            <aside className="absolute right-0 top-0 flex h-full w-full max-w-2xl flex-col border-l border-gray-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#0a0a0a]">
+                <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-5 py-5 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex min-w-0 items-center gap-3">
                             <div
@@ -874,11 +877,11 @@ function RecordDrawer({
                             </div>
 
                             <div className="min-w-0">
-                                <h2 className="truncate text-lg font-bold text-white">
+                                <h2 className="truncate text-lg font-bold text-gray-900 dark:text-white">
                                     {config.title}
                                 </h2>
 
-                                <p className="mt-1 text-sm text-slate-400">
+                                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                                     {config.description}
                                 </p>
                             </div>
@@ -887,7 +890,7 @@ function RecordDrawer({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/50 text-slate-400 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                         >
                             <X size={19} />
                         </button>
@@ -896,7 +899,7 @@ function RecordDrawer({
                     <div className="relative mt-5">
                         <Search
                             size={17}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
                         />
 
                         <input
@@ -904,18 +907,18 @@ function RecordDrawer({
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search records..."
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950/50 py-3 pl-10 pr-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-yellow-400/30 focus:ring-1 focus:ring-yellow-400/20"
+                            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-yellow-400/30 focus:ring-1 focus:ring-yellow-400/20 dark:border-slate-800 dark:bg-slate-950/50 dark:text-white dark:placeholder:text-slate-600"
                         />
                     </div>
                 </div>
 
-                <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-5 py-3 sm:px-6">
-                    <p className="text-xs font-medium text-slate-500">
+                <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-3 dark:border-slate-800 sm:px-6">
+                    <p className="text-xs font-medium text-gray-500 dark:text-slate-500">
                         {filteredRecords.length.toLocaleString()} record
                         {filteredRecords.length === 1 ? "" : "s"} found
                     </p>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-slate-600">
                         <Eye size={14} />
                         <span>Click a record to open it</span>
                     </div>
@@ -923,19 +926,19 @@ function RecordDrawer({
 
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                     {filteredRecords.length === 0 ? (
-                        <div className="flex min-h-[350px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 px-6 text-center">
+                        <div className="flex min-h-[350px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 text-center dark:border-slate-800 dark:bg-slate-950/30">
                             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-400/10">
                                 <FolderOpen
                                     size={25}
-                                    className="text-yellow-400"
+                                    className="text-yellow-500 dark:text-yellow-400"
                                 />
                             </div>
 
-                            <h3 className="text-sm font-semibold text-white">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                                 No records found
                             </h3>
 
-                            <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">
+                            <p className="mt-1 max-w-sm text-xs leading-5 text-gray-500 dark:text-slate-500">
                                 No records are currently available for this
                                 module.
                             </p>
@@ -956,11 +959,11 @@ function RecordDrawer({
                     )}
                 </div>
 
-                <div className="shrink-0 border-t border-slate-800 bg-slate-900 px-5 py-4 sm:px-6">
+                <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
                     <Link
                         href={MODULE_ROUTES[type]}
                         onClick={onClose}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm font-semibold text-yellow-400 transition hover:bg-yellow-400/20"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm font-semibold text-yellow-600 transition hover:bg-yellow-400/20 dark:text-yellow-400"
                     >
                         <FolderOpen size={16} />
                         View all {type}
@@ -1142,16 +1145,16 @@ function RecordContainer({
                     onClick?.();
                 }
             }}
-            className={`group rounded-2xl border border-slate-800 bg-slate-950/40 p-4 transition ${
+            className={`group rounded-2xl border border-gray-200 bg-gray-50 p-4 transition dark:border-slate-800 dark:bg-slate-950/40 ${
                 interactive
-                    ? "cursor-pointer hover:border-yellow-400/30 hover:bg-slate-950 hover:shadow-lg hover:shadow-yellow-400/5"
-                    : "hover:border-slate-700"
+                    ? "cursor-pointer hover:border-yellow-400/30 hover:bg-white hover:shadow-lg hover:shadow-yellow-400/5 dark:hover:bg-slate-950"
+                    : "hover:border-gray-300 dark:hover:border-slate-700"
             }`}
         >
             {children}
 
             {interactive && (
-                <div className="mt-3 flex items-center justify-end gap-1 text-[11px] font-semibold text-slate-600 transition group-hover:text-yellow-400">
+                <div className="mt-3 flex items-center justify-end gap-1 text-[11px] font-semibold text-gray-400 transition group-hover:text-yellow-600 dark:text-slate-600 dark:group-hover:text-yellow-400">
                     <span>Open record</span>
                     <ChevronRight
                         size={12}
@@ -1177,13 +1180,17 @@ function RecordHeader({
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-                <p className="truncate font-semibold text-white">{title}</p>
+                <p className="truncate font-semibold text-gray-900 dark:text-white">
+                    {title}
+                </p>
 
-                <p className="mt-1 truncate text-sm text-slate-400">
+                <p className="mt-1 truncate text-sm text-gray-600 dark:text-slate-400">
                     {subtitle}
                 </p>
 
-                <p className="mt-1 truncate text-xs text-slate-500">{extra}</p>
+                <p className="mt-1 truncate text-xs text-gray-500 dark:text-slate-500">
+                    {extra}
+                </p>
             </div>
 
             {status && <StatusBadge status={status} />}
@@ -1193,7 +1200,7 @@ function RecordHeader({
 
 function RecordFooter({ children }: { children: React.ReactNode }) {
     return (
-        <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-800 pt-3">
+        <div className="mt-4 grid grid-cols-2 gap-4 border-t border-gray-200 pt-3 dark:border-slate-800">
             {children}
         </div>
     );
@@ -1210,8 +1217,12 @@ function RecordValue({
 }) {
     return (
         <div className={align === "right" ? "text-right" : ""}>
-            <p className="text-[11px] text-slate-500">{label}</p>
-            <p className="mt-1 truncate text-xs text-slate-300">{value}</p>
+            <p className="text-[11px] text-gray-500 dark:text-slate-500">
+                {label}
+            </p>
+            <p className="mt-1 truncate text-xs text-gray-700 dark:text-slate-300">
+                {value}
+            </p>
         </div>
     );
 }
@@ -1245,6 +1256,13 @@ function ActivityTrendChart({
     range: string;
     allModuleRecords: ModuleRecordItem[];
 }) {
+    // ✅ FIX: gamitin ang isDarkMode (hindi theme)
+    const { isDarkMode } = useTheme();
+    const isDark = isDarkMode;
+
+    const gridColor = isDark ? "#1e293b" : "#e5e7eb";
+    const axisColor = isDark ? "#94a3b8" : "#6b7280";
+
     const getRecordsForLabel = (label: string): TooltipRecord[] => {
         return allModuleRecords
             .filter((item) => {
@@ -1291,26 +1309,26 @@ function ActivityTrendChart({
     };
 
     return (
-        <section className="mb-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl sm:p-7">
+        <section className="mb-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-7">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="mb-2 flex items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10">
-                            <TrendingUp size={20} className="text-yellow-400" />
+                            <TrendingUp size={20} className="text-yellow-500 dark:text-yellow-400" />
                         </div>
 
-                        <h2 className="text-xl font-bold text-white">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                             Module Activity Trends
                         </h2>
                     </div>
 
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
                         Actual records recorded across your ALIBATON modules.
                         Hover to see the records.
                     </p>
                 </div>
 
-                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-400">
+                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                     {range}
                 </span>
             </div>
@@ -1358,13 +1376,13 @@ function ActivityTrendChart({
                             <CartesianGrid
                                 strokeDasharray="3 3"
                                 vertical={false}
-                                stroke="#1e293b"
+                                stroke={gridColor}
                             />
 
                             <XAxis
                                 dataKey="label"
                                 tick={{
-                                    fill: "#94a3b8",
+                                    fill: axisColor,
                                     fontSize: 11,
                                 }}
                                 axisLine={false}
@@ -1375,7 +1393,7 @@ function ActivityTrendChart({
                             <YAxis
                                 allowDecimals={false}
                                 tick={{
-                                    fill: "#94a3b8",
+                                    fill: axisColor,
                                     fontSize: 12,
                                 }}
                                 axisLine={false}
@@ -1401,7 +1419,7 @@ function ActivityTrendChart({
                                 activeDot={{
                                     r: 6,
                                     fill: "#facc15",
-                                    stroke: "#111827",
+                                    stroke: isDark ? "#111827" : "#ffffff",
                                     strokeWidth: 3,
                                 }}
                             />
@@ -1415,7 +1433,7 @@ function ActivityTrendChart({
 
 /*
 |--------------------------------------------------------------------------
-| 7 DAY MODULE DISTRIBUTION — MAY SCROLLABLE TOOLTIP
+| 7 DAY MODULE DISTRIBUTION
 |--------------------------------------------------------------------------
 */
 
@@ -1426,6 +1444,9 @@ function SevenDayModuleDistributionChart({
     data: Array<{ name: string; value: number }>;
     allModuleRecords: ModuleRecordItem[];
 }) {
+    const { isDarkMode } = useTheme();
+    const isDark = isDarkMode;
+
     const chartData = data.filter((item) => item.value > 0);
 
     const totalRecords = chartData.reduce(
@@ -1475,26 +1496,26 @@ function SevenDayModuleDistributionChart({
     };
 
     return (
-        <section className="mb-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl sm:p-7">
+        <section className="mb-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-7">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="mb-2 flex items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10">
-                            <BarChart3 size={20} className="text-yellow-400" />
+                            <BarChart3 size={20} className="text-yellow-500 dark:text-yellow-400" />
                         </div>
 
-                        <h2 className="text-xl font-bold text-white">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                             7-Day Module Distribution
                         </h2>
                     </div>
 
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
                         Actual records grouped by module during the last 7 days.
                         Hover to see the records.
                     </p>
                 </div>
 
-                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-400">
+                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                     Last 7 Days
                 </span>
             </div>
@@ -1520,7 +1541,7 @@ function SevenDayModuleDistributionChart({
                                     innerRadius={110}
                                     outerRadius={160}
                                     paddingAngle={3}
-                                    stroke="#0f172a"
+                                    stroke={isDark ? "#0f172a" : "#ffffff"}
                                     strokeWidth={3}
                                 >
                                     {chartData.map((item, index) => {
@@ -1528,9 +1549,7 @@ function SevenDayModuleDistributionChart({
                                             MODULE_LABELS,
                                         ).find(
                                             ([, label]) => label === item.name,
-                                        )?.[0] as
-                                            | OverviewType
-                                            | undefined;
+                                        )?.[0] as OverviewType | undefined;
 
                                         return (
                                             <Cell
@@ -1554,7 +1573,7 @@ function SevenDayModuleDistributionChart({
                                     height={36}
                                     iconType="circle"
                                     formatter={(value) => (
-                                        <span className="text-xs text-slate-300">
+                                        <span className="text-xs text-gray-700 dark:text-slate-300">
                                             {value}
                                         </span>
                                     )}
@@ -1563,26 +1582,28 @@ function SevenDayModuleDistributionChart({
                         </ResponsiveContainer>
 
                         <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center">
-                            <span className="text-4xl font-bold text-white">
+                            <span className="text-4xl font-bold text-gray-900 dark:text-white">
                                 {totalRecords}
                             </span>
 
-                            <span className="mt-1 text-xs font-medium text-slate-500">
+                            <span className="mt-1 text-xs font-medium text-gray-500 dark:text-slate-500">
                                 Total Records
                             </span>
                         </div>
                     </div>
 
                     <div className="space-y-3">
-                        {chartData.map((item, index) => {
+                        {chartData.map((item) => {
                             const percentage =
                                 totalRecords > 0
                                     ? (item.value / totalRecords) * 100
                                     : 0;
 
-                            const moduleKey = Object.entries(MODULE_LABELS).find(
-                                ([, label]) => label === item.name,
-                            )?.[0] as OverviewType | undefined;
+                            const moduleKey = Object.entries(
+                                MODULE_LABELS,
+                            ).find(([, label]) => label === item.name)?.[0] as
+                                | OverviewType
+                                | undefined;
 
                             const color = moduleKey
                                 ? MODULE_COLORS[moduleKey]
@@ -1591,7 +1612,7 @@ function SevenDayModuleDistributionChart({
                             return (
                                 <div
                                     key={item.name}
-                                    className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4"
+                                    className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-950/40"
                                 >
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex min-w-0 items-center gap-3">
@@ -1602,17 +1623,17 @@ function SevenDayModuleDistributionChart({
                                                 }}
                                             />
 
-                                            <span className="truncate text-sm font-medium text-slate-300">
+                                            <span className="truncate text-sm font-medium text-gray-700 dark:text-slate-300">
                                                 {item.name}
                                             </span>
                                         </div>
 
-                                        <span className="text-sm font-bold text-white">
+                                        <span className="text-sm font-bold text-gray-900 dark:text-white">
                                             {item.value}
                                         </span>
                                     </div>
 
-                                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-slate-800">
                                         <div
                                             className="h-full rounded-full"
                                             style={{
@@ -1623,11 +1644,11 @@ function SevenDayModuleDistributionChart({
                                     </div>
 
                                     <div className="mt-2 flex items-center justify-between">
-                                        <span className="text-[11px] text-slate-500">
+                                        <span className="text-[11px] text-gray-500 dark:text-slate-500">
                                             Actual records
                                         </span>
 
-                                        <span className="text-[11px] font-semibold text-slate-400">
+                                        <span className="text-[11px] font-semibold text-gray-600 dark:text-slate-400">
                                             {percentage.toFixed(1)}%
                                         </span>
                                     </div>
@@ -1665,6 +1686,12 @@ function StackedModuleChart({
     allModuleRecords: ModuleRecordItem[];
     dateRange: DateRange;
 }) {
+    const { isDarkMode } = useTheme();
+    const isDark = isDarkMode;
+
+    const gridColor = isDark ? "#1e293b" : "#e5e7eb";
+    const axisColor = isDark ? "#94a3b8" : "#6b7280";
+
     const getRecordsForLabelAndModule = (
         label: string,
         module: OverviewType,
@@ -1705,11 +1732,17 @@ function StackedModuleChart({
 
         const allRecords: TooltipRecord[] = [];
 
-        (["invoices", "payments", "contracts", "compliances"] as OverviewType[])
-            .forEach((module) => {
-                const records = getRecordsForLabelAndModule(label, module);
-                allRecords.push(...records);
-            });
+        (
+            [
+                "invoices",
+                "payments",
+                "contracts",
+                "compliances",
+            ] as OverviewType[]
+        ).forEach((module) => {
+            const records = getRecordsForLabelAndModule(label, module);
+            allRecords.push(...records);
+        });
 
         const total = payload.reduce(
             (sum, item) => sum + Number(item.value ?? 0),
@@ -1728,26 +1761,26 @@ function StackedModuleChart({
     const hasData = data.some((item) => item.total > 0);
 
     return (
-        <section className="mb-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl sm:p-7">
+        <section className="mb-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-7">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="mb-2 flex items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10">
-                            <Layers size={20} className="text-yellow-400" />
+                            <Layers size={20} className="text-yellow-500 dark:text-yellow-400" />
                         </div>
 
-                        <h2 className="text-xl font-bold text-white">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                             Records by Module Over Time
                         </h2>
                     </div>
 
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
                         Nakikita kung anong module ang may pinakamaraming
                         records sa bawat panahon. Hover to see the records.
                     </p>
                 </div>
 
-                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-400">
+                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                     {range}
                 </span>
             </div>
@@ -1772,13 +1805,13 @@ function StackedModuleChart({
                             <CartesianGrid
                                 strokeDasharray="3 3"
                                 vertical={false}
-                                stroke="#1e293b"
+                                stroke={gridColor}
                             />
 
                             <XAxis
                                 dataKey="label"
                                 tick={{
-                                    fill: "#94a3b8",
+                                    fill: axisColor,
                                     fontSize: 11,
                                 }}
                                 axisLine={false}
@@ -1789,7 +1822,7 @@ function StackedModuleChart({
                             <YAxis
                                 allowDecimals={false}
                                 tick={{
-                                    fill: "#94a3b8",
+                                    fill: axisColor,
                                     fontSize: 12,
                                 }}
                                 axisLine={false}
@@ -1808,7 +1841,7 @@ function StackedModuleChart({
                                 height={36}
                                 iconType="circle"
                                 formatter={(value) => (
-                                    <span className="text-xs text-slate-300">
+                                    <span className="text-xs text-gray-700 dark:text-slate-300">
                                         {value}
                                     </span>
                                 )}
@@ -1852,7 +1885,7 @@ function StackedModuleChart({
 
 /*
 |--------------------------------------------------------------------------
-| RECENT ACTIVITY — MAY SCROLL BAR KAPAG > 4 RECORDS
+| RECENT ACTIVITY
 |--------------------------------------------------------------------------
 */
 
@@ -1863,32 +1896,31 @@ function RecentActivitySection({
     activities: ActivityItem[];
     onOpen?: (activity: ActivityItem) => void;
 }) {
-    /* ✅ Scrollbar kapag lagpas 4 records */
     const shouldScroll = activities.length > SCROLL_RECORD_THRESHOLD;
 
     return (
-        <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl sm:p-7">
+        <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-7">
             <div className="mb-6">
                 <div className="mb-2 flex items-center gap-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10">
-                        <Activity size={20} className="text-yellow-400" />
+                        <Activity size={20} className="text-yellow-500 dark:text-yellow-400" />
                     </div>
 
-                    <h2 className="text-xl font-bold text-white">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                         Recent Activity
                     </h2>
 
                     {activities.length > 0 && (
-                        <span className="ml-1 rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1 text-[10px] font-bold text-slate-400">
+                        <span className="ml-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold text-gray-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
                             {activities.length}
                         </span>
                     )}
                 </div>
 
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-gray-500 dark:text-slate-400">
                     Latest actual records from your modules.
                     {shouldScroll && (
-                        <span className="ml-1 text-yellow-400/70">
+                        <span className="ml-1 text-yellow-600/70 dark:text-yellow-400/70">
                             (scroll to view more)
                         </span>
                     )}
@@ -1903,9 +1935,7 @@ function RecentActivitySection({
             ) : (
                 <div
                     className={`alibaton-dashboard-scroll space-y-3 ${
-                        shouldScroll
-                            ? "max-h-[420px] overflow-y-auto pr-2"
-                            : ""
+                        shouldScroll ? "max-h-[420px] overflow-y-auto pr-2" : ""
                     }`}
                 >
                     {activities.map((activity) => (
@@ -1913,32 +1943,32 @@ function RecentActivitySection({
                             key={activity.id}
                             type="button"
                             onClick={() => onOpen?.(activity)}
-                            className="group flex w-full items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-left transition hover:border-yellow-400/30 hover:bg-slate-950"
+                            className="group flex w-full items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-yellow-400/30 hover:bg-white dark:border-slate-800 dark:bg-slate-950/40 dark:hover:bg-slate-950"
                         >
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10">
                                 <Activity
                                     size={18}
-                                    className="text-yellow-400"
+                                    className="text-yellow-500 dark:text-yellow-400"
                                 />
                             </div>
 
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-semibold text-white">
+                                    <p className="font-semibold text-gray-900 dark:text-white">
                                         {activity.title}
                                     </p>
 
-                                    <span className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[9px] font-medium text-slate-400">
+                                    <span className="rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[9px] font-medium text-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                                         {activity.module}
                                     </span>
                                 </div>
 
-                                <p className="mt-1 text-sm text-slate-400">
+                                <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                                     {activity.description}
                                 </p>
 
                                 {activity.date && (
-                                    <p className="mt-2 text-xs text-slate-500">
+                                    <p className="mt-2 text-xs text-gray-500 dark:text-slate-500">
                                         {formatDateTime(activity.date)}
                                     </p>
                                 )}
@@ -1950,7 +1980,7 @@ function RecentActivitySection({
 
                             <ChevronRight
                                 size={15}
-                                className="mt-3 shrink-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-yellow-400"
+                                className="mt-3 shrink-0 text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-yellow-600 dark:text-slate-600 dark:group-hover:text-yellow-400"
                             />
                         </button>
                     ))}
@@ -1962,7 +1992,7 @@ function RecentActivitySection({
 
 /*
 |--------------------------------------------------------------------------
-| UPCOMING DEADLINES — MAY SCROLL BAR KAPAG > 4 RECORDS
+| UPCOMING DEADLINES
 |--------------------------------------------------------------------------
 */
 
@@ -1973,32 +2003,31 @@ function UpcomingDeadlinesSection({
     deadlines: DeadlineItem[];
     onOpen?: (deadline: DeadlineItem) => void;
 }) {
-    /* ✅ Scrollbar kapag lagpas 4 records */
     const shouldScroll = deadlines.length > SCROLL_RECORD_THRESHOLD;
 
     return (
-        <section className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl sm:p-7">
+        <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-7">
             <div className="mb-6">
                 <div className="mb-2 flex items-center gap-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10">
-                        <CalendarDays size={20} className="text-yellow-400" />
+                        <CalendarDays size={20} className="text-yellow-500 dark:text-yellow-400" />
                     </div>
 
-                    <h2 className="text-xl font-bold text-white">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                         Upcoming Deadlines
                     </h2>
 
                     {deadlines.length > 0 && (
-                        <span className="ml-1 rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1 text-[10px] font-bold text-slate-400">
+                        <span className="ml-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold text-gray-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
                             {deadlines.length}
                         </span>
                     )}
                 </div>
 
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-gray-500 dark:text-slate-400">
                     Actual upcoming due, expiry, and contract end dates.
                     {shouldScroll && (
-                        <span className="ml-1 text-yellow-400/70">
+                        <span className="ml-1 text-yellow-600/70 dark:text-yellow-400/70">
                             (scroll to view more)
                         </span>
                     )}
@@ -2013,9 +2042,7 @@ function UpcomingDeadlinesSection({
             ) : (
                 <div
                     className={`alibaton-dashboard-scroll space-y-3 ${
-                        shouldScroll
-                            ? "max-h-[420px] overflow-y-auto pr-2"
-                            : ""
+                        shouldScroll ? "max-h-[420px] overflow-y-auto pr-2" : ""
                     }`}
                 >
                     {deadlines.map((deadline) => (
@@ -2023,32 +2050,32 @@ function UpcomingDeadlinesSection({
                             key={deadline.id}
                             type="button"
                             onClick={() => onOpen?.(deadline)}
-                            className="group flex w-full items-center gap-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-left transition hover:border-yellow-400/30 hover:bg-slate-950"
+                            className="group flex w-full items-center gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-yellow-400/30 hover:bg-white dark:border-slate-800 dark:bg-slate-950/40 dark:hover:bg-slate-950"
                         >
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10">
                                 <CalendarDays
                                     size={18}
-                                    className="text-yellow-400"
+                                    className="text-yellow-500 dark:text-yellow-400"
                                 />
                             </div>
 
                             <div className="min-w-0 flex-1">
-                                <p className="truncate font-semibold text-white">
+                                <p className="truncate font-semibold text-gray-900 dark:text-white">
                                     {deadline.title}
                                 </p>
 
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
                                     {deadline.type}
                                 </p>
                             </div>
 
                             <div className="text-right">
-                                <p className="text-sm font-semibold text-yellow-400">
+                                <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
                                     {formatDate(deadline.date)}
                                 </p>
 
                                 {deadline.status && (
-                                    <p className="mt-1 text-xs text-slate-500">
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
                                         {deadline.status}
                                     </p>
                                 )}
@@ -2056,7 +2083,7 @@ function UpcomingDeadlinesSection({
 
                             <ChevronRight
                                 size={15}
-                                className="shrink-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-yellow-400"
+                                className="shrink-0 text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-yellow-600 dark:text-slate-600 dark:group-hover:text-yellow-400"
                             />
                         </button>
                     ))}
@@ -2074,12 +2101,14 @@ function UpcomingDeadlinesSection({
 
 function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
     return (
-        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 px-5 py-10 text-center">
-            <div className="mx-auto mb-3 flex justify-center text-slate-600">
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-5 py-10 text-center dark:border-slate-800 dark:bg-slate-950/30">
+            <div className="mx-auto mb-3 flex justify-center text-gray-400 dark:text-slate-600">
                 {icon}
             </div>
 
-            <p className="text-sm font-medium text-slate-400">{text}</p>
+            <p className="text-sm font-medium text-gray-600 dark:text-slate-400">
+                {text}
+            </p>
         </div>
     );
 }
@@ -2297,7 +2326,10 @@ export default function Dashboard() {
         return [
             { name: MODULE_LABELS.invoices, value: countByModule("invoices") },
             { name: MODULE_LABELS.payments, value: countByModule("payments") },
-            { name: MODULE_LABELS.contracts, value: countByModule("contracts") },
+            {
+                name: MODULE_LABELS.contracts,
+                value: countByModule("contracts"),
+            },
             {
                 name: MODULE_LABELS.compliances,
                 value: countByModule("compliances"),
@@ -2305,7 +2337,6 @@ export default function Dashboard() {
         ];
     }, [rangeRecords]);
 
-    /* ✅ Recent Activity — pinapakita lahat (scroll na ang bahala) */
     const recentActivities = useMemo<ActivityItem[]>(() => {
         return [...allModuleRecords]
             .sort((a, b) => {
@@ -2350,7 +2381,6 @@ export default function Dashboard() {
             });
     }, [allModuleRecords]);
 
-    /* ✅ Upcoming Deadlines — pinapakita lahat (scroll na ang bahala) */
     const upcomingDeadlines = useMemo<DeadlineItem[]>(() => {
         const today = startOfDay(new Date());
         const futureLimit = endOfDay(addDays(today, 90));
@@ -2408,12 +2438,7 @@ export default function Dashboard() {
         compliances.forEach((record) => {
             const title = getRecordNumber("compliances", record);
 
-            addDeadline(
-                record,
-                MODULE_LABELS.compliances,
-                "due_date",
-                title,
-            );
+            addDeadline(record, MODULE_LABELS.compliances, "due_date", title);
 
             addDeadline(
                 record,
@@ -2553,24 +2578,24 @@ export default function Dashboard() {
                 }
             `}</style>
 
-            <div className="min-w-0 flex-1 bg-[#000000] px-4 pb-8 pt-20 sm:px-6 lg:px-8 lg:pt-8">
+       <div className="min-w-0 flex-1 bg-gray-50 px-4 pb-8 pt-20 dark:bg-black sm:px-6 lg:px-8 lg:pt-8">
                 <div className="mx-auto w-full max-w-[1600px]">
-                    <div className="mb-5">
-                        <div className="mb-4">
-                            <div>
-                                <div className="mb-2 flex items-center gap-2"></div>
+                    {/* HEADER */}
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                            <div className="mb-2 flex items-center gap-2"></div>
 
-                                <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                                    Welcome back, {userName}!
-                                </h1>
+                            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+                                Welcome back, {userName}!
+                            </h1>
 
-                                <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                                    Monitor your actual module records,
-                                    activity, and upcoming deadlines from one
-                                    place.
-                                </p>
-                            </div>
+                            <p className="mt-2 max-w-2xl text-sm text-gray-500 dark:text-slate-400">
+                                Monitor your actual module records, activity,
+                                and upcoming deadlines from one place.
+                            </p>
                         </div>
+
+
                     </div>
 
                     <SystemOverview
@@ -2578,7 +2603,7 @@ export default function Dashboard() {
                         onSelect={setSelectedOverview}
                     />
 
-                    <div className="mb-6 w-full rounded-2xl border border-slate-800 bg-slate-900/95 p-2 shadow-xl">
+                    <div className="mb-6 w-full rounded-2xl border border-gray-200 bg-white/95 p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900/95">
                         <div className="flex w-full items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700">
                             {filters.map((filter) => {
                                 const active = dateRange === filter;
@@ -2593,7 +2618,7 @@ export default function Dashboard() {
                                         className={`shrink-0 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all sm:px-4 sm:text-sm ${
                                             active
                                                 ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/10"
-                                                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                                : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                                         }`}
                                     >
                                         {filter}
@@ -2609,7 +2634,7 @@ export default function Dashboard() {
                                 className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all sm:px-4 sm:text-sm ${
                                     dateRange === "Custom Range"
                                         ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/10"
-                                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                        : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                                 }`}
                             >
                                 <CalendarDays size={14} />
@@ -2618,8 +2643,8 @@ export default function Dashboard() {
 
                             {dateRange === "Custom Range" && (
                                 <div className="flex shrink-0 items-center gap-2 pl-1">
-                                    <label className="flex h-[42px] shrink-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                    <label className="flex h-[42px] shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-500">
                                             From
                                         </span>
                                         <input
@@ -2631,12 +2656,12 @@ export default function Dashboard() {
                                                 );
                                                 setDateRange("Custom Range");
                                             }}
-                                            className="min-w-[128px] bg-transparent text-xs font-medium text-white outline-none [color-scheme:dark]"
+                                            className="min-w-[128px] bg-transparent text-xs font-medium text-gray-900 outline-none [color-scheme:light] dark:text-white dark:[color-scheme:dark]"
                                         />
                                     </label>
 
-                                    <label className="flex h-[42px] shrink-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                    <label className="flex h-[42px] shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-500">
                                             To
                                         </span>
                                         <input
@@ -2648,7 +2673,7 @@ export default function Dashboard() {
                                                 );
                                                 setDateRange("Custom Range");
                                             }}
-                                            className="min-w-[128px] bg-transparent text-xs font-medium text-white outline-none [color-scheme:dark]"
+                                            className="min-w-[128px] bg-transparent text-xs font-medium text-gray-900 outline-none [color-scheme:light] dark:text-white dark:[color-scheme:dark]"
                                         />
                                     </label>
                                 </div>
@@ -2656,7 +2681,7 @@ export default function Dashboard() {
                         </div>
 
                         {customRangeInvalid && (
-                            <p className="px-2 pb-1 pt-2 text-[11px] font-medium text-red-400">
+                            <p className="px-2 pb-1 pt-2 text-[11px] font-medium text-red-500 dark:text-red-400">
                                 The start date must be on or before the end
                                 date.
                             </p>
@@ -2699,7 +2724,7 @@ export default function Dashboard() {
                         />
                     </div>
 
-                    <div className="mt-8 flex flex-col gap-2 border-t border-slate-800 pt-5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mt-8 flex flex-col gap-2 border-t border-gray-200 pt-5 text-xs text-gray-400 dark:border-slate-800 dark:text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                         <p>
                             © {new Date().getFullYear()} ALIBATON Heavy
                             Equipment & Logistics

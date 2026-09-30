@@ -41,6 +41,7 @@ class PaymentController extends Controller
 
     public function index()
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
         abort_unless(
@@ -84,7 +85,9 @@ class PaymentController extends Controller
 
         $payments = Payment::query()
             ->with([
-                'invoice:id,number,client,client_email,project,amount,status,due_date,description,job_order_id', // ✅ Added client_email
+                // ✅ Kasama ang billing_number (BILL-YYYY-NNN) at job order reference
+                'invoice:id,number,billing_number,client,client_email,project,amount,status,due_date,description,job_order_id',
+                'invoice.jobOrder:id,number',
                 'user:id,name,email,role',
                 'editor:id,name,email',
                 'updatedBy:id,name,email',
@@ -133,7 +136,7 @@ class PaymentController extends Controller
                     $invoice->id,
 
                     'number' =>
-                    $invoice->number,
+                    $invoice->number ?? $invoice->billing_number,
 
                     'client' =>
                     $invoice->client,
@@ -179,6 +182,24 @@ class PaymentController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | ✅ NOTIFICATIONS
+        |--------------------------------------------------------------------------
+        */
+
+        $notifications = $user
+            ->notifications()
+            ->take(20)
+            ->get()
+            ->map(fn($n) => [
+                'id' => $n->id,
+                'type' => $n->type,
+                'data' => $n->data,
+                'read_at' => $n->read_at,
+                'created_at' => $n->created_at->toISOString(),
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
         | RESPONSE
         |--------------------------------------------------------------------------
         */
@@ -194,6 +215,9 @@ class PaymentController extends Controller
 
                 'paymentMethods' =>
                 self::PAYMENT_METHODS,
+
+                'notifications' =>
+                $notifications,
 
                 'flash' => [
                     'success' =>
@@ -746,6 +770,25 @@ class PaymentController extends Controller
 
             'invoiceNumber' =>
             $invoiceNumber,
+
+            /*
+            |--------------------------------------------------------------------------
+            | ✅ REFERENCE NUMBERS (Billing No. + Job Order No.)
+            |--------------------------------------------------------------------------
+            |
+            | BILLING NUMBER (BILL-YYYY-NNN) — mayroon agad sa pag-create ng
+            | billing. Ito ang reference na hinahanap sa Payment Management.
+            |
+            */
+
+            'billingNumber' =>
+            $payment->billing_number
+                ?: $invoice?->billing_number
+                ?: null,
+
+            'jobOrderNumber' =>
+            $invoice?->jobOrder?->number
+                ?: null,
 
             /*
             |--------------------------------------------------------------------------
@@ -2169,6 +2212,102 @@ class PaymentController extends Controller
         return back()->with(
             'success',
             "Statement of Account sent successfully to {$validated['email']}."
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ NOTIFICATIONS (BAGONG DAGDAG)
+    |--------------------------------------------------------------------------
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ NOTIFICATIONS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get notifications (para sa bell icon polling)
+     */
+    public function getNotifications()
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $notifications = $user
+            ->notifications()
+            ->take(50)
+            ->get()
+            ->map(fn($n) => [
+                'id' => $n->id,
+                'type' => $n->type,
+                'data' => $n->data,
+                'read_at' => $n->read_at,
+                'created_at' => $n->created_at->toISOString(),
+            ]);
+
+        return response()->json([
+            'notifications' => $notifications,
+            'unread_count' => $user->unreadNotifications()->count(),
+        ]);
+    }
+
+    /**
+     * Mark single notification as read
+     */
+    public function markNotificationRead($id)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $notification = $user->notifications()->findOrFail($id);
+        $notification->markAsRead();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mark all notifications as read
+     */
+    public function markAllNotificationsRead()
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $user->unreadNotifications->markAsRead();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Record a payment (nag-ti-trigger ng notification)
+     */
+    public function recordPayment(Request $request, Payment $payment)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'payment_date' => 'required|date',
+            'method' => 'required|string',
+            'reference' => 'nullable|string',
+            'notes' => 'nullable|string',
+        ]);
+
+        $payment->transactions()->create([
+            'amount' => $validated['amount'],
+            'date' => $validated['payment_date'],
+            'type' => 'Partial',
+            'status' => 'Completed',
+            'method' => $validated['method'],
+            'reference' => $validated['reference'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        event(new \App\Events\PaymentReceived($payment->fresh()));
+
+        return back()->with(
+            'success',
+            'Payment recorded successfully! Status updated.'
         );
     }
 }

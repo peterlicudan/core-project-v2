@@ -59,29 +59,9 @@ class AdminPaymentController extends Controller
 
         $payments = Payment::query()
             ->with([
-                /*
-                |--------------------------------------------------------------------------
-                | PAYMENT OWNER / CLIENT ACCOUNT
-                |--------------------------------------------------------------------------
-                */
                 'user:id,name,email,role',
-
-                /*
-                |--------------------------------------------------------------------------
-                | INVOICE
-                |--------------------------------------------------------------------------
-                |
-                | client_email is included when the invoice table has
-                | this column.
-                |
-                */
-                'invoice:id,number,client,client_email,project,amount,status',
-
-                /*
-                |--------------------------------------------------------------------------
-                | AUDIT
-                |--------------------------------------------------------------------------
-                */
+                'invoice:id,number,billing_number,client,client_email,project,amount,status,job_order_id',
+                'invoice.jobOrder:id,number',
                 'editor:id,name,email',
                 'updatedBy:id,name,email',
             ])
@@ -134,13 +114,6 @@ class AdminPaymentController extends Controller
         |--------------------------------------------------------------------------
         | CLIENT EMAIL
         |--------------------------------------------------------------------------
-        |
-        | Priority:
-        |
-        | 1. Payment client_email
-        | 2. Invoice client_email
-        | 3. Payment user's email
-        |
         */
 
         $clientEmail =
@@ -343,14 +316,12 @@ class AdminPaymentController extends Controller
         |--------------------------------------------------------------------------
         | EDIT PERMISSION
         |--------------------------------------------------------------------------
-        |
-        | Pending and Partial can be edited.
-        | Paid and Archived are locked.
-        |
+        | ✅ ADMIN archive check (hindi user-side)
+        |--------------------------------------------------------------------------
         */
 
         $canEdit =
-            !$payment->archived &&
+            !$payment->admin_archived &&
             !$isPaid &&
             (
                 $isPartial ||
@@ -429,13 +400,6 @@ class AdminPaymentController extends Controller
         */
 
         return [
-
-            /*
-            |--------------------------------------------------------------------------
-            | BASIC
-            |--------------------------------------------------------------------------
-            */
-
             'id' =>
                 $payment->id,
 
@@ -450,23 +414,11 @@ class AdminPaymentController extends Controller
             'client' =>
                 $client,
 
-            /*
-            |--------------------------------------------------------------------------
-            | CLIENT EMAIL
-            |--------------------------------------------------------------------------
-            */
-
             'clientEmail' =>
                 $clientEmail,
 
             'client_email' =>
                 $clientEmail,
-
-            /*
-            |--------------------------------------------------------------------------
-            | INVOICE
-            |--------------------------------------------------------------------------
-            */
 
             'invoice' =>
                 $invoiceNumber,
@@ -474,11 +426,15 @@ class AdminPaymentController extends Controller
             'invoiceId' =>
                 $payment->invoice_id,
 
-            /*
-            |--------------------------------------------------------------------------
-            | PAYMENT
-            |--------------------------------------------------------------------------
-            */
+            /* ✅ REFERENCE — Billing No. (BILL-YYYY-NNN) + Job Order No. */
+            'billingNumber' =>
+                $payment->billing_number
+                ?: $invoice?->billing_number
+                ?: null,
+
+            'jobOrderNumber' =>
+                $invoice?->jobOrder?->number
+                ?: null,
 
             'method' =>
                 $payment->payment_method,
@@ -489,20 +445,8 @@ class AdminPaymentController extends Controller
             'amount' =>
                 (float) $payment->amount,
 
-            /*
-            |--------------------------------------------------------------------------
-            | STATUS
-            |--------------------------------------------------------------------------
-            */
-
             'status' =>
                 $status,
-
-            /*
-            |--------------------------------------------------------------------------
-            | BALANCE
-            |--------------------------------------------------------------------------
-            */
 
             'invoiceAmount' =>
                 $invoiceAmount,
@@ -512,12 +456,6 @@ class AdminPaymentController extends Controller
 
             'remainingBalance' =>
                 $remainingBalance,
-
-            /*
-            |--------------------------------------------------------------------------
-            | DATES
-            |--------------------------------------------------------------------------
-            */
 
             'paymentDate' =>
                 $paymentDate,
@@ -543,12 +481,6 @@ class AdminPaymentController extends Controller
             'due_date' =>
                 $dueDate,
 
-            /*
-            |--------------------------------------------------------------------------
-            | STATUS FLAGS
-            |--------------------------------------------------------------------------
-            */
-
             'isPending' =>
                 $isPending,
 
@@ -570,32 +502,14 @@ class AdminPaymentController extends Controller
             'daysUntilDue' =>
                 $daysUntilDue,
 
-            /*
-            |--------------------------------------------------------------------------
-            | EDIT
-            |--------------------------------------------------------------------------
-            */
-
             'canEdit' =>
                 $canEdit,
 
             'isLocked' =>
                 !$canEdit,
 
-            /*
-            |--------------------------------------------------------------------------
-            | NOTES
-            |--------------------------------------------------------------------------
-            */
-
             'notes' =>
                 $payment->notes,
-
-            /*
-            |--------------------------------------------------------------------------
-            | OWNER / CLIENT ACCOUNT
-            |--------------------------------------------------------------------------
-            */
 
             'userId' =>
                 $payment->user_id,
@@ -608,12 +522,6 @@ class AdminPaymentController extends Controller
 
             'userRole' =>
                 $payment->user?->role,
-
-            /*
-            |--------------------------------------------------------------------------
-            | AUDIT
-            |--------------------------------------------------------------------------
-            */
 
             'editedBy' =>
                 $payment->editor?->name,
@@ -634,18 +542,12 @@ class AdminPaymentController extends Controller
                     )
                     : null,
 
-            /*
-            |--------------------------------------------------------------------------
-            | INVOICE STATUS
-            |--------------------------------------------------------------------------
-            */
-
             'invoiceStatus' =>
                 $invoice?->status,
 
             /*
             |--------------------------------------------------------------------------
-            | ARCHIVE
+            | USER-SIDE ARCHIVE
             |--------------------------------------------------------------------------
             */
 
@@ -655,6 +557,32 @@ class AdminPaymentController extends Controller
             'archivedAt' =>
                 $payment->archived_at
                     ? $payment->archived_at->format(
+                        'Y-m-d H:i:s'
+                    )
+                    : null,
+
+            /*
+            |--------------------------------------------------------------------------
+            | ✅ ADMIN-SIDE ARCHIVE (BAGO)
+            |--------------------------------------------------------------------------
+            */
+
+            'admin_archived' =>
+                (bool) $payment->admin_archived,
+
+            'adminArchived' =>
+                (bool) $payment->admin_archived,
+
+            'admin_archived_at' =>
+                $payment->admin_archived_at
+                    ? $payment->admin_archived_at->format(
+                        'Y-m-d H:i:s'
+                    )
+                    : null,
+
+            'adminArchivedAt' =>
+                $payment->admin_archived_at
+                    ? $payment->admin_archived_at->format(
                         'Y-m-d H:i:s'
                     )
                     : null,
@@ -681,12 +609,6 @@ class AdminPaymentController extends Controller
 
             'daysUntilExpiration' =>
                 $daysUntilExpiration,
-
-            /*
-            |--------------------------------------------------------------------------
-            | ARCHIVE INFO
-            |--------------------------------------------------------------------------
-            */
 
             'archiveInfo' =>
                 $payment->archived
@@ -776,7 +698,7 @@ class AdminPaymentController extends Controller
                     $invoice->id,
 
                 'invoice_number' =>
-                    $invoice->number,
+                    $invoice->number ?? $invoice->billing_number,
 
                 'invoice_amount' =>
                     number_format(
@@ -809,23 +731,6 @@ class AdminPaymentController extends Controller
     |--------------------------------------------------------------------------
     | UPDATE PAYMENT
     |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    |
-    | Amount is NEVER accepted from frontend.
-    | Status is NEVER accepted from frontend.
-    |
-    | Editable:
-    |
-    | - Payment Method
-    | - Payment Date
-    | - Due Date
-    | - Notes
-    |
-    | Partial amount = automatic 50%.
-    |
-    | Payment Date on Partial/Pending = Fully Paid.
-    |
     */
 
     public function update(
@@ -836,11 +741,11 @@ class AdminPaymentController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | ARCHIVED LOCK
+        | ✅ ADMIN ARCHIVED LOCK (BAGO)
         |--------------------------------------------------------------------------
         */
 
-        if ($payment->archived) {
+        if ($payment->admin_archived) {
             return back()->withErrors([
                 'payment' =>
                     'Archived payments cannot be modified.',
@@ -902,11 +807,6 @@ class AdminPaymentController extends Controller
         |--------------------------------------------------------------------------
         | VALIDATION
         |--------------------------------------------------------------------------
-        |
-        | NO amount.
-        | NO status.
-        | NO partial_date from frontend.
-        |
         */
 
         $validated =
@@ -947,20 +847,8 @@ class AdminPaymentController extends Controller
                 $currentStatus
             ) {
 
-                /*
-                |--------------------------------------------------------------------------
-                | PAYMENT METHOD
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->payment_method =
                     $validated['payment_method'];
-
-                /*
-                |--------------------------------------------------------------------------
-                | INVOICE
-                |--------------------------------------------------------------------------
-                */
 
                 $invoice =
                     $payment->invoice;
@@ -992,12 +880,6 @@ class AdminPaymentController extends Controller
                         );
                     }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | PAYMENT DATE = FULLY PAID
-                    |--------------------------------------------------------------------------
-                    */
-
                     if (
                         !empty(
                             $validated['payment_date']
@@ -1007,50 +889,24 @@ class AdminPaymentController extends Controller
                         $payment->status =
                             'Paid';
 
-                        /*
-                        | Full invoice amount.
-                        */
-
                         $payment->amount =
                             $invoiceAmount;
-
-                        /*
-                        | Keep original partial date.
-                        */
 
                         if (!$payment->partial_date) {
                             $payment->partial_date =
                                 now()->toDateString();
                         }
 
-                        /*
-                        | Final payment date.
-                        */
-
                         $payment->payment_date =
                             $validated['payment_date'];
-
-                        /*
-                        | Paid = no due date.
-                        */
 
                         $payment->due_date =
                             null;
 
                     } else {
 
-                        /*
-                        |--------------------------------------------------------------------------
-                        | STILL PARTIAL
-                        |--------------------------------------------------------------------------
-                        */
-
                         $payment->status =
                             'Partial';
-
-                        /*
-                        | Always keep amount at 50%.
-                        */
 
                         $payment->amount =
                             round(
@@ -1058,26 +914,13 @@ class AdminPaymentController extends Controller
                                 2
                             );
 
-                        /*
-                        | Automatically preserve/create
-                        | partial payment date.
-                        */
-
                         if (!$payment->partial_date) {
                             $payment->partial_date =
                                 now()->toDateString();
                         }
 
-                        /*
-                        | No final payment date yet.
-                        */
-
                         $payment->payment_date =
                             null;
-
-                        /*
-                        | Keep/update due date.
-                        */
 
                         $payment->due_date =
                             $validated['due_date']
@@ -1094,15 +937,6 @@ class AdminPaymentController extends Controller
                 if (
                     $currentStatus === 'pending'
                 ) {
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | PAYMENT DATE SUPPLIED
-                    |--------------------------------------------------------------------------
-                    |
-                    | Pending -> Paid
-                    |
-                    */
 
                     if (
                         !empty(
@@ -1130,74 +964,33 @@ class AdminPaymentController extends Controller
                         $payment->status =
                             'Paid';
 
-                        /*
-                        | Full invoice amount.
-                        */
-
                         $payment->amount =
                             $invoiceAmount;
-
-                        /*
-                        | Final payment date.
-                        */
 
                         $payment->payment_date =
                             $validated['payment_date'];
 
-                        /*
-                        | Pending had no partial payment.
-                        */
-
                         $payment->partial_date =
                             null;
-
-                        /*
-                        | Paid = no due date.
-                        */
 
                         $payment->due_date =
                             null;
 
                     } else {
 
-                        /*
-                        |--------------------------------------------------------------------------
-                        | STILL PENDING
-                        |--------------------------------------------------------------------------
-                        */
-
                         $payment->status =
                             'Pending';
-
-                        /*
-                        | CRITICAL:
-                        |
-                        | Keep the existing amount.
-                        | The edit form cannot change it.
-                        */
 
                         $payment->amount =
                             $payment->getOriginal(
                                 'amount'
                             );
 
-                        /*
-                        | No final payment date.
-                        */
-
                         $payment->payment_date =
                             null;
 
-                        /*
-                        | Preserve any existing partial date.
-                        */
-
                         $payment->partial_date =
                             $payment->partial_date;
-
-                        /*
-                        | Due date.
-                        */
 
                         $payment->due_date =
                             $validated['due_date']
@@ -1232,7 +1025,7 @@ class AdminPaymentController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | NEVER AUTO ARCHIVE
+                | USER-SIDE ARCHIVE FLAGS (HUWAG GALAWIN)
                 |--------------------------------------------------------------------------
                 */
 
@@ -1292,12 +1085,6 @@ class AdminPaymentController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | SUCCESS
-        |--------------------------------------------------------------------------
-        */
-
         return back()->with(
             'success',
             'Payment record updated successfully.'
@@ -1317,11 +1104,11 @@ class AdminPaymentController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | ARCHIVED LOCK
+        | ✅ ADMIN ARCHIVED LOCK (BAGO)
         |--------------------------------------------------------------------------
         */
 
-        if ($payment->archived) {
+        if ($payment->admin_archived) {
             return back()->withErrors([
                 'payment' =>
                     'Archived payments cannot be modified.',
@@ -1370,63 +1157,27 @@ class AdminPaymentController extends Controller
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | FINAL PAYMENT DATE
-                |--------------------------------------------------------------------------
-                */
-
                 $paymentDate =
                     now()->toDateString();
-
-                /*
-                |--------------------------------------------------------------------------
-                | MARK PAID
-                |--------------------------------------------------------------------------
-                */
 
                 $payment->status =
                     'Paid';
 
-                /*
-                |--------------------------------------------------------------------------
-                | FULL INVOICE AMOUNT
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->amount =
                     $invoiceAmount;
-
-                /*
-                |--------------------------------------------------------------------------
-                | FINAL PAYMENT DATE
-                |--------------------------------------------------------------------------
-                */
 
                 $payment->payment_date =
                     $paymentDate;
 
-                /*
-                |--------------------------------------------------------------------------
-                | KEEP PARTIAL DATE
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->partial_date =
                     $payment->partial_date;
-
-                /*
-                |--------------------------------------------------------------------------
-                | PAID = NO DUE DATE
-                |--------------------------------------------------------------------------
-                */
 
                 $payment->due_date =
                     null;
 
                 /*
                 |--------------------------------------------------------------------------
-                | NEVER AUTO ARCHIVE
+                | USER-SIDE ARCHIVE FLAGS
                 |--------------------------------------------------------------------------
                 */
 
@@ -1457,19 +1208,7 @@ class AdminPaymentController extends Controller
                 $payment->updated_by =
                     Auth::id();
 
-                /*
-                |--------------------------------------------------------------------------
-                | SAVE
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->save();
-
-                /*
-                |--------------------------------------------------------------------------
-                | SYNC INVOICE
-                |--------------------------------------------------------------------------
-                */
 
                 $this->syncInvoiceStatus(
                     $payment
@@ -1477,23 +1216,11 @@ class AdminPaymentController extends Controller
             }
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | REFRESH
-        |--------------------------------------------------------------------------
-        */
-
         $freshPayment =
             $payment->fresh([
                 'user',
                 'invoice',
             ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | EMAIL
-        |--------------------------------------------------------------------------
-        */
 
         if ($freshPayment) {
             $this->sendAutomaticStatusEmail(
@@ -1520,11 +1247,11 @@ class AdminPaymentController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | ARCHIVED LOCK
+        | ✅ ADMIN ARCHIVED LOCK (BAGO)
         |--------------------------------------------------------------------------
         */
 
-        if ($payment->archived) {
+        if ($payment->admin_archived) {
             return back()->withErrors([
                 'payment' =>
                     'Archived payments cannot be modified.',
@@ -1573,74 +1300,34 @@ class AdminPaymentController extends Controller
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | AUTOMATIC 50%
-                |--------------------------------------------------------------------------
-                */
-
                 $halfPayment =
                     round(
                         $invoiceAmount / 2,
                         2
                     );
 
-                /*
-                |--------------------------------------------------------------------------
-                | AUTOMATIC PARTIAL DATE
-                |--------------------------------------------------------------------------
-                */
-
                 $partialDate =
                     $payment->partial_date
                     ?: now()->toDateString();
 
-                /*
-                |--------------------------------------------------------------------------
-                | SAVE PARTIAL
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->status =
                     'Partial';
-
-                /*
-                | Amount automatically locked at 50%.
-                */
 
                 $payment->amount =
                     $halfPayment;
 
-                /*
-                |--------------------------------------------------------------------------
-                | PARTIAL DATE
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->partial_date =
                     $partialDate;
 
-                /*
-                |--------------------------------------------------------------------------
-                | FINAL PAYMENT DATE EMPTY
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->payment_date =
                     null;
-
-                /*
-                |--------------------------------------------------------------------------
-                | KEEP DUE DATE
-                |--------------------------------------------------------------------------
-                */
 
                 $payment->due_date =
                     $payment->due_date;
 
                 /*
                 |--------------------------------------------------------------------------
-                | NEVER AUTO ARCHIVE
+                | USER-SIDE ARCHIVE FLAGS
                 |--------------------------------------------------------------------------
                 */
 
@@ -1671,19 +1358,7 @@ class AdminPaymentController extends Controller
                 $payment->updated_by =
                     Auth::id();
 
-                /*
-                |--------------------------------------------------------------------------
-                | SAVE
-                |--------------------------------------------------------------------------
-                */
-
                 $payment->save();
-
-                /*
-                |--------------------------------------------------------------------------
-                | SYNC INVOICE
-                |--------------------------------------------------------------------------
-                */
 
                 $this->syncInvoiceStatus(
                     $payment
@@ -1691,23 +1366,11 @@ class AdminPaymentController extends Controller
             }
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | REFRESH
-        |--------------------------------------------------------------------------
-        */
-
         $freshPayment =
             $payment->fresh([
                 'user',
                 'invoice',
             ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | EMAIL
-        |--------------------------------------------------------------------------
-        */
 
         if ($freshPayment) {
             $this->sendAutomaticStatusEmail(
@@ -1723,7 +1386,11 @@ class AdminPaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | ARCHIVE PAID PAYMENT
+    | ✅ ADMIN ARCHIVE (BAGO)
+    |--------------------------------------------------------------------------
+    | WALANG status check — lahat pwedeng i-archive.
+    | Gumagamit ng `admin_archived` (hindi `archived`).
+    | HINDI apektado ang user side.
     |--------------------------------------------------------------------------
     */
 
@@ -1733,69 +1400,32 @@ class AdminPaymentController extends Controller
         $this->authorizeAdmin();
 
         abort_unless(
-            strtolower(
-                trim(
-                    (string) $payment->status
-                )
-            ) === 'paid',
-            422,
-            'Only Paid payments can be archived.'
-        );
-
-        abort_unless(
-            !$payment->archived,
+            !$payment->admin_archived,
             422,
             'This payment is already archived.'
         );
 
         DB::transaction(
             function () use ($payment) {
-
-                $archivedAt =
-                    now();
-
                 $payment->update([
-                    'archived' =>
-                        true,
-
-                    'archived_at' =>
-                        $archivedAt,
-
-                    'archive_expires_at' =>
-                        $archivedAt
-                            ->copy()
-                            ->addDays(
-                                self::ARCHIVE_DAYS
-                            ),
-
-                    'delete_after' =>
-                        $archivedAt
-                            ->copy()
-                            ->addYears(
-                                self::DELETE_AFTER_YEARS
-                            ),
-
-                    'updated_by' =>
-                        Auth::id(),
-
-                    'edited_by' =>
-                        Auth::id(),
-
-                    'edited_at' =>
-                        now(),
+                    'admin_archived'    => true,
+                    'admin_archived_at' => now(),
+                    'updated_by'        => Auth::id(),
+                    'edited_by'         => Auth::id(),
+                    'edited_at'         => now(),
                 ]);
             }
         );
 
         return back()->with(
             'success',
-            'Paid payment has been archived successfully.'
+            'Payment has been moved to admin archive successfully.'
         );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | UNARCHIVE
+    | ✅ ADMIN UNARCHIVE (BAGO)
     |--------------------------------------------------------------------------
     */
 
@@ -1805,53 +1435,28 @@ class AdminPaymentController extends Controller
         $this->authorizeAdmin();
 
         abort_unless(
-            $payment->archived,
+            $payment->admin_archived,
             422,
             'This payment is not archived.'
         );
 
-        abort_unless(
-            strtolower(
-                trim(
-                    (string) $payment->status
-                )
-            ) === 'paid',
-            422,
-            'Only Paid payments can be returned from Archive.'
-        );
-
         $payment->update([
-            'archived' =>
-                false,
-
-            'archived_at' =>
-                null,
-
-            'archive_expires_at' =>
-                null,
-
-            'delete_after' =>
-                null,
-
-            'updated_by' =>
-                Auth::id(),
-
-            'edited_by' =>
-                Auth::id(),
-
-            'edited_at' =>
-                now(),
+            'admin_archived'    => false,
+            'admin_archived_at' => null,
+            'updated_by'        => Auth::id(),
+            'edited_by'         => Auth::id(),
+            'edited_at'         => now(),
         ]);
 
         return back()->with(
             'success',
-            'Payment returned to the Paid records.'
+            'Payment restored from admin archive.'
         );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | CLEANUP EXPIRED ARCHIVES
+    | CLEANUP EXPIRED ARCHIVES (user-side)
     |--------------------------------------------------------------------------
     */
 
@@ -1927,12 +1532,6 @@ class AdminPaymentController extends Controller
         $invoiceAmount =
             (float) $invoice->amount;
 
-        /*
-        |--------------------------------------------------------------------------
-        | FULLY PAID
-        |--------------------------------------------------------------------------
-        */
-
         if (
             $totalPaid >= $invoiceAmount
         ) {
@@ -1940,24 +1539,12 @@ class AdminPaymentController extends Controller
                 'Paid';
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | PARTIAL
-        |--------------------------------------------------------------------------
-        */
-
         elseif (
             $totalPaid > 0
         ) {
             $invoice->status =
                 'Partial';
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | PENDING
-        |--------------------------------------------------------------------------
-        */
 
         else {
             $invoice->status =
@@ -2054,12 +1641,6 @@ class AdminPaymentController extends Controller
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | RECEIPT
-        |--------------------------------------------------------------------------
-        */
-
         $receiptNumber =
             $payment->receipt_number
             ?: $payment->receipt
@@ -2070,22 +1651,10 @@ class AdminPaymentController extends Controller
                 STR_PAD_LEFT
             );
 
-        /*
-        |--------------------------------------------------------------------------
-        | INVOICE
-        |--------------------------------------------------------------------------
-        */
-
         $invoiceNumber =
             $payment->invoice_number
             ?: $payment->invoice?->number
             ?: 'N/A';
-
-        /*
-        |--------------------------------------------------------------------------
-        | AMOUNT
-        |--------------------------------------------------------------------------
-        */
 
         $amount =
             number_format(
@@ -2093,32 +1662,14 @@ class AdminPaymentController extends Controller
                 2
             );
 
-        /*
-        |--------------------------------------------------------------------------
-        | STATUS
-        |--------------------------------------------------------------------------
-        */
-
         $status =
             $payment->status
             ?: 'Pending';
-
-        /*
-        |--------------------------------------------------------------------------
-        | INVOICE TOTAL
-        |--------------------------------------------------------------------------
-        */
 
         $invoiceAmount =
             $payment->invoice
             ? (float) $payment->invoice->amount
             : 0;
-
-        /*
-        |--------------------------------------------------------------------------
-        | TOTAL PAID
-        |--------------------------------------------------------------------------
-        */
 
         $totalPaid =
             $payment->invoice_id
@@ -2137,32 +1688,14 @@ class AdminPaymentController extends Controller
                 ->sum('amount')
             : 0;
 
-        /*
-        |--------------------------------------------------------------------------
-        | REMAINING
-        |--------------------------------------------------------------------------
-        */
-
         $remaining =
             max(
                 0,
                 $invoiceAmount - $totalPaid
             );
 
-        /*
-        |--------------------------------------------------------------------------
-        | SUBJECT
-        |--------------------------------------------------------------------------
-        */
-
         $subject =
             "ALIBATON Payment Status Update - {$receiptNumber}";
-
-        /*
-        |--------------------------------------------------------------------------
-        | MESSAGE
-        |--------------------------------------------------------------------------
-        */
 
         $message =
             "Hello {$user->name},\n\n" .
@@ -2180,12 +1713,6 @@ class AdminPaymentController extends Controller
 
             "Status: {$status}\n";
 
-        /*
-        |--------------------------------------------------------------------------
-        | PARTIAL DATE
-        |--------------------------------------------------------------------------
-        */
-
         if (
             $payment->partial_date
         ) {
@@ -2197,12 +1724,6 @@ class AdminPaymentController extends Controller
                 "\n";
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | FINAL PAYMENT DATE
-        |--------------------------------------------------------------------------
-        */
-
         if (
             $payment->payment_date
         ) {
@@ -2213,12 +1734,6 @@ class AdminPaymentController extends Controller
                 ) .
                 "\n";
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | DUE DATE
-        |--------------------------------------------------------------------------
-        */
 
         if (
             $payment->due_date &&
@@ -2235,12 +1750,6 @@ class AdminPaymentController extends Controller
                 ) .
                 "\n";
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | BALANCE
-        |--------------------------------------------------------------------------
-        */
 
         $message .=
             "Invoice Total: ₱" .
@@ -2263,12 +1772,6 @@ class AdminPaymentController extends Controller
                 2
             ) .
             "\n\n";
-
-        /*
-        |--------------------------------------------------------------------------
-        | STATUS MESSAGE
-        |--------------------------------------------------------------------------
-        */
 
         if (
             $status === 'Paid'
@@ -2294,21 +1797,9 @@ class AdminPaymentController extends Controller
                 "Your payment is currently pending administrative review.\n\n";
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | FOOTER
-        |--------------------------------------------------------------------------
-        */
-
         $message .=
             "Thank you,\n" .
             "ALIBATON Heavy Equipment & Logistics Management System";
-
-        /*
-        |--------------------------------------------------------------------------
-        | SEND
-        |--------------------------------------------------------------------------
-        */
 
         try {
 

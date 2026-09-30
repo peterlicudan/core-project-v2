@@ -9,6 +9,8 @@ use App\Models\Notification;
 use App\Models\JobOrder;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -19,27 +21,35 @@ class AdminBillingController extends Controller
     |--------------------------------------------------------------------------
     | INDEX — Billing Management Page
     |--------------------------------------------------------------------------
-    |
-    | ✅ Loads:
-    | - Invoices (for billing approval)
-    | - Pending Invoices
-    | - ✅ Pending Job Orders (for Job Order approval)
-    | - Stats
-    | - Notifications
-    |
     */
 
     public function index()
     {
-        $invoices = Invoice::with(['user', 'jobOrder'])->get();
-        $pendingInvoices = Invoice::where('status', 'Pending')
-            ->with(['user', 'jobOrder'])
-            ->get();
+        $invoices = Invoice::with(['user', 'jobOrder'])
+            ->latest('created_at')
+            ->get()
+            ->map(fn (Invoice $invoice) => $this->transformForAdmin($invoice));
 
-        // ✅ PENDING JOB ORDERS — para sa admin approval
-        $pendingJobOrders = JobOrder::where('status', 'Pending Admin Approval')
-            ->with(['user:id,name,email', 'generatedBy:id,name,email'])
-            ->latest()
+        $pendingInvoices = $invoices
+            ->where('status', 'Pending')
+            ->values();
+
+        /*
+        |--------------------------------------------------------------------------
+        | ✅ JOB ORDERS (reference / verification ng admin)
+        |--------------------------------------------------------------------------
+        |
+        | Hindi na ito "pending approval" — ang BILLING na ang ina-verify ng
+        | admin. Ito lang ang reference para makita kung tugma ang billing.
+        |
+        */
+
+        $jobOrders = JobOrder::with([
+            'user:id,name,email',
+            'generatedBy:id,name,email',
+            'invoices:id,job_order_id,status,service_month,amount,base_amount,billing_number',
+        ])
+            ->latest('created_at')
             ->get()
             ->map(function (JobOrder $jobOrder) {
                 return [
@@ -56,32 +66,78 @@ class AdminBillingController extends Controller
                     'startDate' => $jobOrder->start_date?->format('Y-m-d'),
                     'endDate' => $jobOrder->end_date?->format('Y-m-d'),
                     'amount' => (float) $jobOrder->amount,
+                    'quotationTotal' => $jobOrder->quotationTotal(),
+                    'billingMonths' => $jobOrder->billingMonths(),
+                    'monthlyAmount' => $jobOrder->monthlyAmount(),
                     'description' => $jobOrder->description,
                     'notes' => $jobOrder->notes,
                     'status' => $jobOrder->status,
+                    'billingStatus' => $jobOrder->billingStatus(),
+                    'pendingCount' => $jobOrder->pendingBillingsCount(),
+                    'approvedCount' => $jobOrder->approvedBillingsCount(),
+                    'rejectedCount' => $jobOrder->rejectedBillingsCount(),
                     'generatedAt' => $jobOrder->generated_at?->format('Y-m-d H:i:s'),
                     'generatedByName' => $jobOrder->generatedBy?->name ?? 'Staff',
                     'staffName' => $jobOrder->user?->name ?? 'Unassigned',
-                    'hasInvoice' => false,
-                    'invoiceId' => null,
-                    'invoiceNumber' => null,
+                    'billings' => $jobOrder->invoices
+                        ->map(fn (Invoice $invoice) => [
+                            'id' => $invoice->id,
+                            'billingNumber' => $invoice->billing_number,
+                            'serviceMonth' => $invoice->service_month,
+                            'status' => $invoice->status,
+                            'baseAmount' => $invoice->baseAmountValue(),
+                            'totalAmount' => (float) $invoice->amount,
+                        ])
+                        ->values(),
                 ];
             })
             ->values();
 
+        $pendingJobOrders = $jobOrders->where('pendingCount', '>', 0)->values();
+
         $stats = [
-            'pending' => Invoice::where('status', 'Pending')->count(),
-            'approved' => Invoice::where('status', 'Approved')->count(),
-            'rejected' => Invoice::where('status', 'Rejected')->count(),
-            'paid' => Invoice::where('status', 'Paid')->count(),
-            'overdue' => Invoice::where('status', 'Overdue')->count(),
-            'total' => Invoice::count(),
-            // ✅ BAGO — Pending Job Orders count
+            'pending' => $invoices->where('status', 'Pending')->count(),
+            'approved' => $invoices->where('status', 'Approved')->count(),
+            'rejected' => $invoices->where('status', 'Rejected')->count(),
+            'paid' => $invoices->where('status', 'Paid')->count(),
+            'overdue' => $invoices->where('status', 'Overdue')->count(),
+            'mismatched' => $invoices->where('matchesJobOrder', false)->count(),
+            'total' => $invoices->count(),
             'pendingJobOrders' => $pendingJobOrders->count(),
         ];
 
-        // ✅ NOTIFICATIONS (polymorphic)
-        $notifications = Notification::where('notifiable_type', 'App\\Models\\User')
+        // ✅ NOTIFICATIONS (polymorphic) — shared with the global bell
+        $notifications = $this->flattenNotifications();
+
+        return Inertia::render('Admin/BillingManagement', [
+            'invoices' => $invoices,
+            'pendingInvoices' => $pendingInvoices,
+            'pendingJobOrders' => $pendingJobOrders,
+            'jobOrders' => $jobOrders,
+            'stats' => $stats,
+            'notifications' => $notifications,
+        ]);
+    }
+
+    /**
+     * ✅ ADMIN NOTIFICATION LIST (JSON) — ginagamit ng global bell
+     * para mag-poll/kumuha ng pinakabagong notifications kahit
+     * hindi pa nag-reload ang buong page.
+     */
+    public function notificationList(): JsonResponse
+    {
+        return response()->json([
+            'notifications' => $this->flattenNotifications(),
+        ]);
+    }
+
+    /**
+     * Flatten the admin's notifications into the UI shape:
+     * { id, title, message, type, link, read, createdAt }.
+     */
+    private function flattenNotifications(): array
+    {
+        return Notification::where('notifiable_type', 'App\\Models\\User')
             ->where('notifiable_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->take(30)
@@ -96,19 +152,72 @@ class AdminBillingController extends Controller
                     'title' => $data['title'] ?? 'Notification',
                     'message' => $data['message'] ?? '',
                     'type' => $data['type'] ?? 'info',
-                    'link' => $data['link'] ?? null,
+                    'link' => $data['link'] ?? $data['redirect_url'] ?? null,
                     'read' => !is_null($notification->read_at),
                     'createdAt' => $notification->created_at?->toIso8601String(),
                 ];
-            });
+            })
+            ->values()
+            ->toArray();
+    }
 
-        return Inertia::render('Admin/BillingManagement', [
-            'invoices' => $invoices,
-            'pendingInvoices' => $pendingInvoices,
-            'pendingJobOrders' => $pendingJobOrders,   // ✅ BAGO
-            'stats' => $stats,
-            'notifications' => $notifications,
-        ]);
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ TRANSFORM INVOICE PARA SA ADMIN VERIFICATION
+    |--------------------------------------------------------------------------
+    */
+
+    private function transformForAdmin(Invoice $invoice): array
+    {
+        $jobOrder = $invoice->jobOrder;
+
+        $expected = $jobOrder?->monthlyAmount() ?? 0.0;
+        $base = $invoice->baseAmountValue();
+        $matches = $expected > 0 ? abs($base - $expected) < 0.01 : null;
+        $difference = $invoice->amountDifferenceValue();
+
+        return [
+            'id' => $invoice->id,
+            'number' => $invoice->number,
+            'hasInvoiceNumber' => filled($invoice->number),
+            'billingNumber' => $invoice->billing_number,
+            'client' => $invoice->client,
+            'clientEmail' => $invoice->client_email,
+            'clientAddress' => $invoice->client_address,
+            'project' => $invoice->project,
+            'description' => $invoice->description,
+            'notes' => $invoice->notes,
+            'amount' => (float) $invoice->amount,
+            'baseAmount' => $base,
+            'vatRate' => (float) ($invoice->vat_rate ?? 0),
+            'vatAmount' => $invoice->vatAmountValue(),
+            'additionalCharges' => $invoice->additionalChargesValue(),
+            'totalAmount' => $invoice->totalAmountValue(),
+            'status' => $invoice->status,
+            'due_date' => $invoice->due_date?->format('Y-m-d'),
+            'created_at' => $invoice->created_at?->format('Y-m-d H:i:s'),
+            'serviceMonth' => $invoice->service_month,
+            'billingSequence' => $invoice->billing_sequence,
+            'approved_at' => $invoice->approved_at?->format('Y-m-d H:i:s'),
+            'approved_by' => $invoice->approved_by,
+            'rejected_at' => $invoice->rejected_at?->format('Y-m-d H:i:s'),
+            'rejected_by' => $invoice->rejected_by,
+            'rejection_reason' => $invoice->rejection_reason,
+            'verified_at' => $invoice->verified_at?->format('Y-m-d H:i:s'),
+            'verified_by' => $invoice->verified_by,
+            'staffName' => $invoice->user?->name ?? 'Unassigned',
+
+            /* ✅ VERIFICATION DATA — JO vs Billing */
+            'jobOrderId' => $invoice->job_order_id,
+            'jobOrderNumber' => $jobOrder?->number,
+            'jobOrderStatus' => $jobOrder?->billingStatus(),
+            'quotationTotal' => $jobOrder?->quotationTotal() ?? 0,
+            'billingMonths' => $jobOrder?->billingMonths() ?? 0,
+            'monthlyAmount' => $expected,
+            'expectedAmount' => $expected,
+            'amountDifference' => $difference ?? 0,
+            'matchesJobOrder' => $matches,
+        ];
     }
 
     /*
@@ -127,7 +236,8 @@ class AdminBillingController extends Controller
         ]);
 
         $invoice = Invoice::create([
-            'number' => $this->generateInvoiceNumber(),
+            'number' => null,
+            'billing_number' => $this->generateBillingNumber(),
             'client' => $request->client,
             'client_email' => $request->client_email,
             'client_address' => $request->client_address,
@@ -141,7 +251,7 @@ class AdminBillingController extends Controller
             'staff_id' => Auth::id(),
         ]);
 
-        return redirect()->back()->with('success', "Invoice {$invoice->number} has been created.");
+        return redirect()->back()->with('success', "Billing record {$invoice->billing_number} has been created.");
     }
 
     /*
@@ -173,7 +283,7 @@ class AdminBillingController extends Controller
             'notes' => $request->notes,
         ]);
 
-        return redirect()->back()->with('success', "Invoice {$invoice->number} has been updated.");
+        return redirect()->back()->with('success', "Billing record {$this->ref($invoice)} has been updated.");
     }
 
     /*
@@ -190,10 +300,17 @@ class AdminBillingController extends Controller
             'status' => 'required|in:Pending,Approved,Rejected,Paid,Overdue,Partial',
         ]);
 
+        /* ✅ Kapag manu-mano inilipat sa Approved, doon din nabubuo ang invoice number */
+        if ($request->status === 'Approved' && blank($invoice->number)) {
+            $invoice->number = $this->generateInvoiceNumber();
+        }
+
         $invoice->status = $request->status;
         $invoice->save();
 
-        return redirect()->back()->with('success', "Invoice {$invoice->number} status updated to {$request->status}.");
+        $invoice->jobOrder?->syncBillingStatus();
+
+        return redirect()->back()->with('success', "Billing record {$this->ref($invoice)} status updated to {$request->status}.");
     }
 
     /*
@@ -205,24 +322,16 @@ class AdminBillingController extends Controller
     public function destroy($id)
     {
         $invoice = Invoice::findOrFail($id);
-        $invoiceNumber = $invoice->number;
+        $invoiceNumber = $this->ref($invoice);
         $invoice->delete();
 
-        return redirect()->back()->with('success', "Invoice {$invoiceNumber} has been deleted.");
+        return redirect()->back()->with('success', "Billing record {$invoiceNumber} has been deleted.");
     }
 
     // ============================================================
-    // ✅ JOB ORDER APPROVAL (BAGO)
+    // ✅ JOB ORDER APPROVAL
     // ============================================================
 
-    /**
-     * ✅ APPROVE JOB ORDER → Create Invoice
-     *
-     * Flow:
-     * - Job Order status: "Pending Admin Approval" → "Generated"
-     * - Invoice AUTO-CREATED (status = "Pending")
-     * - Staff notified
-     */
     public function approveJobOrder(Request $request, $id)
     {
         $jobOrder = JobOrder::findOrFail($id);
@@ -236,41 +345,38 @@ class AdminBillingController extends Controller
         }
 
         $result = DB::transaction(function () use ($jobOrder, $request) {
-            // 1. Update Job Order
             $jobOrder->update([
                 'status' => 'Generated',
                 'approved_at' => now(),
                 'approved_by' => Auth::id(),
             ]);
 
-            // 2. Create Invoice
-            $invoiceNumber = $this->generateInvoiceNumber();
-
             $invoice = Invoice::create([
-                'number' => $invoiceNumber,
+                /* ✅ Walang invoice number pa — ito ay billing record pa lang */
+                'number' => null,
+                'billing_number' => $this->generateBillingNumber(),
                 'job_order_id' => $jobOrder->id,
-                'user_id' => $jobOrder->user_id,
-                'staff_id' => $jobOrder->user_id,
+              'user_id' => $jobOrder->user_id ?? Auth::id(),
+'staff_id' => $jobOrder->user_id ?? Auth::id(),
                 'client' => $jobOrder->client,
                 'client_email' => $jobOrder->client_email,
                 'client_address' => $jobOrder->client_address,
                 'client_contact' => $jobOrder->client_contact,
                 'project' => $jobOrder->project,
                 'amount' => $jobOrder->amount,
-                'status' => 'Pending',   // ✅ Invoice status = Pending (billing approval next)
+                'status' => 'Pending',
                 'due_date' => now()->addDays(30),
                 'description' => $jobOrder->description ?? 'Heavy Equipment & Logistics Service',
                 'notes' => $jobOrder->notes,
                 'payment_method' => $request->input('payment_method', 'Bank Transfer'),
             ]);
 
-            // 3. Notify staff
             if ($jobOrder->user_id) {
                 $this->createNotification(
                     Auth::id(),
                     $jobOrder->user_id,
                     'Job Order Approved ✅',
-                    "Your Job Order {$jobOrder->number} has been approved. Invoice {$invoiceNumber} has been created and awaits payment.",
+                    "Your Job Order {$jobOrder->number} has been approved. A billing record is ready for verification.",
                     'success',
                     '/billing-invoicing'
                 );
@@ -281,18 +387,10 @@ class AdminBillingController extends Controller
 
         return redirect()->back()->with(
             'success',
-            "Job Order {$result['jobOrder']->number} approved. Invoice {$result['invoice']->number} has been created."
+            "Job Order {$result['jobOrder']->number} approved. Billing record {$result['invoice']->billing_number} is ready for verification."
         );
     }
 
-    /**
-     * ✅ REJECT JOB ORDER
-     *
-     * Flow:
-     * - Job Order status: "Pending Admin Approval" → "Pending"
-     * - No invoice created
-     * - Staff notified
-     */
     public function rejectJobOrder(Request $request, $id)
     {
         $request->validate([
@@ -313,7 +411,6 @@ class AdminBillingController extends Controller
             'approved_by' => null,
         ]);
 
-        // Notify staff
         if ($jobOrder->user_id) {
             $this->createNotification(
                 Auth::id(),
@@ -332,48 +429,126 @@ class AdminBillingController extends Controller
     }
 
     // ============================================================
-    // INVOICE APPROVAL (EXISTING)
+    // INVOICE APPROVAL
     // ============================================================
 
     /**
      * Approve an invoice
+     *
+     * ✅ UPDATED: Nag-capture na ng $payment at nagpapasa ng extra data
      */
     public function approve(Request $request, $id)
     {
         $invoice = Invoice::findOrFail($id);
 
         if ($invoice->status !== 'Pending') {
-            return redirect()->back()->with('error', 'Only pending invoices can be approved.');
+            return redirect()->back()->with('error', 'Only pending billing records can be approved.');
+        }
+
+        /*
+        |----------------------------------------------------------------------
+        | ✅ VERIFICATION: dapat TUGMA ang billing sa Job Order
+        | Ihahambing yung BASE amount (excl. VAT + additional charges) sa
+        | monthly amount ng approved quotation.
+        |----------------------------------------------------------------------
+        */
+
+        $jobOrder = $invoice->jobOrder;
+
+        if ($jobOrder) {
+            $expected = $jobOrder->monthlyAmount();
+            $base = $invoice->baseAmountValue();
+
+            if ($expected > 0 && abs($base - $expected) >= 0.01) {
+                return redirect()->back()->with(
+                    'error',
+                    "Hindi tugma ang billing at job order. Expected base amount: ₱" .
+                        number_format($expected, 2) .
+                        " pero ₱" .
+                        number_format($base, 2) .
+                        ". Pumunta sa Reject para makita ng staff ang problema."
+                );
+            }
+        }
+
+        /*
+        |----------------------------------------------------------------------
+        | ✅ DUN LANG GUMAWA NG INVOICE
+        |----------------------------------------------------------------------
+        |
+        | Ang billing record ay walang invoice number hanggang ngayon.
+        | Sa APPROVE na lang natatanggap ang Invoice No. — kaya lang
+        | gumagawa ang Service Invoice, at doon na lumalabas ang number
+        | kasama ang Billing No. at Job Order No.
+        |
+        */
+
+        if (blank($invoice->number)) {
+            $invoice->number = $this->generateInvoiceNumber();
         }
 
         $invoice->status = 'Approved';
         $invoice->approved_at = now();
         $invoice->approved_by = Auth::user()->name ?? Auth::user()->email;
         $invoice->approval_notes = $request->notes;
+        $invoice->verified_at = now();
+        $invoice->verified_by = Auth::user()->name ?? Auth::user()->email;
         $invoice->save();
 
-        // Update related job order if exists
-        if ($invoice->jobOrder) {
-            $invoice->jobOrder->status = 'Approved';
-            $invoice->jobOrder->save();
-        }
+        // ✅ Job Order status = Completed kapag na-approve na lahat, else Created
+        $jobOrder?->syncBillingStatus();
 
-        // Create payment record
-        $this->createPaymentRecord($invoice);
+        // ✅ Create payment record — CAPTURE the returned $payment
+        $payment = $this->createPaymentRecord($invoice);
 
         // Notify staff
         $staffId = $invoice->staff_id ?? $invoice->user_id ?? 1;
 
+        // ✅ Build extra data for enhanced notification
+        $extraData = [];
+        if ($payment) {
+            $extraData = [
+                'payment_id' => $payment->id,
+                'invoice_id' => $invoice->id,
+                'receipt' => $payment->receipt,
+                'client' => $payment->client,
+                'client_email' => $payment->client_email,
+                'invoice' => $invoice->number,
+                'status' => $payment->status,
+                'amount' => (float) $payment->amount,
+                'paid_amount' => (float) ($payment->paid_amount ?? 0),
+                'remaining_balance' => (float) ($payment->remaining_balance ?? $payment->amount),
+                'due_date' => $payment->due_date,
+                'redirect_url' => "/payment-management?payment_id={$payment->id}",
+                'changes' => [
+                    'status' => [
+                        'from' => null,
+                        'to' => $payment->status,
+                    ],
+                    'amount' => [
+                        'from' => null,
+                        'to' => (float) $payment->amount,
+                    ],
+                ],
+            ];
+        }
+
+        $billingRef = $invoice->billing_number ?? $invoice->number ?? "#{$invoice->id}";
+
         $this->createNotification(
             Auth::id(),
             $staffId,
-            'Invoice Approved ✅',
-            "Invoice {$invoice->number} has been approved by " . Auth::user()->name . ' and payment record created.',
+            'Billing Record Approved ✅',
+            "Billing record {$billingRef} has been verified and approved by " . Auth::user()->name . ". Service Invoice {$invoice->number} is now available. You can bill the next month.",
             'success',
-            '/payment-management'
+            '/billing-invoicing',
+            $extraData   // ✅ IPASA
         );
 
-        return redirect()->back()->with('success', "Invoice {$invoice->number} has been approved and payment record created.");
+        return redirect()->back()->with(
+            'success',
+            "Billing record {$billingRef} verified and approved. Service Invoice {$invoice->number} created."
+        );
     }
 
     /**
@@ -382,25 +557,32 @@ class AdminBillingController extends Controller
     public function reject(Request $request, $id)
     {
         $request->validate([
-            'reason' => 'required|string|min:3|max:500',
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
 
         $invoice = Invoice::findOrFail($id);
 
         if ($invoice->status !== 'Pending') {
-            return redirect()->back()->with('error', 'Only pending invoices can be rejected.');
+            return redirect()->back()->with('error', 'Only pending billing records can be rejected.');
         }
+
+        $jobOrder = $invoice->jobOrder;
+        $billingRef = $invoice->billing_number ?? $invoice->number ?? "#{$invoice->id}";
 
         $invoice->status = 'Rejected';
         $invoice->rejected_at = now();
         $invoice->rejected_by = Auth::user()->name ?? Auth::user()->email;
         $invoice->rejection_reason = $request->reason;
+        $invoice->verified_at = now();
+        $invoice->verified_by = Auth::user()->name ?? Auth::user()->email;
         $invoice->save();
 
-        if ($invoice->jobOrder) {
-            $invoice->jobOrder->status = 'Rejected';
-            $invoice->jobOrder->rejection_reason = $request->reason;
-            $invoice->jobOrder->save();
+        if ($jobOrder) {
+            $jobOrder->rejection_reason = $request->reason;
+            $jobOrder->save();
+
+            /* ✅ Job Order status = Rejected (staff can re-create the billing) */
+            $jobOrder->syncBillingStatus();
         }
 
         $staffId = $invoice->staff_id ?? $invoice->user_id ?? 1;
@@ -408,13 +590,16 @@ class AdminBillingController extends Controller
         $this->createNotification(
             Auth::id(),
             $staffId,
-            'Invoice Rejected ❌',
-            "Invoice {$invoice->number} has been rejected. Reason: {$request->reason}",
+            'Billing Record Rejected ❌',
+            "Billing record {$billingRef} has been rejected. Reason: {$request->reason}",
             'error',
             '/billing-invoicing'
         );
 
-        return redirect()->back()->with('success', "Invoice {$invoice->number} has been rejected.");
+        return redirect()->back()->with(
+            'success',
+            "Billing record {$billingRef} has been rejected. Staff can now create a corrected billing."
+        );
     }
 
     /*
@@ -435,7 +620,13 @@ class AdminBillingController extends Controller
         $invoice->sent_by = Auth::user()->name ?? Auth::user()->email;
         $invoice->save();
 
-        return redirect()->back()->with('success', "Invoice {$invoice->number} has been sent to {$invoice->client}.");
+        $docLabel = $invoice->status === 'Approved'
+            ? "Service Invoice {$invoice->number}"
+            : "Billing record {$this->ref($invoice)}";
+
+        return redirect()
+            ->back()
+            ->with('success', "{$docLabel} has been sent to {$invoice->client}.");
     }
 
     /*
@@ -474,31 +665,79 @@ class AdminBillingController extends Controller
     */
 
     /**
-     * Generate unique invoice number
+     * ✅ Reference label para sa flash messages.
+     *
+     * Billing No. kung meron (kahit hindi pa approved), kaya walang
+     * lumilitaw na "Invoice" na walang number.
      */
-    private function generateInvoiceNumber()
+    private function ref(Invoice $invoice): string
     {
-        $year = date('Y');
+        return $invoice->billing_number
+            ?? $invoice->number
+            ?? "#{$invoice->id}";
+    }
 
-        $lastInvoice = Invoice::whereYear('created_at', $year)
-            ->orderBy('id', 'desc')
-            ->first();
+    /**
+     * ✅ Gumagawa ng Billing No. (BILL-YYYY-NNN) — mayroon agad sa pag-create.
+     *
+     * Ito ang number na ginagamit sa Billing Records (walang invoice number).
+     */
+    private function generateBillingNumber(): string
+    {
+        $year = (int) date('Y');
 
-        if ($lastInvoice && preg_match('/-(\d+)$/', $lastInvoice->number, $matches)) {
-            $lastNumber = (int) $matches[1];
-            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '0001';
-        }
+        $max = Invoice::query()
+            ->where('billing_number', 'like', "BILL-{$year}-%")
+            ->pluck('billing_number')
+            ->map(function ($number) {
+                return preg_match('/(\d+)$/', (string) $number, $matches)
+                    ? (int) $matches[1]
+                    : 0;
+            })
+            ->max() ?? 0;
 
-        return "INV-{$year}-{$newNumber}";
+        return sprintf('BILL-%d-%03d', $year, ((int) $max) + 1);
+    }
+
+    /**
+     * ✅ Gumagawa ng Invoice No. (INV-YYYY-NNNN) — TINATAWAG LANG NG APPROVE().
+     *
+     * Hindi basta `orderByDesc('id')` dahil may ibang number format sa DB
+     * (INV-TEST-..., INV-2026-1790683296) na makakaisang ma-skip.
+     * Kinukuha ang pinakamalangi numeric suffix na 4-digit, at 0 kapag wala.
+     */
+    private function generateInvoiceNumber(): string
+    {
+        $year = (int) date('Y');
+
+        $max = Invoice::query()
+            ->whereNotNull('number')
+            ->where('number', 'like', "INV-{$year}-%")
+            ->pluck('number')
+            ->map(function ($number) {
+                return preg_match('/(\d+)$/', (string) $number, $matches)
+                    ? (int) $matches[1]
+                    : 0;
+            })
+            ->max() ?? 0;
+
+        return sprintf('INV-%d-%04d', $year, ((int) $max) + 1);
     }
 
     /**
      * Create a notification (polymorphic)
+     *
+     * ✅ UPDATED: Nag-accept na ng $extraData parameter
      */
-    private function createNotification($fromUserId, $toUserId, $title, $message, $type = 'info', $link = null)
-    {
+    private function createNotification(
+        $fromUserId,
+        $toUserId,
+        $title,
+        $message,
+        $type = 'info',
+        $link = null,
+        array $extraData = []   // ✅ BAGONG PARAMETER
+    ) {
         // Check if user exists
         $user = User::find($toUserId);
         if (!$user) {
@@ -517,31 +756,37 @@ class AdminBillingController extends Controller
             'notifiable_type' => 'App\\Models\\User',
             'notifiable_id' => $toUserId,
             'type' => 'admin_notification',
-            'data' => json_encode([
+            'data' => json_encode(array_merge([
                 'title' => $title,
                 'message' => $message,
                 'type' => $type,
                 'link' => $link,
                 'from_user_id' => $fromUserId,
-            ]),
+            ], $extraData)),   // ✅ MERGE EXTRA DATA
             'read_at' => null,
         ]);
     }
 
     /**
      * Create payment record from approved invoice
+     *
+     * ✅ UPDATED: Nag-re-return na ng $payment
      */
     private function createPaymentRecord(Invoice $invoice)
     {
+        // Check if payment already exists
         $existingPayment = Payment::where('invoice_id', $invoice->id)->first();
         if ($existingPayment) {
-            return;
+            return $existingPayment;   // ✅ RETURN EXISTING
         }
 
-        Payment::create([
+        // Create new payment
+        $payment = Payment::create([
             'user_id' => $invoice->user_id,
             'invoice_id' => $invoice->id,
             'invoice_number' => $invoice->number,
+            /* ✅ REFERENCE — Billing No., para laging nasa Payment Management */
+            'billing_number' => $invoice->billing_number,
             'client' => $invoice->client,
             'amount' => $invoice->amount,
             'status' => 'Pending',
@@ -550,8 +795,10 @@ class AdminBillingController extends Controller
             'receipt_number' => null,
             'receipt' => null,
             'payment_method' => null,
-            'notes' => 'Auto-generated from approved invoice #' . $invoice->number,
+            'notes' => 'Auto-generated from approved billing ' . $this->ref($invoice),
             'archived' => false,
         ]);
+
+        return $payment;   // ✅ RETURN NEW PAYMENT
     }
 }

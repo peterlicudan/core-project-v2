@@ -234,6 +234,8 @@ Route::middleware(['auth'])->group(function () {
 
 
 
+
+
     /*
     |--------------------------------------------------------------------------
     | BILLING
@@ -1082,6 +1084,12 @@ Route::middleware([
             'index',
         ])->name('user.roles');
 
+        // ✅ AUDIT LOG — activities ng napiling staff sa lahat ng modules
+        Route::get('/user-roles/{user}/activity', [
+            UserRolesController::class,
+            'activity',
+        ])->name('user.roles.activity');
+
         Route::post('/create-user', [
             UserRolesController::class,
             'store',
@@ -1291,6 +1299,12 @@ Route::delete('/documents/{document}', [
         | ADMIN NOTIFICATIONS
         |--------------------------------------------------------------------------
         */
+
+        // ✅ GET list (JSON) — ginagamit ng global bell sa pag-poll
+        Route::get('/notifications', [
+            AdminBillingController::class,
+            'notificationList',
+        ])->name('notifications.list');
 
         Route::post('/notifications/{notification}/read', [
             AdminBillingController::class,
@@ -2649,6 +2663,32 @@ Route::middleware([
         'sendRecordEmail',
     ])->name('payment.management.send.email');
 
+        /*
+    |--------------------------------------------------------------------------
+    | ✅ PAYMENT NOTIFICATIONS (BAGONG DAGDAG)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/payment-management/notifications', [
+        PaymentController::class,
+        'getNotifications',
+    ])->name('payment.management.notifications');
+
+    Route::post('/payment-management/notifications/{id}/read', [
+        PaymentController::class,
+        'markNotificationRead',
+    ])->name('payment.management.notifications.read');
+
+    Route::post('/payment-management/notifications/read-all', [
+        PaymentController::class,
+        'markAllNotificationsRead',
+    ])->name('payment.management.notifications.read-all');
+
+    Route::post('/payment-management/{payment}/record-payment', [
+        PaymentController::class,
+        'recordPayment',
+    ])->name('payment.management.record-payment');
+
 
 /*
 |--------------------------------------------------------------------------
@@ -3253,6 +3293,12 @@ Route::get('/documents', function () {
         AlibatonAIController::class,
         'chat',
     ])->name('ai.alibaton.chat');
+
+    // ✅ GET page — para may dedicated page ang Local AI (inilagay sa sidebar)
+    Route::get('/ai/alibaton', [
+        AlibatonAIController::class,
+        'index',
+    ])->name('ai.alibaton');
 
 
     /*

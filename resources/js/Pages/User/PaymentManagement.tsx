@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Head, router } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import UserLayout from "../../Layouts/UserLayout";
+
 
 import {
     Wallet,
@@ -66,6 +67,9 @@ type Payment = {
     invoice: string;
     invoiceId?: number | null;
     invoiceNumber?: string | null;
+    /* ✅ REFERENCE — Billing No. (BILL-YYYY-NNN) at Job Order No. */
+    billingNumber?: string | null;
+    jobOrderNumber?: string | null;
     method: "Bank Transfer" | "Cheque" | string;
     amount: number;
     status: PaymentStatus | string;
@@ -751,7 +755,7 @@ const normalizePayment = (payment: Payment): Payment => {
             payment.archive_expires_at ||
             payment.retention_delete_at,
         ),
-        clientEmail: clientEmail, // ✅ ADD THIS
+        clientEmail: clientEmail,
     };
 };
 
@@ -812,6 +816,7 @@ Receipt Number      : ${payment.receipt}
 Client              : ${payment.client}
 Client Email        : ${payment.clientEmail || "N/A"}
 Invoice Number      : ${payment.invoice}
+Billing Reference   : ${payment.billingNumber || "N/A"}
 Payment Method      : ${payment.method}
 Status              : ${payment.status}
 Date Issued         : ${payment.paymentDate || new Date().toISOString().split("T")[0]}
@@ -938,6 +943,8 @@ SYSTEM INFORMATION
 export default function PaymentManagement({
     payments: serverPayments = [],
 }: PageProps) {
+    const { url } = usePage();
+
     const [payments, setPayments] = useState<Payment[]>(
         serverPayments.length > 0
             ? serverPayments.map(normalizePayment)
@@ -958,6 +965,9 @@ export default function PaymentManagement({
     const [sendingEmail, setSendingEmail] = useState<number | null>(null);
     const [successMessage, setSuccessMessage] = useState("");
     const [emailSuccessMessage, setEmailSuccessMessage] = useState("");
+    const [highlightedPaymentId, setHighlightedPaymentId] = useState<
+        number | null
+    >(null);
 
     const [showEmailForm, setShowEmailForm] = useState(false);
     const [emailFormData, setEmailFormData] = useState({
@@ -1012,6 +1022,49 @@ export default function PaymentManagement({
             setPayments(serverPayments.map(normalizePayment));
         }
     }, [serverPayments]);
+
+    /* ------------------------------------------------------------------ */
+    /* ✅ NEW: Handle notification redirect (?payment_id=X / ?invoice_id=X)*/
+    /* ------------------------------------------------------------------ */
+    useEffect(() => {
+        const params = new URLSearchParams(url.split("?")[1] || "");
+        const paymentIdFromUrl = params.get("payment_id");
+        const invoiceIdFromUrl = params.get("invoice_id");
+
+        if (!paymentIdFromUrl && !invoiceIdFromUrl) return;
+
+        const target = payments.find((p) => {
+            if (paymentIdFromUrl) return p.id === Number(paymentIdFromUrl);
+            if (invoiceIdFromUrl)
+                return p.invoiceId === Number(invoiceIdFromUrl);
+            return false;
+        });
+
+        if (!target) return;
+
+        if (target.invoiceId && target.invoiceItems?.length === 0) {
+            fetchInvoiceItems(target);
+        }
+
+        setSelectedPayment(target);
+        setHighlightedPaymentId(target.id);
+
+        window.requestAnimationFrame(() => {
+            document
+                .getElementById("payment-records")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+
+        const timer = window.setTimeout(
+            () => setHighlightedPaymentId(null),
+            4000,
+        );
+
+        // ✅ IDAGDAG: Clear URL param para hindi mag-re-run yung effect
+        window.history.replaceState({}, "", "/payment-management");
+
+        return () => window.clearTimeout(timer);
+    }, [url, payments]);
 
     const flashSuccess =
         (window as any).flash?.success || (window as any).flash?.message;
@@ -1101,6 +1154,9 @@ export default function PaymentManagement({
                 payment.receipt,
                 payment.client,
                 payment.invoice,
+                /* ✅ REFERENCE SEARCH — Billing No. + Job Order No. */
+                payment.billingNumber || "",
+                payment.jobOrderNumber || "",
                 payment.method,
                 payment.status,
                 payment.paymentDate || "",
@@ -1179,7 +1235,7 @@ export default function PaymentManagement({
             )
             .join("\n");
 
-      const defaultSubject = `Payment Confirmation - ${payment.receipt}`;
+        const defaultSubject = `Payment Confirmation - ${payment.receipt}`;
 
         const defaultMessage = `Dear ${payment.client},
 
@@ -1191,6 +1247,7 @@ ACCOUNT SUMMARY
 
 Receipt Number      : ${payment.receipt}
 Invoice Number      : ${payment.invoice}
+Billing Reference   : ${payment.billingNumber || "N/A"}
 Total Amount        : ${formatMoney(payment.amount)}
 Amount Paid         : ${formatMoney(Number(payment.paidAmount || 0))}
 Remaining Balance   : ${formatMoney(Number(payment.remainingBalance || 0))}
@@ -1618,6 +1675,7 @@ td {
             <div><span class="label">Receipt Number:</span> <span class="value">${payment.receipt}</span></div>
             <div><span class="label">Client:</span> <span class="value">${payment.client}</span></div>
             <div><span class="label">Invoice Number:</span> <span class="value">${payment.invoice}</span></div>
+            <div><span class="label">Billing Reference:</span> <span class="value">${payment.billingNumber || "N/A"}</span></div>
             <div><span class="label">Payment Method:</span> <span class="value">${payment.method}</span></div>
             <div><span class="label">Client Email:</span> <span class="value">${payment.clientEmail || "N/A"}</span></div>
             <div><span class="label">Date Issued:</span> <span class="value">${payment.paymentDate || "N/A"}</span></div>
@@ -1770,6 +1828,7 @@ Receipt: ${payment.receipt}
 Client: ${payment.client}
 Client Email: ${payment.clientEmail || "N/A"}
 Invoice: ${payment.invoice}
+Billing Reference: ${payment.billingNumber || "N/A"}
 Payment Method: ${payment.method}
 
 Status: ${payment.status}
@@ -1827,25 +1886,25 @@ Generated by ALIBATON.
         <>
             <Head title="Payment Management | ALIBATON" />
             <UserLayout>
-                <div className="w-full min-w-0 pt-16 pb-8 text-white sm:pt-8 lg:pt-0">
+                <div className="w-full min-w-0 pt-16 pb-8 text-gray-900 dark:text-white sm:pt-8 lg:pt-0">
                     {emailSuccessMessage && (
                         <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-4 shadow-lg shadow-emerald-950/20 animate-in slide-in-from-top-2 fade-in duration-300">
                             <CheckCircle2
                                 size={22}
-                                className="mt-0.5 shrink-0 text-emerald-400"
+                                className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="font-black uppercase tracking-wide text-emerald-300">
+                                <p className="font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
                                     SOA Sent Successfully
                                 </p>
-                                <p className="mt-1 text-sm leading-6 text-emerald-400/80">
+                                <p className="mt-1 text-sm leading-6 text-emerald-600/80 dark:text-emerald-400/80">
                                     {emailSuccessMessage}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setEmailSuccessMessage("")}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-300"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600 dark:text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-600 dark:hover:text-emerald-300"
                             >
                                 <X size={17} />
                             </button>
@@ -1856,38 +1915,43 @@ Generated by ALIBATON.
                         <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-4 shadow-lg shadow-emerald-950/20">
                             <CheckCircle
                                 size={22}
-                                className="mt-0.5 shrink-0 text-emerald-400"
+                                className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="font-black uppercase tracking-wide text-emerald-300">
+                                <p className="font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
                                     Success
                                 </p>
-                                <p className="mt-1 text-sm leading-6 text-emerald-400/80">
+                                <p className="mt-1 text-sm leading-6 text-emerald-600/80 dark:text-emerald-400/80">
                                     {successMessage}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSuccessMessage("")}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-300"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600 dark:text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-600 dark:hover:text-emerald-300"
                             >
                                 <X size={17} />
                             </button>
                         </div>
                     )}
 
-                    <div>
-                        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-300">
-                            <CreditCard size={14} />
-                            Payment Management
+                    {/* ✅ HEADER WITH NOTIFICATION BELL */}
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-600 dark:text-yellow-300">
+                                <CreditCard size={14} />
+                                Payment Management
+                            </div>
+                            <h1 className="text-2xl font-black sm:text-3xl lg:text-4xl">
+                                Payment Records
+                            </h1>
+                            <p className="mt-2 max-w-2xl text-sm text-gray-500 dark:text-slate-400">
+                                View your payment records, payment dates, due
+                                dates, partial payments and remaining balances.
+                            </p>
                         </div>
-                        <h1 className="text-2xl font-black sm:text-3xl lg:text-4xl">
-                            Payment Records
-                        </h1>
-                        <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                            View your payment records, payment dates, due dates,
-                            partial payments and remaining balances.
-                        </p>
+
+
                     </div>
 
                     <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1936,28 +2000,28 @@ Generated by ALIBATON.
 
                     <div
                         id="payment-records"
-                        className="mt-5 overflow-hidden rounded-3xl border border-yellow-400/15 bg-slate-900/90 shadow-2xl backdrop-blur-xl"
+                        className="mt-5 overflow-hidden rounded-3xl border border-yellow-400/15 bg-white shadow-2xl backdrop-blur-xl dark:bg-slate-900/90"
                     >
-                        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-4 sm:px-5">
+                        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4 dark:border-slate-800 sm:px-5">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <FileText size={18} />
                                 </div>
                                 <div>
                                     <h2 className="font-bold">
                                         Payment Records
                                     </h2>
-                                    <p className="text-xs text-slate-600">
+                                    <p className="text-xs text-gray-400 dark:text-slate-600">
                                         Your payment database
                                     </p>
                                 </div>
                             </div>
-                            <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-[10px] font-semibold text-slate-400">
+                            <span className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-[10px] font-semibold text-gray-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
                                 {filteredPayments.length} records
                             </span>
                         </div>
 
-                        <div className="border-b border-slate-800 bg-slate-950/50 px-3 py-3 sm:px-5">
+                        <div className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 px-3 py-3 sm:px-5">
                             <div className="flex w-full items-center gap-2 overflow-x-auto">
                                 <div className="flex shrink-0 gap-2">
                                     <PaymentTab
@@ -1990,20 +2054,20 @@ Generated by ALIBATON.
                                         onClick={() => changeTab("Due")}
                                     />
                                 </div>
-                                <div className="ml-auto shrink-0 border-l border-slate-800 pl-3">
+                                <div className="ml-auto shrink-0 border-l border-gray-200 dark:border-slate-800 pl-3">
                                     <button
                                         type="button"
                                         onClick={() => changeTab("Archive")}
                                         className={[
                                             "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition",
                                             activeTab === "Archive"
-                                                ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-300"
-                                                : "border-slate-700 bg-slate-900 text-slate-400 hover:border-yellow-400/30 hover:text-yellow-300",
+                                                ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-600 dark:text-yellow-300"
+                                                : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-500 dark:text-slate-400 hover:border-yellow-400/30 hover:text-yellow-600 dark:hover:text-yellow-300",
                                         ].join(" ")}
                                     >
                                         <Archive size={15} />
                                         Archive
-                                        <span className="rounded-full bg-slate-950 px-1.5 py-0.5 text-[9px]">
+                                        <span className="rounded-full bg-gray-50 dark:bg-slate-950 px-1.5 py-0.5 text-[9px]">
                                             {archivedPayments.length}
                                         </span>
                                     </button>
@@ -2012,8 +2076,11 @@ Generated by ALIBATON.
                         </div>
 
                         <div className="px-3 pt-4 sm:px-5">
-                            <div className="flex items-center gap-3 rounded-2xl border border-yellow-400/15 bg-slate-950/80 px-4 py-3">
-                                <Search size={19} className="text-yellow-400" />
+                            <div className="flex items-center gap-3 rounded-2xl border border-yellow-400/15 bg-gray-50 dark:bg-slate-950/80 px-4 py-3">
+                                <Search
+                                    size={19}
+                                    className="text-yellow-600 dark:text-yellow-400"
+                                />
                                 <input
                                     value={search}
                                     onChange={(event) =>
@@ -2024,13 +2091,13 @@ Generated by ALIBATON.
                                             ? "Search archived payments..."
                                             : "Search client, invoice, receipt..."
                                     }
-                                    className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-600"
+                                    className="w-full bg-transparent text-sm text-gray-900 dark:text-white outline-none placeholder:text-slate-600"
                                 />
                                 {search && (
                                     <button
                                         type="button"
                                         onClick={() => setSearch("")}
-                                        className="text-slate-500 hover:text-white"
+                                        className="text-gray-500 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white"
                                     >
                                         <X size={16} />
                                     </button>
@@ -2043,22 +2110,22 @@ Generated by ALIBATON.
                                 <div className="flex items-start gap-3">
                                     <Archive
                                         size={19}
-                                        className="mt-0.5 shrink-0 text-yellow-400"
+                                        className="mt-0.5 shrink-0 text-yellow-600 dark:text-yellow-400"
                                     />
                                     <div>
-                                        <p className="text-xs font-black text-yellow-300">
+                                        <p className="text-xs font-black text-yellow-600 dark:text-yellow-300">
                                             Payment Archive
                                         </p>
-                                        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                                        <p className="mt-1 text-[11px] leading-relaxed text-gray-500 dark:text-slate-500">
                                             Fully Paid payments can be manually
                                             archived. Archived records remain
                                             for{" "}
-                                            <strong className="text-slate-300">
+                                            <strong className="text-gray-700 dark:text-slate-300">
                                                 90 days
                                             </strong>
                                             . Permanent deletion is scheduled
                                             after{" "}
-                                            <strong className="text-slate-300">
+                                            <strong className="text-gray-700 dark:text-slate-300">
                                                 6 months
                                             </strong>{" "}
                                             retention.
@@ -2071,8 +2138,8 @@ Generated by ALIBATON.
                         <div className="mt-4 hidden md:block">
                             <div className="max-h-[560px] overflow-auto">
                                 <table className="w-full min-w-[1350px] text-left">
-                                    <thead className="sticky top-0 z-10 bg-slate-950">
-                                        <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500">
+                                    <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-slate-950">
+                                        <tr className="border-b border-gray-200 text-[10px] uppercase tracking-wider text-gray-500 dark:border-slate-800 dark:text-slate-500">
                                             <th className="px-4 py-3">
                                                 Receipt
                                             </th>
@@ -2115,14 +2182,22 @@ Generated by ALIBATON.
                                                 getArchiveInfo(payment);
                                             const vat =
                                                 getVatBreakdown(payment);
+                                            const isHighlighted =
+                                                highlightedPaymentId ===
+                                                payment.id;
 
                                             return (
                                                 <tr
                                                     key={payment.id}
-                                                    className="border-b border-slate-800/80 hover:bg-slate-800/30"
+                                                    className={[
+                                                        "border-b border-gray-200 transition-colors dark:border-slate-800/80",
+                                                        isHighlighted
+                                                            ? "bg-yellow-400/10 ring-2 ring-yellow-400/40"
+                                                            : "hover:bg-gray-50 dark:hover:bg-slate-800/30",
+                                                    ].join(" ")}
                                                 >
                                                     <td className="px-4 py-4">
-                                                        <p className="text-xs font-black text-white">
+                                                        <p className="text-xs font-black text-gray-900 dark:text-white">
                                                             {payment.receipt}
                                                         </p>
                                                         <p className="mt-1 text-[10px] text-slate-600">
@@ -2130,14 +2205,13 @@ Generated by ALIBATON.
                                                         </p>
                                                     </td>
 
-                                                    {/* ✅ CLIENT WITH EMAIL */}
                                                     <td className="px-4 py-4">
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs font-semibold text-slate-300">
+                                                            <span className="text-xs font-semibold text-gray-700 dark:text-slate-300">
                                                                 {payment.client}
                                                             </span>
                                                             {payment.clientEmail && (
-                                                                <span className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                                                                <span className="mt-0.5 flex items-center gap-1 text-[10px] text-gray-500 dark:text-slate-500">
                                                                     <Mail
                                                                         size={
                                                                             11
@@ -2154,24 +2228,44 @@ Generated by ALIBATON.
                                                     <td className="px-4 py-4">
                                                         {payment.invoiceId &&
                                                         payment.invoiceNumber ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    router.visit(
-                                                                        `/billing-invoicing/${payment.invoiceId}`,
-                                                                    );
-                                                                }}
-                                                                className="flex items-center gap-1.5 text-xs font-bold text-yellow-400 hover:text-yellow-300 hover:underline"
-                                                            >
-                                                                {
-                                                                    payment.invoiceNumber
-                                                                }
-                                                                <ExternalLink
-                                                                    size={12}
-                                                                />
-                                                            </button>
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        router.visit(
+                                                                            `/billing-invoicing/${payment.invoiceId}`,
+                                                                        );
+                                                                    }}
+                                                                    className="flex items-center gap-1.5 text-xs font-bold text-yellow-600 dark:text-yellow-400 hover:text-yellow-600 dark:hover:text-yellow-300 hover:underline"
+                                                                >
+                                                                    {
+                                                                        payment.invoiceNumber
+                                                                    }
+                                                                    <ExternalLink
+                                                                        size={
+                                                                            12
+                                                                        }
+                                                                    />
+                                                                </button>
+                                                                {/* ✅ REFERENCE NUMBERS — Billing No. + Job Order No. */}
+                                                                {payment.billingNumber && (
+                                                                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                                                        Billing:{" "}
+                                                                        {
+                                                                            payment.billingNumber
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                                {payment.jobOrderNumber && (
+                                                                    <span className="text-[10px] text-slate-500 dark:text-slate-500">
+                                                                        {
+                                                                            payment.jobOrderNumber
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         ) : (
-                                                            <span className="text-xs text-slate-500">
+                                                            <span className="text-xs text-gray-500 dark:text-slate-500">
                                                                 {
                                                                     payment.invoice
                                                                 }
@@ -2183,9 +2277,9 @@ Generated by ALIBATON.
                                                         <div className="flex items-center gap-2">
                                                             <Banknote
                                                                 size={14}
-                                                                className="text-yellow-400"
+                                                                className="text-yellow-600 dark:text-yellow-400"
                                                             />
-                                                            <span className="text-xs text-slate-400">
+                                                            <span className="text-xs text-gray-500 dark:text-slate-400">
                                                                 {payment.method}
                                                             </span>
                                                         </div>
@@ -2193,7 +2287,7 @@ Generated by ALIBATON.
 
                                                     <td className="px-4 py-4">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-xs font-black text-yellow-400">
+                                                            <span className="text-xs font-black text-yellow-600 dark:text-yellow-400">
                                                                 {visiblePaymentId ===
                                                                 payment.id
                                                                     ? formatMoney(
@@ -2208,7 +2302,7 @@ Generated by ALIBATON.
                                                                         payment.id,
                                                                     )
                                                                 }
-                                                                className="rounded-md border border-slate-700 p-1.5 text-slate-500 hover:text-yellow-400"
+                                                                className="rounded-md border border-gray-300 dark:border-slate-700 p-1.5 text-gray-500 dark:text-slate-500 hover:text-yellow-600 dark:hover:text-yellow-400"
                                                             >
                                                                 {visiblePaymentId ===
                                                                 payment.id ? (
@@ -2230,7 +2324,7 @@ Generated by ALIBATON.
 
                                                     <td className="px-4 py-4">
                                                         <div className="min-w-[150px]">
-                                                            <p className="text-xs font-black text-cyan-300">
+                                                            <p className="text-xs font-black text-cyan-600 dark:text-cyan-300">
                                                                 {visiblePaymentId ===
                                                                 payment.id
                                                                     ? formatMoney(
@@ -2253,7 +2347,7 @@ Generated by ALIBATON.
                                                     </td>
 
                                                     <td className="px-4 py-4">
-                                                        <span className="text-xs font-bold text-green-400">
+                                                        <span className="text-xs font-bold text-green-600 dark:text-green-400">
                                                             {visiblePaymentId ===
                                                             payment.id
                                                                 ? formatMoney(
@@ -2274,8 +2368,8 @@ Generated by ALIBATON.
                                                                     payment.remainingBalance ||
                                                                         0,
                                                                 ) > 0
-                                                                    ? "text-red-400"
-                                                                    : "text-green-400",
+                                                                    ? "text-red-600 dark:text-red-400"
+                                                                    : "text-green-600 dark:text-green-400",
                                                             ].join(" ")}
                                                         >
                                                             {visiblePaymentId ===
@@ -2334,14 +2428,14 @@ Generated by ALIBATON.
                                                                             size={
                                                                                 14
                                                                             }
-                                                                            className="text-yellow-400"
+                                                                            className="text-yellow-600 dark:text-yellow-400"
                                                                         />
-                                                                        <span className="text-[10px] font-bold text-slate-300">
+                                                                        <span className="text-[10px] font-bold text-gray-700 dark:text-slate-300">
                                                                             90-days
                                                                             archive
                                                                         </span>
                                                                     </div>
-                                                                    <p className="mt-1 text-[10px] text-slate-500">
+                                                                    <p className="mt-1 text-[10px] text-gray-500 dark:text-slate-500">
                                                                         Expires:{" "}
                                                                         {
                                                                             archiveInfo.expiration
@@ -2351,8 +2445,8 @@ Generated by ALIBATON.
                                                                         className={[
                                                                             "mt-1 text-[10px] font-bold",
                                                                             archiveInfo.expired
-                                                                                ? "text-red-400"
-                                                                                : "text-yellow-400",
+                                                                                ? "text-red-600 dark:text-red-400"
+                                                                                : "text-yellow-600 dark:text-yellow-400",
                                                                         ].join(
                                                                             " ",
                                                                         )}
@@ -2384,7 +2478,7 @@ Generated by ALIBATON.
                                                                     payment.id,
                                                                 )
                                                             }
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-950 text-slate-400 hover:border-yellow-400/40 hover:text-yellow-400"
+                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 text-gray-500 dark:text-slate-400 hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                                                         >
                                                             <MoreVertical
                                                                 size={18}
@@ -2404,11 +2498,18 @@ Generated by ALIBATON.
                             {filteredPayments.map((payment) => {
                                 const archiveInfo = getArchiveInfo(payment);
                                 const vat = getVatBreakdown(payment);
+                                const isHighlighted =
+                                    highlightedPaymentId === payment.id;
 
                                 return (
                                     <div
                                         key={payment.id}
-                                        className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+                                        className={[
+                                            "rounded-2xl border bg-gray-50 dark:bg-slate-950/70 p-4 transition-all",
+                                            isHighlighted
+                                                ? "border-yellow-400/60 ring-2 ring-yellow-400/40"
+                                                : "border-gray-200 dark:border-slate-800",
+                                        ].join(" ")}
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
@@ -2421,8 +2522,14 @@ Generated by ALIBATON.
                                                 <p className="mt-1 text-[10px] text-slate-600">
                                                     {payment.invoice}
                                                 </p>
+                                                {payment.billingNumber && (
+                                                    <p className="mt-0.5 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                                        Billing:{" "}
+                                                        {payment.billingNumber}
+                                                    </p>
+                                                )}
                                                 {payment.clientEmail && (
-                                                    <p className="mt-1 flex items-center gap-1 text-[9px] text-slate-500">
+                                                    <p className="mt-1 flex items-center gap-1 text-[9px] text-gray-500 dark:text-slate-500">
                                                         <Mail size={10} />
                                                         {payment.clientEmail}
                                                     </p>
@@ -2441,7 +2548,7 @@ Generated by ALIBATON.
                                                             payment.id,
                                                         )
                                                     }
-                                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700"
+                                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 dark:border-slate-700"
                                                 >
                                                     <MoreVertical size={16} />
                                                 </button>
@@ -2543,7 +2650,7 @@ Generated by ALIBATON.
                                             />
                                         </div>
 
-                                        <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-3">
+                                        <div className="mt-4 flex items-center justify-between border-t border-gray-200 dark:border-slate-800 pt-3">
                                             <button
                                                 type="button"
                                                 onClick={() =>
@@ -2551,7 +2658,7 @@ Generated by ALIBATON.
                                                         payment.id,
                                                     )
                                                 }
-                                                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-[10px] font-bold text-slate-400"
+                                                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-slate-700 px-3 py-2 text-[10px] font-bold text-gray-500 dark:text-slate-400"
                                             >
                                                 {visiblePaymentId ===
                                                 payment.id ? (
@@ -2572,7 +2679,7 @@ Generated by ALIBATON.
                                                         <p className="text-[9px] text-slate-600">
                                                             Archive expires
                                                         </p>
-                                                        <p className="text-[10px] font-bold text-yellow-400">
+                                                        <p className="text-[10px] font-bold text-yellow-600 dark:text-yellow-400">
                                                             {
                                                                 archiveInfo.expiration
                                                             }
@@ -2591,7 +2698,7 @@ Generated by ALIBATON.
                                     size={30}
                                     className="mx-auto text-slate-700"
                                 />
-                                <p className="mt-3 text-sm font-bold text-slate-400">
+                                <p className="mt-3 text-sm font-bold text-gray-500 dark:text-slate-400">
                                     No payment records found
                                 </p>
                                 <p className="mt-1 text-xs text-slate-600">
@@ -2693,13 +2800,13 @@ function PaymentTab({
             className={[
                 "inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition",
                 active
-                    ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-300"
-                    : "border-slate-800 bg-slate-900 text-slate-500 hover:text-slate-300",
+                    ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-600 dark:text-yellow-300"
+                    : "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-300",
             ].join(" ")}
         >
             {icon}
             {label}
-            <span className="rounded-full bg-slate-950 px-1.5 py-0.5 text-[9px]">
+            <span className="rounded-full bg-gray-50 dark:bg-slate-950 px-1.5 py-0.5 text-[9px]">
                 {count}
             </span>
         </button>
@@ -2735,7 +2842,7 @@ function SummaryCard({
                 "group rounded-2xl border p-4 text-left shadow-xl transition",
                 active
                     ? "border-yellow-400/60 bg-yellow-400/10 ring-2 ring-yellow-400/30"
-                    : "border-slate-800 bg-slate-900/80 hover:border-yellow-400/40 hover:bg-slate-900",
+                    : "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-yellow-400/40 hover:bg-gray-100 dark:hover:bg-slate-900",
                 onClick ? "cursor-pointer" : "cursor-default",
             ].join(" ")}
         >
@@ -2745,7 +2852,7 @@ function SummaryCard({
                         "flex h-10 w-10 items-center justify-center rounded-xl transition",
                         active
                             ? "bg-yellow-400 text-slate-950"
-                            : "bg-yellow-400/10 text-yellow-400 group-hover:bg-yellow-400/20",
+                            : "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 group-hover:bg-yellow-400/20",
                     ].join(" ")}
                 >
                     {icon}
@@ -2765,7 +2872,7 @@ function SummaryCard({
                                 onToggle();
                             }
                         }}
-                        className="rounded-lg border border-slate-800 p-2 text-slate-500 transition hover:text-yellow-400"
+                        className="rounded-lg border border-gray-200 dark:border-slate-800 p-2 text-gray-500 dark:text-slate-500 transition hover:text-yellow-600 dark:hover:text-yellow-400"
                     >
                         {visible ? <EyeOff size={15} /> : <Eye size={15} />}
                     </span>
@@ -2786,14 +2893,18 @@ function SummaryCard({
 
 function Status({ status }: { status: string }) {
     const normalized = status.toLowerCase().trim();
-    let classes = "border-slate-700 bg-slate-800 text-slate-400";
+    let classes =
+        "border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400";
 
     if (normalized === "fully paid")
-        classes = "border-green-400/20 bg-green-400/10 text-green-400";
+        classes =
+            "border-green-400/20 bg-green-400/10 text-green-600 dark:text-green-400";
     if (normalized === "partially paid")
-        classes = "border-yellow-400/20 bg-yellow-400/10 text-yellow-300";
+        classes =
+            "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-300";
     if (normalized === "due")
-        classes = "border-red-400/20 bg-red-400/10 text-red-400";
+        classes =
+            "border-red-400/20 bg-red-400/10 text-red-600 dark:text-red-400";
 
     return (
         <span
@@ -2813,7 +2924,7 @@ function DateRow({ label, value }: { label: string; value: string }) {
             <span className="text-[9px] font-bold uppercase text-slate-600">
                 {label}
             </span>
-            <span className="text-[10px] font-semibold text-slate-400">
+            <span className="text-[10px] font-semibold text-gray-500 dark:text-slate-400">
                 {value}
             </span>
         </div>
@@ -2831,7 +2942,7 @@ function VatRow({
 }) {
     return (
         <div className="flex items-center justify-between gap-4 px-5 py-3">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                 {label}
             </span>
             <span
@@ -2849,7 +2960,7 @@ function PaymentDetail({ label, value }: { label: string; value: string }) {
             <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
                 {label}
             </p>
-            <p className="mt-1 truncate text-xs font-semibold text-slate-300">
+            <p className="mt-1 truncate text-xs font-semibold text-gray-700 dark:text-slate-300">
                 {value}
             </p>
         </div>
@@ -2926,11 +3037,11 @@ function ActionMenu({
         <div
             ref={menuRef}
             data-payment-menu
-            className="fixed z-[99999] w-[235px] max-w-[calc(100vw-20px)] max-h-[calc(100vh-20px)] overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl"
+            className="fixed z-[99999] w-[235px] max-w-[calc(100vw-20px)] max-h-[calc(100vh-20px)] overflow-y-auto overflow-x-hidden rounded-2xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 shadow-2xl"
             style={{ top: adjustedPosition.top, left: adjustedPosition.left }}
         >
-            <div className="border-b border-slate-800 px-3 py-3">
-                <p className="text-[10px] font-bold uppercase text-slate-500">
+            <div className="border-b border-gray-200 dark:border-slate-800 px-3 py-3">
+                <p className="text-[10px] font-bold uppercase text-gray-500 dark:text-slate-500">
                     {payment.receipt}
                 </p>
                 <p className="mt-1 text-[10px] text-slate-700">
@@ -2958,7 +3069,7 @@ function ActionMenu({
                     label="Download"
                     onClick={() => onDownload(payment)}
                 />
-                <div className="my-1 border-t border-slate-800" />
+                <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
                 {payment.archived ? (
                     archiveInfo?.expired ? (
                         <ActionButton
@@ -3017,8 +3128,8 @@ function ActionButton({
                 disabled
                     ? "cursor-not-allowed opacity-50"
                     : danger
-                      ? "text-red-400 hover:bg-red-400/10"
-                      : "text-slate-400 hover:bg-yellow-400/10 hover:text-yellow-300",
+                      ? "text-red-600 dark:text-red-400 hover:bg-red-400/10"
+                      : "text-gray-500 dark:text-slate-400 hover:bg-yellow-400/10 hover:text-yellow-600 dark:hover:text-yellow-300",
             ].join(" ")}
         >
             {icon}
@@ -3064,145 +3175,153 @@ function EmailFormModal({
                 if (e.target === e.currentTarget && !isSending) onClose();
             }}
         >
-            <div className="w-full max-w-md overflow-hidden rounded-2xl border border-yellow-400/20 bg-slate-900 shadow-2xl">
-                <div className="border-b border-slate-800 px-5 py-4">
+            <div className="w-full max-w-md overflow-hidden rounded-2xl border border-yellow-400/20 bg-white dark:bg-slate-900 shadow-2xl">
+                <div className="border-b border-gray-200 dark:border-slate-800 px-5 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-400/10 text-blue-400">
-    <Mail size={17} />
-</div>
-<div>
-    <h2 className="text-base font-black text-white">
-        Send Email
-    </h2>
-    <p className="text-[11px] text-slate-500">
-        Enter the client's email address and details
-    </p>
-</div>
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-400/10 text-blue-600 dark:text-blue-400">
+                                <Mail size={17} />
+                            </div>
+                            <div>
+                                <h2 className="text-base font-black text-gray-900 dark:text-white">
+                                    Send Email
+                                </h2>
+                                <p className="text-[11px] text-gray-500 dark:text-slate-500">
+                                    Enter the client's email address and details
+                                </p>
+                            </div>
                         </div>
                         <button
                             type="button"
                             onClick={onClose}
                             disabled={isSending}
-                            className="rounded-xl border border-slate-700 p-2 text-slate-500 transition hover:border-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-xl border border-gray-300 dark:border-slate-700 p-2 text-gray-500 dark:text-slate-500 transition hover:border-gray-300 dark:hover:border-slate-600 hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <X size={18} />
                         </button>
                     </div>
                 </div>
 
-               <form onSubmit={onSubmit} className="p-4 space-y-3">
-                  <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
-    <div className="grid grid-cols-2 gap-3">
-        <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-slate-600">
-                Receipt
-            </p>
-            <p className="mt-0.5 text-xs font-bold text-white">
-                {receipt}
-            </p>
-        </div>
-        <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-slate-600">
-                Client
-            </p>
-            <p className="mt-0.5 text-xs font-bold text-white">
-                {client}
-            </p>
-        </div>
-    </div>
-    <div className="mt-2.5 rounded-md border border-blue-400/20 bg-blue-400/5 p-2">
-        <div className="flex items-center gap-1.5">
-            <FileText size={12} className="text-blue-400" />
-            <span className="text-[9px] font-bold text-blue-300">
-                Account Summary
-            </span>
-        </div>
-    </div>
-</div>
-
-                    <div>
-                       <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-    <AtSign size={13} className="text-slate-600" />
-    Client Email Address
-    <span className="text-yellow-400">*</span>
-</label>
-<div className="relative">
-    <UserRound
-        size={15}
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-    />
-    <input
-        type="email"
-        value={email}
-        onChange={(e) => onEmailChange(e.target.value)}
-        placeholder="Enter client email address"
-        className={[
-            "w-full rounded-lg border bg-slate-950 py-2 pl-9 pr-3 text-xs text-white outline-none transition placeholder:text-slate-600",
-            error
-                ? "border-red-400/50 focus:border-red-400/50 focus:ring-2 focus:ring-red-400/10"
-                : "border-slate-700 focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10",
-        ].join(" ")}
-        disabled={isSending}
-        autoFocus
-    />
-</div>
+                <form onSubmit={onSubmit} className="p-4 space-y-3">
+                    <div className="rounded-lg border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 p-3">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-600">
+                                    Receipt
+                                </p>
+                                <p className="mt-0.5 text-xs font-bold text-gray-900 dark:text-white">
+                                    {receipt}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-600">
+                                    Client
+                                </p>
+                                <p className="mt-0.5 text-xs font-bold text-gray-900 dark:text-white">
+                                    {client}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="mt-2.5 rounded-md border border-blue-400/20 bg-blue-400/5 p-2">
+                            <div className="flex items-center gap-1.5">
+                                <FileText
+                                    size={12}
+                                    className="text-blue-600 dark:text-blue-400"
+                                />
+                                <span className="text-[9px] font-bold text-blue-600 dark:text-blue-300">
+                                    Account Summary
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
                     <div>
-                      <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-    <FileText size={13} className="text-slate-600" />
-    Email Subject
-    <span className="text-yellow-400">*</span>
-</label>
-<input
-    type="text"
-    value={subject}
-    onChange={(e) => onSubjectChange(e.target.value)}
-    placeholder="Enter email subject"
-    className="w-full rounded-lg border border-slate-700 bg-slate-950 py-2 px-3 text-xs text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10"
-    disabled={isSending}
-/>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-gray-500 dark:text-slate-500">
+                            <AtSign size={13} className="text-slate-600" />
+                            Client Email Address
+                            <span className="text-yellow-600 dark:text-yellow-400">
+                                *
+                            </span>
+                        </label>
+                        <div className="relative">
+                            <UserRound
+                                size={15}
+                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
+                            />
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => onEmailChange(e.target.value)}
+                                placeholder="Enter client email address"
+                                className={[
+                                    "w-full rounded-lg border bg-gray-50 dark:bg-slate-950 py-2 pl-9 pr-3 text-xs text-gray-900 dark:text-white outline-none transition placeholder:text-slate-600",
+                                    error
+                                        ? "border-red-400/50 focus:border-red-400/50 focus:ring-2 focus:ring-red-400/10"
+                                        : "border-gray-300 dark:border-slate-700 focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10",
+                                ].join(" ")}
+                                disabled={isSending}
+                                autoFocus
+                            />
+                        </div>
                     </div>
 
                     <div>
-                    <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-    <Mail size={13} className="text-slate-600" />
-    Email Message
-</label>
-<textarea
-    rows={4}
-    value={message}
-    onChange={(e) => onMessageChange(e.target.value)}
-    placeholder="Enter your email message..."
-    className="w-full rounded-lg border border-slate-700 bg-slate-950 py-2 px-3 text-[11px] text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10 resize-y"
-    disabled={isSending}
-/>
-<p className="mt-1 text-[9px] text-slate-500">
-    The payment receipt will be attached as a PDF/Text document.
-</p>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-gray-500 dark:text-slate-500">
+                            <FileText size={13} className="text-slate-600" />
+                            Email Subject
+                            <span className="text-yellow-600 dark:text-yellow-400">
+                                *
+                            </span>
+                        </label>
+                        <input
+                            type="text"
+                            value={subject}
+                            onChange={(e) => onSubjectChange(e.target.value)}
+                            placeholder="Enter email subject"
+                            className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-2 px-3 text-xs text-gray-900 dark:text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10"
+                            disabled={isSending}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-gray-500 dark:text-slate-500">
+                            <Mail size={13} className="text-slate-600" />
+                            Email Message
+                        </label>
+                        <textarea
+                            rows={4}
+                            value={message}
+                            onChange={(e) => onMessageChange(e.target.value)}
+                            placeholder="Enter your email message..."
+                            className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-2 px-3 text-[11px] text-gray-900 dark:text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10 resize-y"
+                            disabled={isSending}
+                        />
+                        <p className="mt-1 text-[9px] text-gray-500 dark:text-slate-500">
+                            The payment receipt will be attached as a PDF/Text
+                            document.
+                        </p>
                     </div>
 
                     {error && (
-                        <p className="flex items-center gap-1.5 text-xs font-semibold text-red-400">
+                        <p className="flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
                             <AlertCircle size={14} /> {error}
                         </p>
                     )}
 
-                   <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
-    <button
-        type="button"
-        onClick={onClose}
-        disabled={isSending}
-        className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-950 px-4 text-xs font-bold text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-    >
-        Cancel
-    </button>
-    <button
-        type="submit"
-        disabled={isSending}
-        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 text-xs font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
-    >
+                    <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isSending}
+                            className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-4 text-xs font-bold text-gray-700 dark:text-slate-300 transition hover:border-gray-300 dark:hover:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSending}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 text-xs font-black text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
                             {isSending ? (
                                 <>
                                     <Loader2
@@ -3277,54 +3396,55 @@ function ViewPaymentModal({
 
     return (
         <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/80 p-3 backdrop-blur-md sm:p-6">
-            <div className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-yellow-400/20 bg-slate-950 shadow-[0_30px_100px_rgba(0,0,0,0.65)]">
-                <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-5 py-4 sm:px-6">
+            <div className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-yellow-400/20 bg-gray-50 dark:bg-slate-950 shadow-[0_30px_100px_rgba(0,0,0,0.65)]">
+                <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-5 py-4 sm:px-6">
                     <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.25em] text-yellow-400">
+                        <p className="text-[9px] font-black uppercase tracking-[0.25em] text-yellow-600 dark:text-yellow-400">
                             Payment Management
                         </p>
-                        <h2 className="mt-1 text-base font-black text-white sm:text-lg">
+                        <h2 className="mt-1 text-base font-black text-gray-900 dark:text-white sm:text-lg">
                             Payment Document
                         </h2>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-xl border border-slate-800 bg-slate-900 p-2 text-slate-500 transition hover:border-slate-700 hover:text-white"
+                        className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 text-gray-500 dark:text-slate-500 transition hover:border-gray-300 dark:hover:border-slate-700 hover:text-gray-900 dark:hover:text-white"
                     >
                         <X size={18} />
                     </button>
                 </div>
 
-                <div className="overflow-y-auto bg-slate-800/80 p-3 sm:p-6">
+                <div className="overflow-y-auto bg-gray-100 dark:bg-slate-800/80 p-3 sm:p-6">
                     <div className="mx-auto w-full max-w-[820px] overflow-hidden bg-white text-slate-900 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
                         <div className="border-b-4 border-yellow-400 px-6 py-6 sm:px-10 sm:py-8">
                             <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border-2 border-slate-900 text-xl font-black tracking-widest">
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border-2 border-gray-200 dark:border-slate-900 text-xl font-black tracking-widest">
                                         A
                                     </div>
                                     <div>
                                         <h1 className="text-2xl font-black tracking-[0.12em] text-slate-950 sm:text-3xl">
                                             ALIBATON
                                         </h1>
-                                        <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                                        <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-slate-500">
                                             Heavy Equipment & Logistics
-                                            Management System                                        </p>
-                                        <p className="mt-1 text-[8px] text-slate-400">
+                                            Management System
+                                        </p>
+                                        <p className="mt-1 text-[8px] text-gray-500 dark:text-slate-400">
                                             45 Riverside, Quezon City,
                                             Philippines
                                         </p>
                                     </div>
                                 </div>
                                 <div className="text-left sm:text-right">
-                                    <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                    <p className="text-[8px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">
                                         Official Receipt
                                     </p>
                                     <p className="mt-1 text-lg font-black text-slate-950">
                                         {payment.receipt}
                                     </p>
-                                    <p className="mt-1 text-[8px] uppercase tracking-wider text-slate-400">
+                                    <p className="mt-1 text-[8px] uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Payment Statement
                                     </p>
                                 </div>
@@ -3334,18 +3454,18 @@ function ViewPaymentModal({
                         <div className="border-b border-slate-200 px-6 py-5 sm:px-10">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-slate-400">
                                         Transaction Record
                                     </p>
                                     <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
                                         PAYMENT STATEMENT
                                     </h2>
-                                    <p className="mt-1 text-[9px] text-slate-500">
+                                    <p className="mt-1 text-[9px] text-gray-500 dark:text-slate-500">
                                         Official record of payment transaction
                                     </p>
                                 </div>
                                 <div className="flex flex-col items-start gap-1 sm:items-end">
-                                    <span className="text-[7px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                    <span className="text-[7px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">
                                         Payment Status
                                     </span>
                                     <div
@@ -3360,9 +3480,21 @@ function ViewPaymentModal({
                         {payment.invoiceId && payment.invoiceNumber && (
                             <div className="px-6 py-4 sm:px-10">
                                 <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 flex items-center justify-between">
-                                    <p className="text-sm font-bold text-blue-800">
-                                        Linked Invoice
-                                    </p>
+                                    <div className="flex flex-col">
+                                        <p className="text-sm font-bold text-blue-800">
+                                            Linked Invoice
+                                        </p>
+                                        {payment.billingNumber && (
+                                            <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-500">
+                                                Billing: {payment.billingNumber}
+                                            </p>
+                                        )}
+                                        {payment.jobOrderNumber && (
+                                            <p className="text-[10px] text-blue-700/80 dark:text-blue-400/80">
+                                                {payment.jobOrderNumber}
+                                            </p>
+                                        )}
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -3381,33 +3513,44 @@ function ViewPaymentModal({
                         )}
 
                         <div className="px-6 py-5 sm:px-10">
-                            <div className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            <div className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                 Account Information
                             </div>
                             <div className="grid grid-cols-1 border border-slate-200 sm:grid-cols-2">
                                 <div className="border-b border-slate-200 p-4 sm:border-r">
-                                    <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                    <p className="text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Client
                                     </p>
                                     <p className="mt-1 break-words text-sm font-bold text-slate-900">
                                         {payment.client}
                                     </p>
                                     {payment.clientEmail && (
-                                        <p className="mt-1 text-[10px] text-slate-500">
+                                        <p className="mt-1 text-[10px] text-gray-500 dark:text-slate-500">
                                             {payment.clientEmail}
                                         </p>
                                     )}
                                 </div>
                                 <div className="border-b border-slate-200 p-4">
-                                    <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                    <p className="text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Invoice Number
                                     </p>
                                     <p className="mt-1 text-sm font-bold text-slate-900">
                                         {payment.invoice}
                                     </p>
+                                    {/* ✅ REFERENCE — Billing No. + Job Order No. */}
+                                    {payment.billingNumber && (
+                                        <p className="mt-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                            Billing: {payment.billingNumber}
+                                        </p>
+                                    )}
+                                    {payment.jobOrderNumber && (
+                                        <p className="text-[10px] text-gray-500 dark:text-slate-500">
+                                            {payment.jobOrderNumber}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="border-b border-slate-200 p-4 sm:border-r sm:border-b-0">
-                                    <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                    <p className="text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Payment Method
                                     </p>
                                     <p className="mt-1 text-sm font-bold text-slate-900">
@@ -3415,7 +3558,7 @@ function ViewPaymentModal({
                                     </p>
                                 </div>
                                 <div className="p-4">
-                                    <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                    <p className="text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Receipt Number
                                     </p>
                                     <p className="mt-1 text-sm font-bold text-slate-900">
@@ -3428,15 +3571,15 @@ function ViewPaymentModal({
                         <div className="px-6 py-5 sm:px-10">
                             <div className="mb-3 flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                         Sales Invoice Items
                                     </p>
-                                    <p className="mt-1 text-[9px] text-slate-400">
+                                    <p className="mt-1 text-[9px] text-gray-500 dark:text-slate-400">
                                         Items billed under the linked sales
                                         invoice
                                     </p>
                                 </div>
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[8px] font-black uppercase text-slate-500">
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[8px] font-black uppercase text-gray-500 dark:text-slate-500">
                                     Invoice Details
                                 </span>
                             </div>
@@ -3446,16 +3589,16 @@ function ViewPaymentModal({
                                     <table className="w-full min-w-[620px] border-collapse">
                                         <thead>
                                             <tr className="border-b border-slate-200 bg-slate-50">
-                                                <th className="w-[70px] px-4 py-3 text-center text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <th className="w-[70px] px-4 py-3 text-center text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Qty
                                                 </th>
-                                                <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Particulars
                                                 </th>
-                                                <th className="w-[150px] px-4 py-3 text-right text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <th className="w-[150px] px-4 py-3 text-right text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Unit Price
                                                 </th>
-                                                <th className="w-[150px] px-4 py-3 text-right text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <th className="w-[150px] px-4 py-3 text-right text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Amount
                                                 </th>
                                             </tr>
@@ -3500,11 +3643,11 @@ function ViewPaymentModal({
                                 </div>
                             ) : (
                                 <div className="border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center">
-                                    <p className="text-xs font-semibold text-slate-500">
+                                    <p className="text-xs font-semibold text-gray-500 dark:text-slate-500">
                                         No sales invoice items were returned by
                                         the server.
                                     </p>
-                                    <p className="mt-1 text-[10px] text-slate-400">
+                                    <p className="mt-1 text-[10px] text-gray-500 dark:text-slate-400">
                                         Make sure the Payment controller
                                         eager-loads the linked invoice items.
                                     </p>
@@ -3514,13 +3657,13 @@ function ViewPaymentModal({
 
                         <div className="mx-6 border border-slate-200 sm:mx-10">
                             <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
-                                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                     Payment Summary
                                 </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3">
                                 <div className="border-b border-slate-200 p-5 sm:border-r">
-                                    <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                    <p className="text-[8px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Total Amount
                                     </p>
                                     <p className="mt-2 text-lg font-black text-slate-950">
@@ -3528,7 +3671,7 @@ function ViewPaymentModal({
                                     </p>
                                 </div>
                                 <div className="border-b border-slate-200 p-5 sm:border-r">
-                                    <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                    <p className="text-[8px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Paid Amount
                                     </p>
                                     <p className="mt-2 text-lg font-black text-emerald-600">
@@ -3536,7 +3679,7 @@ function ViewPaymentModal({
                                     </p>
                                 </div>
                                 <div className="p-5">
-                                    <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                    <p className="text-[8px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                         Remaining Balance
                                     </p>
                                     <p
@@ -3551,7 +3694,7 @@ function ViewPaymentModal({
                         <div className="mx-6 mt-5 overflow-hidden border border-slate-200 sm:mx-10">
                             <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
                                 <div className="flex items-center justify-between gap-3">
-                                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                         VAT Computation
                                     </p>
                                     <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[8px] font-black text-cyan-700">
@@ -3589,13 +3732,13 @@ function ViewPaymentModal({
                         </div>
 
                         <div className="px-6 py-5 sm:px-10">
-                            <div className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            <div className="mb-3 text-[9px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                 Payment Details
                             </div>
                             <table className="w-full border-collapse border border-slate-200">
                                 <tbody>
                                     <tr>
-                                        <td className="w-[38%] border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                        <td className="w-[38%] border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                             Payment Date
                                         </td>
                                         <td className="border-b border-slate-200 px-4 py-3 text-xs font-bold text-slate-900">
@@ -3603,7 +3746,7 @@ function ViewPaymentModal({
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                        <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                             Due Date
                                         </td>
                                         <td className="border-b border-slate-200 px-4 py-3 text-xs font-bold text-slate-900">
@@ -3611,7 +3754,7 @@ function ViewPaymentModal({
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                        <td className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                             Partial Payment Date
                                         </td>
                                         <td className="border-b border-slate-200 px-4 py-3 text-xs font-bold text-slate-900">
@@ -3619,7 +3762,7 @@ function ViewPaymentModal({
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td className="bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                        <td className="bg-slate-50 px-4 py-3 text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                             Payment Status
                                         </td>
                                         <td className="px-4 py-3">
@@ -3636,8 +3779,11 @@ function ViewPaymentModal({
 
                         <div className="px-6 pb-5 sm:px-10">
                             <div className="mb-3 flex items-center gap-2">
-                                <Receipt size={14} className="text-slate-500" />
-                                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                <Receipt
+                                    size={14}
+                                    className="text-gray-500 dark:text-slate-500"
+                                />
+                                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-500">
                                     Transaction History
                                 </p>
                             </div>
@@ -3646,13 +3792,13 @@ function ViewPaymentModal({
                                     <table className="w-full border-collapse">
                                         <thead>
                                             <tr className="border-b border-slate-200 bg-slate-50">
-                                                <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Type
                                                 </th>
-                                                <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Date
                                                 </th>
-                                                <th className="px-4 py-3 text-right text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                <th className="px-4 py-3 text-right text-[8px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Amount
                                                 </th>
                                             </tr>
@@ -3671,7 +3817,7 @@ function ViewPaymentModal({
                                                             {transaction.type ||
                                                                 "Payment"}
                                                         </td>
-                                                        <td className="px-4 py-3 text-xs text-slate-500">
+                                                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-500">
                                                             {transaction.date ||
                                                                 "—"}
                                                         </td>
@@ -3691,7 +3837,7 @@ function ViewPaymentModal({
                                 </div>
                             ) : (
                                 <div className="border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center">
-                                    <p className="text-xs text-slate-400">
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">
                                         No payment transactions recorded.
                                     </p>
                                 </div>
@@ -3699,7 +3845,7 @@ function ViewPaymentModal({
                         </div>
 
                         <div className="mx-6 border border-slate-200 bg-slate-50 px-5 py-4 sm:mx-10">
-                            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-slate-400">
                                 Payment Notes
                             </p>
                             <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
@@ -3725,7 +3871,7 @@ function ViewPaymentModal({
                                         </div>
                                         <div className="mt-4 grid gap-4 sm:grid-cols-3">
                                             <div>
-                                                <p className="text-[7px] font-black uppercase tracking-wider text-slate-400">
+                                                <p className="text-[7px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                                     Archived
                                                 </p>
                                                 <p className="mt-1 text-xs font-bold text-slate-800">
@@ -3733,7 +3879,7 @@ function ViewPaymentModal({
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-[7px] font-black uppercase tracking-wider text-slate-400">
+                                                <p className="text-[7px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                                     Archive Expires
                                                 </p>
                                                 <p className="mt-1 text-xs font-bold text-slate-800">
@@ -3741,7 +3887,7 @@ function ViewPaymentModal({
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-[7px] font-black uppercase tracking-wider text-slate-400">
+                                                <p className="text-[7px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                                     Retention Delete
                                                 </p>
                                                 <p className="mt-1 text-xs font-bold text-slate-800">
@@ -3757,13 +3903,13 @@ function ViewPaymentModal({
                             <div className="grid gap-10 sm:grid-cols-2">
                                 <div>
                                     <div className="h-8 border-b border-slate-400" />
-                                    <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-slate-500">
+                                    <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                         Client / Authorized Representative
                                     </p>
                                 </div>
                                 <div>
                                     <div className="h-8 border-b border-slate-400" />
-                                    <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-slate-500">
+                                    <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                         ALIBATON Finance / Authorized Staff
                                     </p>
                                 </div>
@@ -3771,7 +3917,7 @@ function ViewPaymentModal({
                         </div>
 
                         <div className="border-t border-slate-200 px-6 py-4 sm:px-10">
-                            <div className="flex flex-col gap-2 text-[7px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col gap-2 text-[7px] text-gray-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                                 <span>ALIBATON Payment Management System</span>
                                 <span>
                                     Document Status:{" "}
@@ -3786,18 +3932,18 @@ function ViewPaymentModal({
                     </div>
                 </div>
 
-                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-800 bg-slate-950 px-5 py-4 sm:px-6">
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-5 py-4 sm:px-6">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-xl border border-slate-700 px-5 py-2.5 text-xs font-bold text-slate-400 transition hover:bg-slate-900 hover:text-white"
+                        className="rounded-xl border border-gray-300 dark:border-slate-700 px-5 py-2.5 text-xs font-bold text-gray-500 dark:text-slate-400 transition hover:bg-gray-100 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white"
                     >
                         Close
                     </button>
                     <button
                         type="button"
                         onClick={() => onSendEmail(payment)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-400/10 px-5 py-2.5 text-xs font-black text-blue-400 shadow-lg shadow-blue-400/5 transition hover:bg-blue-400/20"
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-400/10 px-5 py-2.5 text-xs font-black text-blue-600 dark:text-blue-400 shadow-lg shadow-blue-400/5 transition hover:bg-blue-400/20"
                     >
                         <Mail size={15} /> Send SOA
                     </button>

@@ -282,7 +282,7 @@ export default function Settings() {
             <Head title="Settings | ALIBATON" />
 
             <UserLayout>
-                <div className="w-full min-w-0 text-white">
+                <div className="w-full min-w-0 text-gray-900 dark:text-white">
 
                     {/* =====================================================
                         SUCCESS TOAST
@@ -290,19 +290,19 @@ export default function Settings() {
 
                     {successMessage && (
                         <div className="fixed right-4 top-4 z-[9999] w-[calc(100%-2rem)] max-w-md">
-                            <div className="flex items-start gap-3 rounded-2xl border border-emerald-400/20 bg-slate-950/95 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                            <div className="flex items-start gap-3 rounded-2xl border border-emerald-400/20 bg-gray-50 dark:bg-slate-950/95 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl">
 
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10">
-                                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                                 </div>
 
                                 <div className="min-w-0 flex-1">
 
-                                    <p className="text-sm font-bold text-white">
+                                    <p className="text-sm font-bold text-gray-900 dark:text-white">
                                         Successfully Updated
                                     </p>
 
-                                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                                    <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-slate-400">
                                         {successMessage}
                                     </p>
 
@@ -315,7 +315,7 @@ export default function Settings() {
                                             ""
                                         )
                                     }
-                                    className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-white"
+                                    className="rounded-lg p-1.5 text-gray-500 dark:text-slate-500 transition hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                                     aria-label="Close success notification"
                                 >
                                     <X size={16} />
@@ -331,19 +331,19 @@ export default function Settings() {
 
                     {errorMessage && (
                         <div className="fixed right-4 top-4 z-[9999] w-[calc(100%-2rem)] max-w-md">
-                            <div className="flex items-start gap-3 rounded-2xl border border-red-400/20 bg-slate-950/95 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                            <div className="flex items-start gap-3 rounded-2xl border border-red-400/20 bg-gray-50 dark:bg-slate-950/95 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl">
 
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-400/10">
-                                    <CircleX className="h-5 w-5 text-red-400" />
+                                    <CircleX className="h-5 w-5 text-red-600 dark:text-red-400" />
                                 </div>
 
                                 <div className="min-w-0 flex-1">
 
-                                    <p className="text-sm font-bold text-red-300">
+                                    <p className="text-sm font-bold text-red-600 dark:text-red-300">
                                         Update Failed
                                     </p>
 
-                                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                                    <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-slate-400">
                                         {errorMessage}
                                     </p>
 
@@ -356,7 +356,7 @@ export default function Settings() {
                                             ""
                                         )
                                     }
-                                    className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-white"
+                                    className="rounded-lg p-1.5 text-gray-500 dark:text-slate-500 transition hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                                     aria-label="Close error notification"
                                 >
                                     <X size={16} />
@@ -384,7 +384,7 @@ export default function Settings() {
                                     Settings
                                 </h1>
 
-                                <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-sm">
+                                <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-slate-500 sm:text-sm">
                                     Manage your account security
                                     and review your account
                                     information.
@@ -400,11 +400,11 @@ export default function Settings() {
                         ACCOUNT INFORMATION
                     ===================================================== */}
 
-                    <section className="mb-5 rounded-2xl border border-yellow-400/20 bg-slate-900/90 p-4 shadow-xl shadow-black/20 sm:p-5">
+                    <section className="mb-5 rounded-2xl border border-yellow-400/20 bg-white dark:bg-slate-900/90 p-4 shadow-xl shadow-black/20 sm:p-5">
 
                         <div className="mb-5 flex items-center gap-3">
 
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-400">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                 <User size={18} />
                             </div>
 
@@ -414,7 +414,7 @@ export default function Settings() {
                                     Account Information
                                 </h2>
 
-                                <p className="text-[11px] text-slate-500 sm:text-xs">
+                                <p className="text-[11px] text-gray-500 dark:text-slate-500 sm:text-xs">
                                     Your account identity is
                                     controlled by the system.
                                 </p>
@@ -461,14 +461,14 @@ export default function Settings() {
 
                         {/* LOCKED NOTICE */}
 
-                        <div className="mt-4 flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3.5">
+                        <div className="mt-4 flex items-start gap-3 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-3.5">
 
                             <ShieldCheck
                                 size={17}
-                                className="mt-0.5 shrink-0 text-yellow-400"
+                                className="mt-0.5 shrink-0 text-yellow-600 dark:text-yellow-400"
                             />
 
-                            <p className="text-[11px] leading-relaxed text-slate-500">
+                            <p className="text-[11px] leading-relaxed text-gray-500 dark:text-slate-500">
                                 Your name and email address
                                 are fixed account information
                                 and cannot be changed from
@@ -483,13 +483,13 @@ export default function Settings() {
                         SECURITY
                     ===================================================== */}
 
-                    <section className="mb-5 rounded-2xl border border-yellow-400/20 bg-slate-900/90 p-4 shadow-xl shadow-black/20 sm:p-5">
+                    <section className="mb-5 rounded-2xl border border-yellow-400/20 bg-white dark:bg-slate-900/90 p-4 shadow-xl shadow-black/20 sm:p-5">
 
                         {/* HEADER */}
 
                         <div className="mb-5 flex items-center gap-3">
 
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-400">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                 <ShieldCheck size={18} />
                             </div>
 
@@ -499,7 +499,7 @@ export default function Settings() {
                                     Security
                                 </h2>
 
-                                <p className="text-[11px] text-slate-500 sm:text-xs">
+                                <p className="text-[11px] text-gray-500 dark:text-slate-500 sm:text-xs">
                                     Protect your account with
                                     a strong password.
                                 </p>
@@ -550,15 +550,15 @@ export default function Settings() {
                             CHANGE PASSWORD
                         ================================================= */}
 
-                        <div className="border-t border-slate-800 pt-5">
+                        <div className="border-t border-gray-200 dark:border-slate-800 pt-5">
 
                             <div className="mb-4">
 
-                                <h3 className="text-sm font-bold text-white">
+                                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                                     Change Password
                                 </h3>
 
-                                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                                <p className="mt-1 text-[11px] leading-relaxed text-gray-500 dark:text-slate-500">
                                     Password must contain
                                     8–12 characters,
                                     including uppercase,
@@ -678,9 +678,9 @@ export default function Settings() {
                                     PASSWORD REQUIREMENTS
                                 ================================================= */}
 
-                                <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                                <div className="mt-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 p-3">
 
-                                    <p className="mb-2 text-[11px] font-bold text-slate-300">
+                                    <p className="mb-2 text-[11px] font-bold text-gray-700 dark:text-slate-300">
                                         Password requirements
                                     </p>
 
@@ -760,7 +760,7 @@ export default function Settings() {
                                         .password_confirmation) && (
                                     <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.04] p-3">
 
-                                        <p className="text-xs leading-relaxed text-red-400">
+                                        <p className="text-xs leading-relaxed text-red-600 dark:text-red-400">
                                             Please correct
                                             the password
                                             errors shown
@@ -851,7 +851,7 @@ function ReadOnlyAccountField({
     return (
         <div className="min-w-0">
 
-            <label className="mb-2 block text-xs font-semibold text-slate-300">
+            <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-slate-300">
                 {label}
             </label>
 
@@ -872,18 +872,18 @@ function ReadOnlyAccountField({
                         cursor-not-allowed
                         rounded-xl
                         border
-                        border-slate-800
-                        bg-slate-800/60
+                        border-gray-200 dark:border-slate-800
+                        bg-gray-100 dark:bg-slate-800/60
                         pl-10
                         pr-3
                         text-sm
                         font-medium
-                        text-slate-500
+                        text-gray-500 dark:text-slate-500
                         outline-none
                     "
                 />
 
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-600">
                     Fixed
                 </span>
 
@@ -917,7 +917,7 @@ function PasswordInput({
     return (
         <div className="min-w-0">
 
-            <label className="mb-2 block text-xs font-semibold text-slate-300">
+            <label className="mb-2 block text-xs font-semibold text-gray-700 dark:text-slate-300">
                 {label}
             </label>
 
@@ -925,7 +925,7 @@ function PasswordInput({
 
                 <Lock
                     size={16}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500"
                 />
 
                 <input
@@ -946,12 +946,12 @@ function PasswordInput({
                         w-full
                         rounded-xl
                         border
-                        border-slate-700
-                        bg-slate-800
+                        border-gray-300 dark:border-slate-700
+                        bg-gray-100 dark:bg-slate-800
                         pl-10
                         pr-11
                         text-sm
-                        text-white
+                        text-gray-900 dark:text-white
                         outline-none
                         transition
                         placeholder:text-slate-600
@@ -975,10 +975,10 @@ function PasswordInput({
                         justify-center
                         rounded-lg
                         p-1.5
-                        text-slate-500
+                        text-gray-500 dark:text-slate-500
                         transition
-                        hover:bg-slate-700
-                        hover:text-yellow-400
+                        hover:bg-gray-200 dark:hover:bg-slate-700
+                        hover:text-yellow-600 dark:hover:text-yellow-400
                     "
                     aria-label={
                         show
@@ -996,7 +996,7 @@ function PasswordInput({
             </div>
 
             {error && (
-                <p className="mt-1.5 text-xs text-red-400">
+                <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
                     {error}
                 </p>
             )}
@@ -1024,7 +1024,7 @@ function PasswordRequirement({
             {valid ? (
                 <CircleCheck
                     size={14}
-                    className="shrink-0 text-emerald-400"
+                    className="shrink-0 text-emerald-600 dark:text-emerald-400"
                 />
             ) : (
                 <CircleX
@@ -1036,8 +1036,8 @@ function PasswordRequirement({
             <span
                 className={`text-[10px] ${
                     valid
-                        ? "text-emerald-400"
-                        : "text-slate-500"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-gray-500 dark:text-slate-500"
                 }`}
             >
                 {text}
@@ -1063,19 +1063,19 @@ function SecurityStatus({
     value: string;
 }) {
     return (
-        <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-800/40 p-3">
+        <div className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-100 dark:bg-slate-800/40 p-3">
 
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-400">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-600 dark:text-emerald-400">
                 {icon}
             </div>
 
             <div className="min-w-0">
 
-                <p className="text-[10px] text-slate-500">
+                <p className="text-[10px] text-gray-500 dark:text-slate-500">
                     {title}
                 </p>
 
-                <p className="mt-0.5 truncate text-xs font-bold text-slate-200">
+                <p className="mt-0.5 truncate text-xs font-bold text-gray-800 dark:text-slate-200">
                     {value}
                 </p>
 

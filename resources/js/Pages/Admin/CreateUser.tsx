@@ -73,7 +73,7 @@ function PasswordRequirement({
     return (
         <div
             className={`flex items-center gap-2 text-xs ${
-                valid ? "text-green-400" : "text-red-400"
+                valid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
             }`}
         >
             {valid ? (
@@ -691,17 +691,17 @@ export default function Index() {
 
             {successMessage && (
                 <div className="fixed right-4 top-4 z-9999 w-[calc(100%-2rem)] max-w-md">
-                    <div className="flex items-start gap-3 rounded-2xl border border-green-400/30 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-xl">
+                    <div className="flex items-start gap-3 rounded-2xl border border-green-400/30 bg-white dark:bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-xl">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-400/10">
-                            <CheckCircle className="h-5 w-5 text-green-400" />
+                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                         </div>
 
                         <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-green-300">
+                            <p className="font-semibold text-green-700 dark:text-green-300">
                                 Success
                             </p>
 
-                            <p className="mt-1 text-sm text-white/60">
+                            <p className="mt-1 text-sm text-gray-600 dark:text-white/60">
                                 {successMessage}
                             </p>
                         </div>
@@ -709,7 +709,7 @@ export default function Index() {
                         <button
                             type="button"
                             onClick={() => setSuccessMessage(null)}
-                            className="rounded-lg p-1.5 text-white/40 transition hover:bg-white/10 hover:text-white"
+                            className="rounded-lg p-1.5 text-gray-500 dark:text-white/40 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                         >
                             <X className="h-4 w-4" />
                         </button>
@@ -731,7 +731,7 @@ export default function Index() {
             {/* ========================================================= */}
 
             <main
-                className={`min-h-screen bg-black text-white pt-16 transition-all duration-300 lg:pt-0 ${
+                className={`min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white pt-16 transition-all duration-300 lg:pt-0 ${
                     sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
                 }`}
             >
@@ -743,7 +743,7 @@ export default function Index() {
                             <div>
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-yellow-400/30 bg-yellow-400/10">
-                                        <Users className="h-6 w-6 text-yellow-400" />
+                                        <Users className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                                     </div>
 
                                     <div>
@@ -751,7 +751,7 @@ export default function Index() {
                                             Staff Accounts
                                         </h1>
 
-                                        <p className="text-sm text-white/50">
+                                        <p className="text-sm text-gray-500 dark:text-white/50">
                                             Create and manage staff accounts.
                                         </p>
                                     </div>
@@ -781,7 +781,7 @@ export default function Index() {
                         {/* FLASH */}
 
                         {flash?.success && (
-                            <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-400/20 bg-green-400/10 px-4 py-3 text-green-300">
+                            <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-400/20 bg-green-400/10 px-4 py-3 text-green-700 dark:text-green-300">
                                 <CheckCircle className="h-5 w-5 shrink-0" />
 
                                 <span className="text-sm">{flash.success}</span>
@@ -792,7 +792,7 @@ export default function Index() {
 
                         <div className="mb-5 grid gap-4 md:grid-cols-[1fr_auto]">
                             <div className="relative">
-                                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40" />
+                                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 dark:text-white/40" />
 
                                 <input
                                     type="text"
@@ -801,15 +801,15 @@ export default function Index() {
                                         setSearch(event.target.value)
                                     }
                                     placeholder="Search name or Gmail..."
-                                    className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-12 pr-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-yellow-400/50"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 py-3 pl-12 pr-4 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-white/30 focus:border-yellow-400/50"
                                 />
                             </div>
 
-                            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-5 py-3">
-                                <Users className="h-5 w-5 text-yellow-400" />
+                            <div className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-3">
+                                <Users className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
 
                                 <div>
-                                    <p className="text-xs text-white/40">
+                                    <p className="text-xs text-gray-500 dark:text-white/40">
                                         Staff Accounts
                                     </p>
 
@@ -820,8 +820,8 @@ export default function Index() {
 
                         {/* TABLE */}
 
-                        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/3">
-                            <div className="border-b border-white/5 px-4 py-3 text-xs text-white/30 sm:hidden">
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/3">
+                            <div className="border-b border-gray-100 dark:border-white/5 px-4 py-3 text-xs text-gray-400 dark:text-white/30 sm:hidden">
                                 Swipe left or right to view all columns.
                             </div>
 
@@ -834,7 +834,7 @@ export default function Index() {
                             >
                                 <table className="w-full min-w-195">
                                     <thead className="sticky top-0 z-30">
-                                        <tr className="border-b border-white/10 bg-zinc-950 text-left text-xs uppercase tracking-wider text-white/40">
+                                        <tr className="border-b border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 text-left text-xs uppercase tracking-wider text-gray-500 dark:text-white/40">
                                             <th className="whitespace-nowrap px-5 py-4">
                                                 User
                                             </th>
@@ -864,13 +864,13 @@ export default function Index() {
                                                     colSpan={5}
                                                     className="px-5 py-16 text-center"
                                                 >
-                                                    <Users className="mx-auto mb-3 h-10 w-10 text-white/20" />
+                                                    <Users className="mx-auto mb-3 h-10 w-10 text-gray-400 dark:text-white/20" />
 
-                                                    <p className="font-medium text-white/60">
+                                                    <p className="font-medium text-gray-600 dark:text-white/60">
                                                         No staff found.
                                                     </p>
 
-                                                    <p className="mt-1 text-sm text-white/30">
+                                                    <p className="mt-1 text-sm text-gray-400 dark:text-white/30">
                                                         Create your first staff
                                                         account.
                                                     </p>
@@ -880,22 +880,22 @@ export default function Index() {
                                             filteredUsers.map((user) => (
                                                 <tr
                                                     key={user.id}
-                                                    className="border-b border-white/5 transition hover:bg-white/3"
+                                                    className="border-b border-gray-100 dark:border-white/5 transition hover:bg-gray-100 dark:hover:bg-white/3"
                                                 >
                                                     {/* USER */}
 
                                                     <td className="px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-yellow-400/10 text-yellow-400">
+                                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                                                 <User className="h-5 w-5" />
                                                             </div>
 
                                                             <div className="min-w-0">
-                                                                <p className="truncate font-medium text-white">
+                                                                <p className="truncate font-medium text-gray-900 dark:text-white">
                                                                     {user.name}
                                                                 </p>
 
-                                                                <p className="text-xs text-white/30">
+                                                                <p className="text-xs text-gray-400 dark:text-white/30">
                                                                     ID #
                                                                     {user.id}
                                                                 </p>
@@ -905,9 +905,9 @@ export default function Index() {
 
                                                     {/* EMAIL */}
 
-                                                    <td className="max-w-75 px-5 py-4 text-sm text-white/60">
+                                                    <td className="max-w-75 px-5 py-4 text-sm text-gray-600 dark:text-white/60">
                                                         <div className="flex items-center gap-2">
-                                                            <Mail className="h-4 w-4 shrink-0 text-white/20" />
+                                                            <Mail className="h-4 w-4 shrink-0 text-gray-400 dark:text-white/20" />
 
                                                             <span className="truncate">
                                                                 {user.email}
@@ -918,7 +918,7 @@ export default function Index() {
                                                     {/* ROLE */}
 
                                                     <td className="px-5 py-4">
-                                                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-xs font-medium text-yellow-300">
+                                                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-xs font-medium text-yellow-700 dark:text-yellow-300">
                                                             <ShieldCheck className="h-3.5 w-3.5" />
                                                             Staff
                                                         </span>
@@ -926,7 +926,7 @@ export default function Index() {
 
                                                     {/* CREATED */}
 
-                                                    <td className="whitespace-nowrap px-5 py-4 text-sm text-white/50">
+                                                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500 dark:text-white/50">
                                                         {formatDate(
                                                             user.created_at,
                                                         )}
@@ -950,8 +950,8 @@ export default function Index() {
                                                             className={`rounded-lg p-2 transition ${
                                                                 openMenu ===
                                                                 user.id
-                                                                    ? "bg-yellow-400/10 text-yellow-400"
-                                                                    : "text-white/50 hover:bg-white/10 hover:text-white"
+                                                                    ? "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                                                    : "text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                                             }`}
                                                         >
                                                             <MoreVertical className="h-5 w-5" />
@@ -966,7 +966,7 @@ export default function Index() {
                         </div>
 
                         {filteredUsers.length > 4 && (
-                            <p className="mt-2 text-right text-xs text-white/25">
+                            <p className="mt-2 text-right text-xs text-gray-400 dark:text-white/25">
                                 Showing {filteredUsers.length} staff accounts •
                                 Scroll to view more
                             </p>
@@ -982,7 +982,7 @@ export default function Index() {
             {openMenu !== null && (
                 <div
                     id="staff-action-menu"
-                    className="fixed z-9999 w-40 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-2xl shadow-black/60"
+                    className="fixed z-9999 w-40 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-2xl shadow-black/60"
                     style={{
                         top: menuPosition.top,
                         left: menuPosition.left,
@@ -1002,16 +1002,16 @@ export default function Index() {
                                 <button
                                     type="button"
                                     onClick={() => openEditModal(selectedUser)}
-                                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white transition hover:bg-white/10"
+                                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-gray-900 dark:text-white transition hover:bg-gray-200 dark:hover:bg-white/10"
                                 >
-                                    <Pencil className="h-4 w-4 text-yellow-400" />
+                                    <Pencil className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                                     Edit
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => openDeleteModal(selectedUser)}
-                                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-400 transition hover:bg-red-400/10"
+                                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-600 dark:text-red-400 transition hover:bg-red-400/10"
                                 >
                                     <Trash2 className="h-4 w-4" />
                                     Delete
@@ -1028,16 +1028,16 @@ export default function Index() {
 
             {showModal && (
                 <div className="fixed inset-0 z-100 flex items-center justify-center overflow-y-auto bg-black/75 p-3 backdrop-blur-md sm:p-4">
-                    <div className="my-auto flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+                    <div className="my-auto flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl">
                         {/* MODAL HEADER */}
 
-                        <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-4 sm:px-6">
+                        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-4 py-4 sm:px-6">
                             <div className="flex min-w-0 items-center gap-3">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10">
                                     {editingUser ? (
-                                        <Pencil className="h-5 w-5 text-yellow-400" />
+                                        <Pencil className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                                     ) : (
-                                        <UserPlus className="h-5 w-5 text-yellow-400" />
+                                        <UserPlus className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                                     )}
                                 </div>
 
@@ -1048,7 +1048,7 @@ export default function Index() {
                                             : "Create Staff"}
                                     </h2>
 
-                                    <p className="truncate text-xs text-white/40">
+                                    <p className="truncate text-xs text-gray-500 dark:text-white/40">
                                         {editingUser
                                             ? "Update staff account information."
                                             : "Create a new Staff login account."}
@@ -1060,7 +1060,7 @@ export default function Index() {
                                 type="button"
                                 onClick={closeModal}
                                 disabled={processing}
-                                className="shrink-0 rounded-lg p-2 text-white/40 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                                className="shrink-0 rounded-lg p-2 text-gray-500 dark:text-white/40 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                             >
                                 <X className="h-5 w-5" />
                             </button>
@@ -1076,7 +1076,7 @@ export default function Index() {
                                 {/* NAME */}
 
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium text-white/70">
+                                    <label className="mb-2 block text-sm font-medium text-gray-600 dark:text-white/70">
                                         Full Name
                                     </label>
 
@@ -1085,9 +1085,9 @@ export default function Index() {
                                             className={`absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 ${
                                                 showNameValidation
                                                     ? nameValid
-                                                        ? "text-green-400"
-                                                        : "text-red-400"
-                                                    : "text-white/30"
+                                                        ? "text-green-600 dark:text-green-400"
+                                                        : "text-red-600 dark:text-red-400"
+                                                    : "text-gray-400 dark:text-white/30"
                                             }`}
                                         />
 
@@ -1101,12 +1101,12 @@ export default function Index() {
                                                 )
                                             }
                                             placeholder="Enter full name"
-                                            className={`w-full rounded-xl border bg-white/5 py-3 pl-11 pr-11 text-sm text-white outline-none placeholder:text-white/25 ${
+                                            className={`w-full rounded-xl border bg-white dark:bg-white/5 py-3 pl-11 pr-11 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-white/25 ${
                                                 showNameValidation
                                                     ? nameValid
                                                         ? "border-green-400/50 focus:border-green-400"
                                                         : "border-red-400/50 focus:border-red-400"
-                                                    : "border-white/10 focus:border-yellow-400/50"
+                                                    : "border-gray-200 dark:border-white/10 focus:border-yellow-400/50"
                                             }`}
                                             required
                                         />
@@ -1114,22 +1114,22 @@ export default function Index() {
                                         {showNameValidation && (
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                                 {nameValid ? (
-                                                    <CheckCircle className="h-5 w-5 text-green-400" />
+                                                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                                                 ) : (
-                                                    <AlertCircle className="h-5 w-5 text-red-400" />
+                                                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
                                                 )}
                                             </div>
                                         )}
                                     </div>
 
                                     {showNameValidation && !nameValid && (
-                                        <p className="mt-1 text-xs text-red-400">
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                             Name is required.
                                         </p>
                                     )}
 
                                     {errors.name && (
-                                        <p className="mt-1 text-xs text-red-400">
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                             {errors.name}
                                         </p>
                                     )}
@@ -1138,7 +1138,7 @@ export default function Index() {
                                 {/* EMAIL */}
 
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium text-white/70">
+                                    <label className="mb-2 block text-sm font-medium text-gray-600 dark:text-white/70">
                                         Gmail Address
                                     </label>
 
@@ -1147,9 +1147,9 @@ export default function Index() {
                                             className={`absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 ${
                                                 showEmailValidation
                                                     ? emailValid
-                                                        ? "text-green-400"
-                                                        : "text-red-400"
-                                                    : "text-white/30"
+                                                        ? "text-green-600 dark:text-green-400"
+                                                        : "text-red-600 dark:text-red-400"
+                                                    : "text-gray-400 dark:text-white/30"
                                             }`}
                                         />
 
@@ -1163,12 +1163,12 @@ export default function Index() {
                                                 )
                                             }
                                             placeholder="example@gmail.com"
-                                            className={`w-full rounded-xl border bg-white/5 py-3 pl-11 pr-11 text-sm text-white outline-none placeholder:text-white/25 ${
+                                            className={`w-full rounded-xl border bg-white dark:bg-white/5 py-3 pl-11 pr-11 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-white/25 ${
                                                 showEmailValidation
                                                     ? emailValid
                                                         ? "border-green-400/50 focus:border-green-400"
                                                         : "border-red-400/50 focus:border-red-400"
-                                                    : "border-white/10 focus:border-yellow-400/50"
+                                                    : "border-gray-200 dark:border-white/10 focus:border-yellow-400/50"
                                             }`}
                                             required
                                         />
@@ -1176,23 +1176,23 @@ export default function Index() {
                                         {showEmailValidation && (
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                                 {emailValid ? (
-                                                    <CheckCircle className="h-5 w-5 text-green-400" />
+                                                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                                                 ) : (
-                                                    <AlertCircle className="h-5 w-5 text-red-400" />
+                                                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
                                                 )}
                                             </div>
                                         )}
                                     </div>
 
                                     {showEmailValidation && !emailValid && (
-                                        <p className="mt-1 text-xs text-red-400">
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                             Please enter a valid Gmail address
                                             ending in @gmail.com.
                                         </p>
                                     )}
 
                                     {errors.email && (
-                                        <p className="mt-1 text-xs text-red-400">
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                             {errors.email}
                                         </p>
                                     )}
@@ -1201,7 +1201,7 @@ export default function Index() {
                                 {/* PASSWORD */}
 
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium text-white/70">
+                                    <label className="mb-2 block text-sm font-medium text-gray-600 dark:text-white/70">
                                         {editingUser
                                             ? "New Password (optional)"
                                             : "Password"}
@@ -1212,9 +1212,9 @@ export default function Index() {
                                             className={`absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 ${
                                                 showPasswordValidation
                                                     ? passwordValid
-                                                        ? "text-green-400"
-                                                        : "text-red-400"
-                                                    : "text-white/30"
+                                                        ? "text-green-600 dark:text-green-400"
+                                                        : "text-red-600 dark:text-red-400"
+                                                    : "text-gray-400 dark:text-white/30"
                                             }`}
                                         />
 
@@ -1236,12 +1236,12 @@ export default function Index() {
                                                     ? "Leave blank to keep current password"
                                                     : "Enter password"
                                             }
-                                            className={`w-full rounded-xl border bg-white/5 py-3 pl-11 pr-20 text-sm text-white outline-none placeholder:text-white/25 ${
+                                            className={`w-full rounded-xl border bg-white dark:bg-white/5 py-3 pl-11 pr-20 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-white/25 ${
                                                 showPasswordValidation
                                                     ? passwordValid
                                                         ? "border-green-400/50 focus:border-green-400"
                                                         : "border-red-400/50 focus:border-red-400"
-                                                    : "border-white/10 focus:border-yellow-400/50"
+                                                    : "border-gray-200 dark:border-white/10 focus:border-yellow-400/50"
                                             }`}
                                             required={!editingUser}
                                         />
@@ -1251,15 +1251,15 @@ export default function Index() {
                                             onClick={() =>
                                                 setShowPassword(!showPassword)
                                             }
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40 hover:text-white"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white"
                                         >
                                             {showPassword ? "Hide" : "Show"}
                                         </button>
                                     </div>
 
                                     {showPasswordValidation && (
-                                        <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
-                                            <p className="mb-2 text-xs font-medium text-white/60">
+                                        <div className="mt-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 p-3">
+                                            <p className="mb-2 text-xs font-medium text-gray-600 dark:text-white/60">
                                                 Password requirements
                                             </p>
 
@@ -1293,7 +1293,7 @@ export default function Index() {
                                     )}
 
                                     {errors.password && (
-                                        <p className="mt-1 text-xs text-red-400">
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                             {errors.password}
                                         </p>
                                     )}
@@ -1302,7 +1302,7 @@ export default function Index() {
                                 {/* CONFIRM PASSWORD */}
 
                                 <div>
-                                    <label className="mb-2 block text-sm font-medium text-white/70">
+                                    <label className="mb-2 block text-sm font-medium text-gray-600 dark:text-white/70">
                                         Confirm Password
                                     </label>
 
@@ -1311,9 +1311,9 @@ export default function Index() {
                                             className={`absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 ${
                                                 showConfirmValidation
                                                     ? passwordMatch
-                                                        ? "text-green-400"
-                                                        : "text-red-400"
-                                                    : "text-white/30"
+                                                        ? "text-green-600 dark:text-green-400"
+                                                        : "text-red-600 dark:text-red-400"
+                                                    : "text-gray-400 dark:text-white/30"
                                             }`}
                                         />
 
@@ -1331,12 +1331,12 @@ export default function Index() {
                                                 )
                                             }
                                             placeholder="Confirm password"
-                                            className={`w-full rounded-xl border bg-white/5 py-3 pl-11 pr-20 text-sm text-white outline-none placeholder:text-white/25 ${
+                                            className={`w-full rounded-xl border bg-white dark:bg-white/5 py-3 pl-11 pr-20 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-white/25 ${
                                                 showConfirmValidation
                                                     ? passwordMatch
                                                         ? "border-green-400/50 focus:border-green-400"
                                                         : "border-red-400/50 focus:border-red-400"
-                                                    : "border-white/10 focus:border-yellow-400/50"
+                                                    : "border-gray-200 dark:border-white/10 focus:border-yellow-400/50"
                                             }`}
                                             required={!editingUser}
                                         />
@@ -1348,7 +1348,7 @@ export default function Index() {
                                                     !showConfirmPassword,
                                                 )
                                             }
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40 hover:text-white"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white"
                                         >
                                             {showConfirmPassword
                                                 ? "Hide"
@@ -1360,8 +1360,8 @@ export default function Index() {
                                         <div
                                             className={`mt-2 flex items-center gap-2 text-xs ${
                                                 passwordMatch
-                                                    ? "text-green-400"
-                                                    : "text-red-400"
+                                                    ? "text-green-600 dark:text-green-400"
+                                                    : "text-red-600 dark:text-red-400"
                                             }`}
                                         >
                                             {passwordMatch ? (
@@ -1379,7 +1379,7 @@ export default function Index() {
                                     )}
 
                                     {errors.password_confirmation && (
-                                        <p className="mt-1 text-xs text-red-400">
+                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                             {errors.password_confirmation}
                                         </p>
                                     )}
@@ -1389,12 +1389,12 @@ export default function Index() {
 
                                 {!editingUser && (
                                     <div className="flex gap-3 rounded-xl border border-yellow-400/10 bg-yellow-400/5 p-4">
-                                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-400" />
+                                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600 dark:text-yellow-400" />
 
-                                        <p className="text-xs leading-5 text-white/50">
+                                        <p className="text-xs leading-5 text-gray-500 dark:text-white/50">
                                             This account will automatically be
                                             created with the role{" "}
-                                            <strong className="text-yellow-300">
+                                            <strong className="text-yellow-700 dark:text-yellow-300">
                                                 Staff
                                             </strong>
                                             . A verification PIN will be sent to
@@ -1410,7 +1410,7 @@ export default function Index() {
                                         type="button"
                                         onClick={closeModal}
                                         disabled={processing}
-                                        className="rounded-xl border border-white/10 px-5 py-3 font-medium text-white/70 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                                        className="rounded-xl border border-gray-200 dark:border-white/10 px-5 py-3 font-medium text-gray-600 dark:text-white/70 transition hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                                     >
                                         Cancel
                                     </button>
@@ -1420,7 +1420,7 @@ export default function Index() {
                                         disabled={processing || !liveFormValid}
                                         className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold transition ${
                                             processing || !liveFormValid
-                                                ? "cursor-not-allowed bg-white/10 text-white/30"
+                                                ? "cursor-not-allowed bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-white/30"
                                                 : "bg-yellow-400 text-black hover:bg-yellow-300"
                                         }`}
                                     >
@@ -1458,13 +1458,13 @@ export default function Index() {
                         }
                     }}
                 >
-                    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+                    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl">
                         {/* HEADER */}
 
-                        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                        <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-5 py-4">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-400/10">
-                                    <Trash2 className="h-5 w-5 text-red-400" />
+                                    <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
                                 </div>
 
                                 <div className="min-w-0">
@@ -1472,7 +1472,7 @@ export default function Index() {
                                         Delete Staff Account
                                     </h2>
 
-                                    <p className="truncate text-xs text-white/40">
+                                    <p className="truncate text-xs text-gray-500 dark:text-white/40">
                                         This action can be undone.
                                     </p>
                                 </div>
@@ -1482,7 +1482,7 @@ export default function Index() {
                                 type="button"
                                 onClick={closeDeleteModal}
                                 disabled={deleting}
-                                className="rounded-lg p-2 text-white/40 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                                className="rounded-lg p-2 text-gray-500 dark:text-white/40 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                             >
                                 <X className="h-5 w-5" />
                             </button>
@@ -1492,27 +1492,27 @@ export default function Index() {
 
                         <div className="p-5">
                             <div className="mb-4 rounded-xl border border-red-400/10 bg-red-400/5 p-4">
-                                <p className="text-sm text-white/70">
+                                <p className="text-sm text-gray-600 dark:text-white/70">
                                     You are about to delete:
                                 </p>
 
-                                <p className="mt-2 font-bold text-white">
+                                <p className="mt-2 font-bold text-gray-900 dark:text-white">
                                     {deletingUser.name}
                                 </p>
 
-                                <p className="text-xs text-white/40">
+                                <p className="text-xs text-gray-500 dark:text-white/40">
                                     {deletingUser.email}
                                 </p>
                             </div>
 
                             <div>
-                                <label className="mb-2 block text-sm font-medium text-white/70">
+                                <label className="mb-2 block text-sm font-medium text-gray-600 dark:text-white/70">
                                     Reason for Deletion{" "}
-                                    <span className="text-red-400">*</span>
+                                    <span className="text-red-600 dark:text-red-400">*</span>
                                 </label>
 
                                 <div className="relative">
-                                    <FileText className="absolute left-3 top-3 h-5 w-5 text-white/30" />
+                                    <FileText className="absolute left-3 top-3 h-5 w-5 text-gray-400 dark:text-white/30" />
 
                                     <textarea
                                         value={deleteReason}
@@ -1521,17 +1521,17 @@ export default function Index() {
                                         }
                                         placeholder="Enter the reason for deleting this staff account..."
                                         rows={3}
-                                        className="w-full resize-none rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/25 focus:border-red-400/50"
+                                        className="w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 py-3 pl-11 pr-4 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-white/25 focus:border-red-400/50"
                                         maxLength={500}
                                     />
                                 </div>
 
                                 <div className="mt-1 flex items-center justify-between text-xs">
-                                    <span className="text-white/30">
+                                    <span className="text-gray-400 dark:text-white/30">
                                         Required field
                                     </span>
 
-                                    <span className="text-white/30">
+                                    <span className="text-gray-400 dark:text-white/30">
                                         {deleteReason.length}/500
                                     </span>
                                 </div>
@@ -1540,9 +1540,9 @@ export default function Index() {
                             {/* WARNING */}
 
                             <div className="mt-4 flex gap-3 rounded-xl border border-yellow-400/10 bg-yellow-400/5 p-3">
-                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
+                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400" />
 
-                                <p className="text-xs leading-5 text-white/50">
+                                <p className="text-xs leading-5 text-gray-500 dark:text-white/50">
                                     The account will be soft-deleted and can be
                                     restored later from the "Deleted Staff"
                                     section.
@@ -1552,12 +1552,12 @@ export default function Index() {
 
                         {/* FOOTER */}
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-white/10 px-5 py-4 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-white/10 px-5 py-4 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={closeDeleteModal}
                                 disabled={deleting}
-                                className="rounded-xl border border-white/10 px-5 py-3 font-medium text-white/70 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                                className="rounded-xl border border-gray-200 dark:border-white/10 px-5 py-3 font-medium text-gray-600 dark:text-white/70 transition hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -1572,7 +1572,7 @@ export default function Index() {
                                 className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold transition ${
                                     deleting ||
                                     deleteReason.trim().length === 0
-                                        ? "cursor-not-allowed bg-white/10 text-white/30"
+                                        ? "cursor-not-allowed bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-white/30"
                                         : "bg-red-500 text-white hover:bg-red-400"
                                 }`}
                             >
@@ -1598,13 +1598,13 @@ export default function Index() {
                         }
                     }}
                 >
-                    <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+                    <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl">
                         {/* HEADER */}
 
-                        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-4">
+                        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-white/10 px-5 py-4">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-400/10">
-                                    <Trash2 className="h-5 w-5 text-red-400" />
+                                    <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
                                 </div>
 
                                 <div className="min-w-0">
@@ -1612,7 +1612,7 @@ export default function Index() {
                                         Deleted Staff ({deletedUsers.length})
                                     </h2>
 
-                                    <p className="truncate text-xs text-white/40">
+                                    <p className="truncate text-xs text-gray-500 dark:text-white/40">
                                         Restore deleted staff accounts.
                                     </p>
                                 </div>
@@ -1621,7 +1621,7 @@ export default function Index() {
                             <button
                                 type="button"
                                 onClick={() => setShowDeletedModal(false)}
-                                className="shrink-0 rounded-lg p-2 text-white/40 transition hover:bg-white/10 hover:text-white"
+                                className="shrink-0 rounded-lg p-2 text-gray-500 dark:text-white/40 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                             >
                                 <X className="h-5 w-5" />
                             </button>
@@ -1631,14 +1631,14 @@ export default function Index() {
 
                         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
                             {deletedUsers.length === 0 ? (
-                                <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.015] px-6 text-center">
-                                    <Trash2 className="h-8 w-8 text-white/20" />
+                                <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10 bg-white/[0.015] px-6 text-center">
+                                    <Trash2 className="h-8 w-8 text-gray-400 dark:text-white/20" />
 
-                                    <p className="mt-3 text-sm font-bold text-white/60">
+                                    <p className="mt-3 text-sm font-bold text-gray-600 dark:text-white/60">
                                         No deleted staff accounts
                                     </p>
 
-                                    <p className="mt-1 text-xs text-white/30">
+                                    <p className="mt-1 text-xs text-gray-400 dark:text-white/30">
                                         Deleted staff will appear here.
                                     </p>
                                 </div>
@@ -1647,23 +1647,23 @@ export default function Index() {
                                     {deletedUsers.map((user) => (
                                         <div
                                             key={user.id}
-                                            className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-start sm:justify-between"
+                                            className="flex flex-col gap-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-4 sm:flex-row sm:items-start sm:justify-between"
                                         >
                                             <div className="flex min-w-0 items-start gap-3">
                                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-400/10">
-                                                    <User className="h-5 w-5 text-red-400" />
+                                                    <User className="h-5 w-5 text-red-600 dark:text-red-400" />
                                                 </div>
 
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="truncate text-sm font-bold text-white/80">
+                                                    <p className="truncate text-sm font-bold text-gray-600 dark:text-white/80">
                                                         {user.name}
                                                     </p>
 
-                                                    <p className="truncate text-xs text-white/35">
+                                                    <p className="truncate text-xs text-gray-500 dark:text-white/35">
                                                         {user.email}
                                                     </p>
 
-                                                    <p className="mt-1 text-[10px] text-red-400/60">
+                                                    <p className="mt-1 text-[10px] text-red-600/60 dark:text-red-400/60">
                                                         Deleted:{" "}
                                                         {formatDateTime(
                                                             user.deleted_at,
@@ -1672,11 +1672,11 @@ export default function Index() {
 
                                                     {user.delete_reason && (
                                                         <div className="mt-2 rounded-lg border border-red-400/10 bg-red-400/5 px-3 py-2">
-                                                            <p className="text-[9px] font-black uppercase tracking-wider text-red-400/60">
+                                                            <p className="text-[9px] font-black uppercase tracking-wider text-red-600/60 dark:text-red-400/60">
                                                                 Reason
                                                             </p>
 
-                                                            <p className="mt-1 text-xs leading-5 text-white/60">
+                                                            <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-white/60">
                                                                 {
                                                                     user.delete_reason
                                                                 }
@@ -1694,7 +1694,7 @@ export default function Index() {
                                                 disabled={
                                                     restoringId === user.id
                                                 }
-                                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-green-400/20 bg-green-400/10 px-4 py-2 text-sm font-medium text-green-400 transition hover:bg-green-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-green-400/20 bg-green-400/10 px-4 py-2 text-sm font-medium text-green-600 dark:text-green-400 transition hover:bg-green-400/20 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
                                                 <RotateCcw
                                                     className={`h-4 w-4 ${
@@ -1716,8 +1716,8 @@ export default function Index() {
 
                         {/* FOOTER */}
 
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 px-5 py-3">
-                            <p className="text-[10px] text-white/25">
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-200 dark:border-white/10 px-5 py-3">
+                            <p className="text-[10px] text-gray-400 dark:text-white/25">
                                 {deletedUsers.length} deleted staff account
                                 {deletedUsers.length !== 1 ? "s" : ""}
                             </p>
@@ -1725,7 +1725,7 @@ export default function Index() {
                             <button
                                 type="button"
                                 onClick={() => setShowDeletedModal(false)}
-                                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-bold text-white/55 transition hover:border-yellow-400/20 hover:bg-yellow-400/[0.05] hover:text-white"
+                                className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] px-4 py-2 text-xs font-bold text-gray-500 dark:text-white/55 transition hover:border-yellow-400/20 hover:bg-yellow-400/[0.05] hover:text-gray-900 dark:hover:text-white"
                             >
                                 Close
                             </button>

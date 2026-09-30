@@ -187,7 +187,7 @@ export default function AdminSettings() {
 
             <AdminSidebar />
 
-            <main className="min-h-screen bg-black text-white pt-16 lg:ml-72 lg:pt-0">
+            <main className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white pt-16 lg:ml-72 lg:pt-0">
                 <div className="p-4 sm:p-6 lg:p-8">
                     <div className="mx-auto max-w-4xl">
 
@@ -195,7 +195,7 @@ export default function AdminSettings() {
                         <div className="mb-8">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-400/10">
-                                    <Settings className="h-6 w-6 text-yellow-400" />
+                                    <Settings className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                                 </div>
 
                                 <div>
@@ -203,7 +203,7 @@ export default function AdminSettings() {
                                         Settings
                                     </h1>
 
-                                    <p className="mt-1 text-white/50">
+                                    <p className="mt-1 text-gray-500 dark:text-white/50">
                                         Manage administrator account settings.
                                     </p>
                                 </div>
@@ -212,14 +212,14 @@ export default function AdminSettings() {
 
                         {/* Flash Messages */}
                         {successMessage && (
-                            <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-green-400">
+                            <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-green-600 dark:text-green-400">
                                 <CheckCircle className="h-5 w-5 shrink-0" />
                                 <p className="text-sm">{successMessage}</p>
                             </div>
                         )}
 
                         {errorMessage && (
-                            <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-400">
+                            <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-600 dark:text-red-400">
                                 <AlertCircle className="h-5 w-5 shrink-0" />
                                 <p className="text-sm">{errorMessage}</p>
                             </div>
@@ -231,9 +231,9 @@ export default function AdminSettings() {
                             {/* Change Password Form          */}
                             {/* ============================= */}
                             <form onSubmit={handlePasswordSubmit}>
-                                <div className="rounded-2xl border border-white/10 bg-white/3 p-6">
+                                <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/3 p-6">
                                     <div className="flex items-center gap-3">
-                                        <Lock className="h-5 w-5 text-yellow-400" />
+                                        <Lock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
 
                                         <h2 className="font-bold">
                                             Change Password
@@ -262,7 +262,7 @@ export default function AdminSettings() {
                                                             e.target.value
                                                         )
                                                     }
-                                                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 outline-none focus:border-yellow-400/50"
+                                                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 pr-12 outline-none focus:border-yellow-400/50"
                                                 />
 
                                                 <button
@@ -272,7 +272,7 @@ export default function AdminSettings() {
                                                             (prev) => !prev
                                                         )
                                                     }
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 transition hover:text-yellow-400"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-white/40 transition hover:text-yellow-600 dark:hover:text-yellow-400"
                                                     aria-label={
                                                         showCurrentPassword
                                                             ? "Hide password"
@@ -289,7 +289,7 @@ export default function AdminSettings() {
 
                                             {passwordForm.errors
                                                 .current_password && (
-                                                <p className="mt-1 text-sm text-red-400">
+                                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                                                     {
                                                         passwordForm.errors
                                                             .current_password
@@ -318,7 +318,7 @@ export default function AdminSettings() {
                                                             e.target.value
                                                         )
                                                     }
-                                                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 outline-none focus:border-yellow-400/50"
+                                                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 pr-12 outline-none focus:border-yellow-400/50"
                                                 />
 
                                                 <button
@@ -328,7 +328,7 @@ export default function AdminSettings() {
                                                             (prev) => !prev
                                                         )
                                                     }
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 transition hover:text-yellow-400"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-white/40 transition hover:text-yellow-600 dark:hover:text-yellow-400"
                                                     aria-label={
                                                         showNewPassword
                                                             ? "Hide password"
@@ -345,8 +345,8 @@ export default function AdminSettings() {
 
                                             {/* PASSWORD REQUIREMENTS */}
                                             {passwordValue.length > 0 && (
-                                                <div className="mt-3 rounded-xl border border-white/10 bg-white/3 p-4">
-                                                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-white/50">
+                                                <div className="mt-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/3 p-4">
+                                                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-white/50">
                                                         Password Requirements
                                                     </p>
 
@@ -386,7 +386,7 @@ export default function AdminSettings() {
                                             )}
 
                                             {passwordForm.errors.password && (
-                                                <p className="mt-1 text-sm text-red-400">
+                                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                                                     {
                                                         passwordForm.errors
                                                             .password
@@ -415,7 +415,7 @@ export default function AdminSettings() {
                                                             e.target.value
                                                         )
                                                     }
-                                                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 outline-none focus:border-yellow-400/50"
+                                                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 pr-12 outline-none focus:border-yellow-400/50"
                                                 />
 
                                                 <button
@@ -425,7 +425,7 @@ export default function AdminSettings() {
                                                             (prev) => !prev
                                                         )
                                                     }
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 transition hover:text-yellow-400"
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-white/40 transition hover:text-yellow-600 dark:hover:text-yellow-400"
                                                     aria-label={
                                                         showConfirmPassword
                                                             ? "Hide password"
@@ -447,8 +447,8 @@ export default function AdminSettings() {
                                                 <p
                                                     className={`mt-2 flex items-center gap-1.5 text-xs ${
                                                         passwordsMatch
-                                                            ? "text-green-400"
-                                                            : "text-red-400"
+                                                            ? "text-green-600 dark:text-green-400"
+                                                            : "text-red-600 dark:text-red-400"
                                                     }`}
                                                 >
                                                     {passwordsMatch ? (
@@ -473,7 +473,7 @@ export default function AdminSettings() {
 
                                             {passwordForm.errors
                                                 .password_confirmation && (
-                                                <p className="mt-1 text-sm text-red-400">
+                                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                                                     {
                                                         passwordForm.errors
                                                             .password_confirmation
@@ -523,8 +523,8 @@ const RequirementRow = ({ met, label }: RequirementRowProps) => (
         <span
             className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
                 met
-                    ? "bg-green-500/20 text-green-400"
-                    : "bg-white/5 text-white/30"
+                    ? "bg-green-500/20 text-green-600 dark:text-green-400"
+                    : "bg-white dark:bg-white/5 text-gray-400 dark:text-white/30"
             }`}
         >
             {met ? (
@@ -535,7 +535,7 @@ const RequirementRow = ({ met, label }: RequirementRowProps) => (
         </span>
 
         <span
-            className={met ? "text-green-400" : "text-white/40"}
+            className={met ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-white/40"}
         >
             {label}
         </span>

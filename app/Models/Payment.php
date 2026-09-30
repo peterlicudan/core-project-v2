@@ -18,8 +18,10 @@ class Payment extends Model
         'receipt',
 
         'client',
-        'client_email', // ✅ ADDED
+        'client_email',
         'invoice_number',
+        /* ✅ REFERENCE — Billing No. (BILL-YYYY-NNN) */
+        'billing_number',
 
         'payment_method',
         'amount',
@@ -33,7 +35,7 @@ class Payment extends Model
 
         /*
         |--------------------------------------------------------------------------
-        | ARCHIVE
+        | USER-SIDE ARCHIVE (existing — hindi natin gagalawin)
         |--------------------------------------------------------------------------
         */
 
@@ -41,6 +43,18 @@ class Payment extends Model
         'archived_at',
         'archive_expires_at',
         'delete_after',
+
+        /*
+        |--------------------------------------------------------------------------
+        | ✅ ADMIN-SIDE ARCHIVE (BAGO)
+        |--------------------------------------------------------------------------
+        | Hiwalay sa user-side archive. Ito lang ang ginagamit ng admin.
+        | Kapag nag-archive ang admin, `admin_archived = true` — HINDI
+        | naapektuhan ang `archived` (user side).
+        */
+
+        'admin_archived',
+        'admin_archived_at',
 
         /*
         |--------------------------------------------------------------------------
@@ -62,7 +76,7 @@ class Payment extends Model
 
         /*
         |--------------------------------------------------------------------------
-        | ARCHIVE
+        | USER-SIDE ARCHIVE
         |--------------------------------------------------------------------------
         */
 
@@ -70,6 +84,15 @@ class Payment extends Model
         'archived_at' => 'datetime',
         'archive_expires_at' => 'datetime',
         'delete_after' => 'datetime',
+
+        /*
+        |--------------------------------------------------------------------------
+        | ✅ ADMIN-SIDE ARCHIVE (BAGO)
+        |--------------------------------------------------------------------------
+        */
+
+        'admin_archived' => 'boolean',
+        'admin_archived_at' => 'datetime',
 
         /*
         |--------------------------------------------------------------------------
@@ -138,13 +161,24 @@ class Payment extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | ARCHIVE STATUS
+    | USER-SIDE ARCHIVE STATUS
     |--------------------------------------------------------------------------
     */
 
     public function isArchived(): bool
     {
         return (bool) $this->archived;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ ADMIN-SIDE ARCHIVE STATUS (BAGO)
+    |--------------------------------------------------------------------------
+    */
+
+    public function isAdminArchived(): bool
+    {
+        return (bool) $this->admin_archived;
     }
 
     /*
@@ -179,7 +213,7 @@ class Payment extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | 90-DAY ARCHIVE EXPIRATION
+    | 90-DAY ARCHIVE EXPIRATION (user-side)
     |--------------------------------------------------------------------------
     */
 
@@ -200,7 +234,7 @@ class Payment extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | 1-YEAR PERMANENT DELETION
+    | 1-YEAR PERMANENT DELETION (user-side)
     |--------------------------------------------------------------------------
     */
 
@@ -221,7 +255,7 @@ class Payment extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | ARCHIVE PAYMENT
+    | USER-SIDE ARCHIVE
     |--------------------------------------------------------------------------
     */
 
@@ -244,7 +278,7 @@ class Payment extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | RESTORE PAYMENT
+    | USER-SIDE RESTORE
     |--------------------------------------------------------------------------
     */
 
@@ -255,6 +289,35 @@ class Payment extends Model
             'archived_at' => null,
             'archive_expires_at' => null,
             'delete_after' => null,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ ADMIN-SIDE ARCHIVE (BAGO)
+    |--------------------------------------------------------------------------
+    | Hiwalay ito sa user-side archive. Gumagamit ng `admin_archived` column.
+    */
+
+    public function archiveForAdmin(): void
+    {
+        $this->update([
+            'admin_archived' => true,
+            'admin_archived_at' => now(),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ ADMIN-SIDE RESTORE (BAGO)
+    |--------------------------------------------------------------------------
+    */
+
+    public function unarchiveForAdmin(): void
+    {
+        $this->update([
+            'admin_archived' => false,
+            'admin_archived_at' => null,
         ]);
     }
 }

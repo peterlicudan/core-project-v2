@@ -251,27 +251,27 @@ function getExpiryStatus(expiryDate?: string | null): {
     if (!expiryDate)
         return {
             label: "No expiry",
-            className: "border-gray-500/20 bg-gray-500/10 text-gray-400",
+            className: "border-gray-500/20 bg-gray-500/10 text-gray-600 dark:text-gray-400",
         };
     const days = getDaysUntilExpiry(expiryDate);
     if (days === null)
         return {
             label: "No expiry",
-            className: "border-gray-500/20 bg-gray-500/10 text-gray-400",
+            className: "border-gray-500/20 bg-gray-500/10 text-gray-600 dark:text-gray-400",
         };
     if (days < 0)
         return {
             label: "Expired",
-            className: "border-red-500/20 bg-red-500/10 text-red-400",
+            className: "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
         };
     if (days <= 30)
         return {
             label: `Expiring in ${days} days`,
-            className: "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
+            className: "border-yellow-500/20 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
         };
     return {
         label: `${days} days left`,
-        className: "border-green-500/20 bg-green-500/10 text-green-400",
+        className: "border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400",
     };
 }
 
@@ -282,7 +282,7 @@ function getRetentionStatus(retentionDate?: string | null): {
     if (!retentionDate || retentionDate === "Permanent") {
         return {
             label: "Permanent",
-            className: "border-blue-500/20 bg-blue-500/10 text-blue-400",
+            className: "border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400",
         };
     }
     const today = new Date();
@@ -292,16 +292,16 @@ function getRetentionStatus(retentionDate?: string | null): {
     if (diffDays < 0)
         return {
             label: "Retention Due",
-            className: "border-red-500/20 bg-red-500/10 text-red-400",
+            className: "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
         };
     if (diffDays <= 30)
         return {
             label: `Retention in ${diffDays} days`,
-            className: "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
+            className: "border-yellow-500/20 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
         };
     return {
         label: `${diffDays} days left`,
-        className: "border-green-500/20 bg-green-500/10 text-green-400",
+        className: "border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400",
     };
 }
 
@@ -743,35 +743,35 @@ export default function DocumentsCompliance() {
         return () => document.removeEventListener("mousedown", handleOutside);
     }, [showNotifications]);
 
-    /* ✅ FIXED: preserveScroll → preserveUrl + as any */
-    useEffect(() => {
-        if (!isAdmin) return;
+  /*
+useEffect(() => {
+    if (!isAdmin) return;
 
-        const interval = window.setInterval(() => {
-            if (
-                showDocumentModal ||
-                showPermissionModal ||
-                selectedDocument ||
-                editingDocument
-            ) {
-                return;
-            }
+    const interval = window.setInterval(() => {
+        if (
+            showDocumentModal ||
+            showPermissionModal ||
+            selectedDocument ||
+            editingDocument
+        ) {
+            return;
+        }
 
-            router.reload({
-                only: ["accessRequests"],
-                preserveUrl: true,
-            } as any);
-        }, 5000);
+        router.reload({
+            only: ["accessRequests"],
+            preserveUrl: true,
+        } as any);
+    }, 5000);
 
-        return () => window.clearInterval(interval);
-    }, [
-        isAdmin,
-        showDocumentModal,
-        showPermissionModal,
-        selectedDocument,
-        editingDocument,
-    ]);
-
+    return () => window.clearInterval(interval);
+}, [
+    isAdmin,
+    showDocumentModal,
+    showPermissionModal,
+    selectedDocument,
+    editingDocument,
+]);
+*/
     const hasPermission = (document: DocumentRecord): boolean => {
         if (isAdmin) return true;
         if (!document.is_locked) return true;
@@ -1020,8 +1020,8 @@ export default function DocumentsCompliance() {
 
     const documentStatusBadge = (status?: string | null) => {
         if (status === "Archived")
-            return "border-gray-500/20 bg-gray-500/10 text-gray-400";
-        return "border-green-400/20 bg-green-400/10 text-green-400";
+            return "border-gray-500/20 bg-gray-500/10 text-gray-600 dark:text-gray-400";
+        return "border-green-400/20 bg-green-400/10 text-green-600 dark:text-green-400";
     };
 
     const resetDocumentFilters = () => {
@@ -1068,7 +1068,7 @@ export default function DocumentsCompliance() {
                 }
             `}</style>
 
-            <div className="min-h-screen bg-[#050505] px-4 py-6 text-white sm:px-6 lg:px-8 lg:py-8">
+            <div className="min-h-screen bg-gray-50 dark:bg-[#050505] px-4 py-6 text-gray-900 dark:text-white sm:px-6 lg:px-8 lg:py-8">
                 <div className="mx-auto max-w-[1600px]">
                     {/* HEADER */}
                     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1076,13 +1076,13 @@ export default function DocumentsCompliance() {
                             <div className="mb-2 flex items-center gap-2">
                                 <ShieldCheck
                                     size={18}
-                                    className="text-yellow-400"
+                                    className="text-yellow-600 dark:text-yellow-400"
                                 />
-                                <span className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">
+                                <span className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-600 dark:text-yellow-400">
                                     Administration
                                 </span>
                             </div>
-                            <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+                            <h1 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white sm:text-3xl">
                                 Documents
                             </h1>
                             <p className="mt-1 max-w-2xl text-sm text-gray-500">
@@ -1098,8 +1098,8 @@ export default function DocumentsCompliance() {
                                         onClick={handleToggleNotifications}
                                         className={`relative flex h-11 w-11 items-center justify-center rounded-xl border transition ${
                                             unseenCount > 0
-                                                ? "border-red-400/40 bg-red-400/[0.08] text-red-400 hover:bg-red-400/[0.14]"
-                                                : "border-white/10 bg-white/5 text-gray-400 hover:border-yellow-400/40 hover:text-yellow-400"
+                                                ? "border-red-400/40 bg-red-400/[0.08] text-red-600 dark:text-red-400 hover:bg-red-400/[0.14]"
+                                                : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                                         }`}
                                         title="Document access requests"
                                     >
@@ -1114,14 +1114,14 @@ export default function DocumentsCompliance() {
                                     </button>
 
                                     {showNotifications && (
-                                        <div className="absolute right-0 top-14 z-[9999] w-[380px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0b] shadow-[0_25px_80px_rgba(0,0,0,.85)]">
-                                            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                                        <div className="absolute right-0 top-14 z-[9999] w-[380px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b] shadow-[0_25px_80px_rgba(0,0,0,.85)]">
+                                            <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <Bell
                                                         size={16}
-                                                        className="text-yellow-400"
+                                                        className="text-yellow-600 dark:text-yellow-400"
                                                     />
-                                                    <p className="text-sm font-black text-white">
+                                                    <p className="text-sm font-black text-gray-900 dark:text-white">
                                                         Access Requests
                                                     </p>
                                                     {pendingCount > 0 && (
@@ -1137,7 +1137,7 @@ export default function DocumentsCompliance() {
                                                             false,
                                                         )
                                                     }
-                                                    className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-white/10 hover:text-white"
+                                                    className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                                 >
                                                     <X size={15} />
                                                 </button>
@@ -1148,9 +1148,9 @@ export default function DocumentsCompliance() {
                                                 <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
                                                     <CheckCircle2
                                                         size={32}
-                                                        className="mb-2 text-green-400"
+                                                        className="mb-2 text-green-600 dark:text-green-400"
                                                     />
-                                                    <p className="text-sm font-bold text-white">
+                                                    <p className="text-sm font-bold text-gray-900 dark:text-white">
                                                         All caught up!
                                                     </p>
                                                     <p className="mt-1 text-xs text-gray-500">
@@ -1160,7 +1160,7 @@ export default function DocumentsCompliance() {
                                                 </div>
                                             ) : (
                                                 <div className="alibaton-notif-scroll max-h-[400px] overflow-y-auto">
-                                                    <div className="divide-y divide-white/5">
+                                                    <div className="divide-y divide-gray-100 dark:divide-white/5">
                                                         {pendingAccessRequests.map(
                                                             (r) => {
                                                                 const isProcessing =
@@ -1187,10 +1187,10 @@ export default function DocumentsCompliance() {
                                                                         key={
                                                                             r.id
                                                                         }
-                                                                        className="px-4 py-3 hover:bg-white/[0.02]"
+                                                                        className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-white/[0.02]"
                                                                     >
                                                                         <div className="flex items-start gap-3">
-                                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10 text-yellow-400">
+                                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                                                                 <User
                                                                                     size={
                                                                                         15
@@ -1198,7 +1198,7 @@ export default function DocumentsCompliance() {
                                                                                 />
                                                                             </div>
                                                                             <div className="min-w-0 flex-1">
-                                                                                <p className="truncate text-xs font-black text-white">
+                                                                                <p className="truncate text-xs font-black text-gray-900 dark:text-white">
                                                                                     {
                                                                                         staffName
                                                                                     }
@@ -1210,14 +1210,14 @@ export default function DocumentsCompliance() {
                                                                                         }
                                                                                     </p>
                                                                                 )}
-                                                                                <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-gray-400">
+                                                                                <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-400">
                                                                                     <FileText
                                                                                         size={
                                                                                             11
                                                                                         }
-                                                                                        className="shrink-0 text-yellow-400"
+                                                                                        className="shrink-0 text-yellow-600 dark:text-yellow-400"
                                                                                     />
-                                                                                    <span className="truncate font-semibold text-gray-300">
+                                                                                    <span className="truncate font-semibold text-gray-700 dark:text-gray-300">
                                                                                         {
                                                                                             docTitle
                                                                                         }
@@ -1247,7 +1247,7 @@ export default function DocumentsCompliance() {
                                                                                         r,
                                                                                     )
                                                                                 }
-                                                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-red-400/20 bg-red-400/[0.05] px-3 py-2 text-[11px] font-black text-red-400 transition hover:bg-red-400/15 disabled:opacity-50"
+                                                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-red-400/20 bg-red-400/[0.05] px-3 py-2 text-[11px] font-black text-red-600 dark:text-red-400 transition hover:bg-red-400/15 disabled:opacity-50"
                                                                             >
                                                                                 <XCircle
                                                                                     size={
@@ -1318,7 +1318,7 @@ export default function DocumentsCompliance() {
                     </div>
 
                     {flashMessage && (
-                        <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-400/20 bg-green-400/10 px-4 py-3 text-sm text-green-400">
+                        <div className="mb-5 flex items-center gap-3 rounded-xl border border-green-400/20 bg-green-400/10 px-4 py-3 text-sm text-green-600 dark:text-green-400">
                             <CheckCircle2 size={18} />
                             <span>{flashMessage}</span>
                             <button
@@ -1332,7 +1332,7 @@ export default function DocumentsCompliance() {
                     )}
 
                     {flashError && (
-                        <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-400">
+                        <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
                             <AlertCircle size={18} />
                             <span>{flashError}</span>
                             <button
@@ -1345,14 +1345,14 @@ export default function DocumentsCompliance() {
                         </div>
                     )}
 
-                    <div className="mb-6 flex overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+                    <div className="mb-6 flex overflow-x-auto rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-1">
                         <button
                             type="button"
                             onClick={() => switchSubTab("client")}
                             className={`flex min-w-[150px] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                                 docSubTab === "client"
                                     ? "bg-blue-400 text-black shadow-lg shadow-blue-400/10"
-                                    : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                             }`}
                         >
                             <File size={17} />
@@ -1361,7 +1361,7 @@ export default function DocumentsCompliance() {
                                 className={`rounded-full px-2 py-0.5 text-[10px] ${
                                     docSubTab === "client"
                                         ? "bg-black/10"
-                                        : "bg-white/10"
+                                        : "bg-gray-100 dark:bg-white/10"
                                 }`}
                             >
                                 {documentStats.client.total}
@@ -1374,7 +1374,7 @@ export default function DocumentsCompliance() {
                             className={`flex min-w-[150px] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                                 docSubTab === "company"
                                     ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/10"
-                                    : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                             }`}
                         >
                             <Building size={17} />
@@ -1383,7 +1383,7 @@ export default function DocumentsCompliance() {
                                 className={`rounded-full px-2 py-0.5 text-[10px] ${
                                     docSubTab === "company"
                                         ? "bg-black/10"
-                                        : "bg-white/10"
+                                        : "bg-gray-100 dark:bg-white/10"
                                 }`}
                             >
                                 {documentStats.company.total}
@@ -1396,7 +1396,7 @@ export default function DocumentsCompliance() {
                             className={`flex min-w-[150px] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                                 docSubTab === "deleted"
                                     ? "bg-red-500 text-white shadow-lg shadow-red-500/10"
-                                    : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
                             }`}
                         >
                             <Trash2 size={17} />
@@ -1404,8 +1404,8 @@ export default function DocumentsCompliance() {
                             <span
                                 className={`rounded-full px-2 py-0.5 text-[10px] ${
                                     docSubTab === "deleted"
-                                        ? "bg-black/20 text-white"
-                                        : "bg-white/10"
+                                        ? "bg-gray-50 dark:bg-black/20 text-gray-900 dark:text-white"
+                                        : "bg-gray-100 dark:bg-white/10"
                                 }`}
                             >
                                 {documentStats.deleted.total}
@@ -1519,9 +1519,9 @@ export default function DocumentsCompliance() {
                     {isDeletedView && (
                         <div className="mb-6 rounded-2xl border border-red-400/20 bg-red-400/[0.03] p-4">
                             <div className="flex items-center gap-3">
-                                <Trash2 size={20} className="text-red-400" />
+                                <Trash2 size={20} className="text-red-600 dark:text-red-400" />
                                 <div>
-                                    <p className="text-sm font-bold text-white">
+                                    <p className="text-sm font-bold text-gray-900 dark:text-white">
                                         Deleted Documents (
                                         {deletedDocuments.length})
                                     </p>
@@ -1535,7 +1535,7 @@ export default function DocumentsCompliance() {
                         </div>
                     )}
 
-                    <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-xl shadow-black/20">
+                    <div className="mb-5 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-4 shadow-xl shadow-black/20">
                         <div className="grid gap-3 lg:grid-cols-[minmax(200px,1fr)_150px_150px_150px_auto]">
                             <SearchInput
                                 value={documentSearch}
@@ -1581,7 +1581,7 @@ export default function DocumentsCompliance() {
                                     className={`flex h-11 w-11 items-center justify-center rounded-xl transition ${
                                         viewMode === "grid"
                                             ? "bg-yellow-400 text-black"
-                                            : "border border-white/10 text-gray-500 hover:border-white/30 hover:text-white"
+                                            : "border border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white"
                                     }`}
                                 >
                                     <Grid size={18} />
@@ -1592,7 +1592,7 @@ export default function DocumentsCompliance() {
                                     className={`flex h-11 w-11 items-center justify-center rounded-xl transition ${
                                         viewMode === "list"
                                             ? "bg-yellow-400 text-black"
-                                            : "border border-white/10 text-gray-500 hover:border-white/30 hover:text-white"
+                                            : "border border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white"
                                     }`}
                                 >
                                     <List size={18} />
@@ -1835,11 +1835,11 @@ function StatCard({
     onClick?: () => void;
 }) {
     const colorClasses = {
-        yellow: "bg-yellow-400/10 text-yellow-400",
-        blue: "bg-blue-400/10 text-blue-400",
-        green: "bg-green-400/10 text-green-400",
-        red: "bg-red-400/10 text-red-400",
-        gray: "bg-gray-400/10 text-gray-400",
+        yellow: "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400",
+        blue: "bg-blue-400/10 text-blue-600 dark:text-blue-400",
+        green: "bg-green-400/10 text-green-600 dark:text-green-400",
+        red: "bg-red-400/10 text-red-600 dark:text-red-400",
+        gray: "bg-gray-400/10 text-gray-600 dark:text-gray-400",
     };
 
     const isClickable = Boolean(onClick);
@@ -1851,12 +1851,12 @@ function StatCard({
             disabled={!isClickable}
             className={`rounded-2xl border p-4 text-left shadow-lg shadow-black/20 transition ${
                 isClickable
-                    ? "cursor-pointer hover:border-yellow-400/40 hover:bg-white/[0.06]"
+                    ? "cursor-pointer hover:border-yellow-400/40 hover:bg-white dark:hover:bg-white/[0.06]"
                     : "cursor-default"
             } ${
                 active
                     ? "border-yellow-400 bg-yellow-400/[0.08] ring-2 ring-yellow-400/30"
-                    : "border-white/10 bg-white/[0.03]"
+                    : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]"
             }`}
         >
             <div className="flex items-start justify-between gap-3">
@@ -1864,7 +1864,7 @@ function StatCard({
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
                         {label}
                     </p>
-                    <p className="mt-2 text-2xl font-black text-white">
+                    <p className="mt-2 text-2xl font-black text-gray-900 dark:text-white">
                         {value}
                     </p>
                 </div>
@@ -1967,7 +1967,7 @@ function DocumentCard({
         >
             <div className="relative">
                 <div
-                    className={`relative flex h-48 items-center justify-center overflow-hidden rounded-t-2xl bg-black/40 ${
+                    className={`relative flex h-48 items-center justify-center overflow-hidden rounded-t-2xl bg-white dark:bg-black/40 ${
                         canView ? "cursor-pointer" : "cursor-not-allowed"
                     }`}
                     onClick={canView ? onOpen : undefined}
@@ -1980,14 +1980,14 @@ function DocumentCard({
                         />
                     ) : canView && document.file_url && isPdf(document) ? (
                         <div className="flex flex-col items-center justify-center">
-                            <FileText size={48} className="text-red-400" />
+                            <FileText size={48} className="text-red-600 dark:text-red-400" />
                             <span className="mt-2 text-xs text-gray-500">
                                 PDF Document
                             </span>
                         </div>
                     ) : canView ? (
                         <div className="flex flex-col items-center justify-center">
-                            <FileText size={48} className="text-yellow-400" />
+                            <FileText size={48} className="text-yellow-600 dark:text-yellow-400" />
                             <span className="mt-2 text-xs text-gray-500">
                                 {document.file_name}
                             </span>
@@ -2000,41 +2000,41 @@ function DocumentCard({
 
                     {isDeleted && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/40 backdrop-blur-sm">
-                            <Trash2 size={40} className="text-red-300" />
-                            <p className="mt-2 text-xs font-black text-red-200">
+                            <Trash2 size={40} className="text-red-700 dark:text-red-300" />
+                            <p className="mt-2 text-xs font-black text-red-700 dark:text-red-200">
                                 DELETED
                             </p>
                         </div>
                     )}
 
                     {!isDeleted && isCompanyDoc && isLocked && (
-                        <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2.5 py-1 text-xs font-semibold text-red-400 backdrop-blur-sm">
+                        <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2.5 py-1 text-xs font-semibold text-red-600 dark:text-red-400 backdrop-blur-sm">
                             <Lock size={11} />
                             Locked
                         </div>
                     )}
 
                     {!isDeleted && isCompanyDoc && !isLocked && (
-                        <div className="absolute right-3 top-3 rounded-full bg-yellow-400/20 px-2.5 py-1 text-xs font-semibold text-yellow-400 backdrop-blur-sm">
+                        <div className="absolute right-3 top-3 rounded-full bg-yellow-400/20 px-2.5 py-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400 backdrop-blur-sm">
                             Company
                         </div>
                     )}
 
                     {!isDeleted && !isCompanyDoc && (
-                        <div className="absolute right-3 top-3 rounded-full bg-blue-400/20 px-2.5 py-1 text-xs font-semibold text-blue-400 backdrop-blur-sm">
+                        <div className="absolute right-3 top-3 rounded-full bg-blue-400/20 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 backdrop-blur-sm">
                             Client
                         </div>
                     )}
 
                     {!isDeleted && attachmentCount > 1 && (
-                        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-purple-400/30 bg-purple-500/25 px-2.5 py-1 text-[10px] font-black text-purple-200 backdrop-blur-sm">
+                        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-purple-400/30 bg-purple-500/25 px-2.5 py-1 text-[10px] font-black text-purple-700 dark:text-purple-200 backdrop-blur-sm">
                             <Paperclip size={10} />
                             {attachmentCount} files
                         </div>
                     )}
 
                     {!isDeleted && isArchived && (
-                        <div className="absolute left-3 top-3 rounded-full bg-gray-500/20 px-2.5 py-1 text-xs font-semibold text-gray-400 backdrop-blur-sm">
+                        <div className="absolute left-3 top-3 rounded-full bg-gray-500/20 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:text-gray-400 backdrop-blur-sm">
                             Archived
                         </div>
                     )}
@@ -2051,19 +2051,19 @@ function DocumentCard({
                     {!isDeleted &&
                         document.retention_period &&
                         document.retention_period !== "" && (
-                            <div className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold text-purple-400 backdrop-blur-sm">
+                            <div className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 backdrop-blur-sm">
                                 <Timer size={11} />
                                 {document.retention_period}
                             </div>
                         )}
 
                     {!isDeleted && !canView && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
-                            <Lock size={32} className="text-red-400" />
-                            <p className="mt-2 text-sm font-semibold text-red-400">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+                            <Lock size={32} className="text-red-600 dark:text-red-400" />
+                            <p className="mt-2 text-sm font-semibold text-red-600 dark:text-red-400">
                                 Access Denied
                             </p>
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
                                 Request permission from Admin
                             </p>
                         </div>
@@ -2073,7 +2073,7 @@ function DocumentCard({
                 <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                            <h3 className="truncate text-sm font-semibold text-white">
+                            <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                                 {document.title}
                             </h3>
                             <p className="mt-1 truncate text-xs text-gray-500">
@@ -2086,7 +2086,7 @@ function DocumentCard({
                             <button
                                 type="button"
                                 onClick={onMenuToggle}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition hover:bg-white/10 hover:text-white"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                             >
                                 <MoreVertical size={16} />
                             </button>
@@ -2095,7 +2095,7 @@ function DocumentCard({
 
                     {isDeleted ? (
                         <div className="mt-3 rounded-lg border border-red-400/20 bg-red-500/5 px-2.5 py-2">
-                            <p className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-400">
+                            <p className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-600 dark:text-red-400">
                                 <Trash2 size={11} />
                                 Deleted: {formatDate(document.deleted_at)}
                             </p>
@@ -2103,7 +2103,7 @@ function DocumentCard({
                     ) : (
                         <>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                                <span className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-gray-400">
+                                <span className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-0.5 text-xs text-gray-600 dark:text-gray-400">
                                     {document.type || "Other"}
                                 </span>
                                 <span
@@ -2131,21 +2131,21 @@ function DocumentCard({
                                             daysUntilExpiry > 0 && (
                                                 <AlertTriangle
                                                     size={10}
-                                                    className="text-yellow-400"
+                                                    className="text-yellow-600 dark:text-yellow-400"
                                                 />
                                             )}
                                         {daysUntilExpiry !== null &&
                                             daysUntilExpiry <= 0 && (
                                                 <AlertCircle
                                                     size={10}
-                                                    className="text-red-400"
+                                                    className="text-red-600 dark:text-red-400"
                                                 />
                                             )}
                                     </span>
                                 )}
                                 {document.retention_period &&
                                     document.retention_period !== "" && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-400">
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 dark:text-purple-400">
                                             <Package size={10} />
                                             Retention:{" "}
                                             {document.retention_period}
@@ -2153,7 +2153,7 @@ function DocumentCard({
                                     )}
                             </div>
 
-                            <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-3 text-xs text-gray-500">
+                            <div className="mt-3 flex items-center justify-between border-t border-gray-100 dark:border-white/5 pt-3 text-xs text-gray-500">
                                 <span>
                                     {formatDate(
                                         document.uploaded_at ||
@@ -2177,7 +2177,7 @@ function DocumentCard({
             {isMenuOpen && (
                 <div
                     data-action-menu
-                    className="absolute right-4 top-[180px] z-30 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0c] p-1 shadow-2xl"
+                    className="absolute right-4 top-[180px] z-30 w-56 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0c0c0c] p-1 shadow-2xl"
                 >
                     {isDeleted ? (
                         <>
@@ -2186,7 +2186,7 @@ function DocumentCard({
                                     <button
                                         type="button"
                                         onClick={onRestoreDeleted}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-green-400 hover:bg-green-500/10"
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-green-600 dark:text-green-400 hover:bg-green-500/10"
                                     >
                                         <RotateCcw size={15} />
                                         Restore Document
@@ -2194,7 +2194,7 @@ function DocumentCard({
                                     <button
                                         type="button"
                                         onClick={onForceDelete}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10"
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-500/10"
                                     >
                                         <Trash2 size={15} />
                                         Permanently Delete
@@ -2209,7 +2209,7 @@ function DocumentCard({
                                     <button
                                         type="button"
                                         onClick={onOpen}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-300 hover:bg-white/10 hover:text-white"
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                     >
                                         <Eye size={15} />
                                         View
@@ -2217,7 +2217,7 @@ function DocumentCard({
                                     <button
                                         type="button"
                                         onClick={onDownload}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-300 hover:bg-white/10 hover:text-white"
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                     >
                                         <Download size={15} />
                                         Download Primary
@@ -2226,7 +2226,7 @@ function DocumentCard({
                                         <button
                                             type="button"
                                             onClick={onDownloadAll}
-                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-purple-300 hover:bg-purple-500/10"
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-purple-700 dark:text-purple-300 hover:bg-purple-500/10"
                                         >
                                             <Package size={15} />
                                             Download All ({attachmentCount})
@@ -2240,7 +2240,7 @@ function DocumentCard({
                                     <button
                                         type="button"
                                         onClick={onEdit}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-blue-300 hover:bg-blue-500/10"
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-500/10"
                                     >
                                         <Pencil size={15} />
                                         Edit Document
@@ -2249,7 +2249,7 @@ function DocumentCard({
                                         <button
                                             type="button"
                                             onClick={onManagePermissions}
-                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-yellow-400 hover:bg-yellow-400/10"
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                                         >
                                             <Users size={15} />
                                             Manage Permissions
@@ -2262,8 +2262,8 @@ function DocumentCard({
                                         }
                                         className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${
                                             isArchived
-                                                ? "text-green-400 hover:bg-green-400/10"
-                                                : "text-yellow-400 hover:bg-yellow-400/10"
+                                                ? "text-green-600 dark:text-green-400 hover:bg-green-400/10"
+                                                : "text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                                         }`}
                                     >
                                         <Archive size={15} />
@@ -2274,7 +2274,7 @@ function DocumentCard({
                                     <button
                                         type="button"
                                         onClick={onDelete}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10"
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-500/10"
                                     >
                                         <Trash2 size={15} />
                                         Delete (Move to Trash)
@@ -2337,11 +2337,11 @@ function DocumentListView({
     isImage: (doc?: DocumentRecord | null) => boolean;
 }) {
     return (
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-xl shadow-black/20">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] shadow-xl shadow-black/20">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px]">
                     <thead>
-                        <tr className="border-b border-white/10 bg-white/[0.02] text-left">
+                        <tr className="border-b border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.02] text-left">
                             <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
                                 Document
                             </th>
@@ -2391,7 +2391,7 @@ function DocumentListView({
                             return (
                                 <tr
                                     key={document.id}
-                                    className={`border-b border-white/5 transition hover:bg-white/[0.025] ${
+                                    className={`border-b border-gray-100 dark:border-white/5 transition hover:bg-gray-100 dark:hover:bg-white/[0.025] ${
                                         isDeletedView ? "bg-red-500/[0.02]" : ""
                                     }`}
                                 >
@@ -2401,12 +2401,12 @@ function DocumentListView({
                                                 {isDeletedView ? (
                                                     <Trash2
                                                         size={17}
-                                                        className="text-red-400"
+                                                        className="text-red-600 dark:text-red-400"
                                                     />
                                                 ) : !canView ? (
                                                     <Lock
                                                         size={17}
-                                                        className="text-red-400"
+                                                        className="text-red-600 dark:text-red-400"
                                                     />
                                                 ) : document.file_url &&
                                                   isImage(document) ? (
@@ -2418,12 +2418,12 @@ function DocumentListView({
                                                 ) : (
                                                     <FileText
                                                         size={19}
-                                                        className="text-yellow-400"
+                                                        className="text-yellow-600 dark:text-yellow-400"
                                                     />
                                                 )}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="truncate text-sm font-semibold text-white">
+                                                <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                                                     {document.title}
                                                 </p>
                                                 <p className="mt-0.5 truncate text-xs text-gray-600">
@@ -2432,7 +2432,7 @@ function DocumentListView({
                                                         : "Access restricted"}
                                                 </p>
                                                 {attachmentCount > 1 && (
-                                                    <p className="mt-0.5 inline-flex items-center gap-1 rounded-lg bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-300">
+                                                    <p className="mt-0.5 inline-flex items-center gap-1 rounded-lg bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
                                                         <Paperclip size={10} />
                                                         {attachmentCount} files
                                                     </p>
@@ -2442,25 +2442,25 @@ function DocumentListView({
                                     </td>
                                     <td className="px-5 py-4">
                                         {isCompanyDoc ? (
-                                            <span className="inline-flex items-center gap-1 rounded-lg bg-yellow-400/10 px-2.5 py-1 text-xs text-yellow-400">
+                                            <span className="inline-flex items-center gap-1 rounded-lg bg-yellow-400/10 px-2.5 py-1 text-xs text-yellow-600 dark:text-yellow-400">
                                                 Company
                                                 {isLocked && <Lock size={11} />}
                                             </span>
                                         ) : (
-                                            <span className="rounded-lg bg-blue-400/10 px-2.5 py-1 text-xs text-blue-400">
+                                            <span className="rounded-lg bg-blue-400/10 px-2.5 py-1 text-xs text-blue-600 dark:text-blue-400">
                                                 Client
                                             </span>
                                         )}
                                     </td>
                                     <td className="px-5 py-4">
-                                        <span className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-gray-400">
+                                        <span className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1 text-xs text-gray-600 dark:text-gray-400">
                                             {document.type || "Other"}
                                         </span>
                                     </td>
                                     {!isDeletedView && (
                                         <>
                                             <td className="px-5 py-4">
-                                                <span className="text-xs text-gray-400">
+                                                <span className="text-xs text-gray-600 dark:text-gray-400">
                                                     {document.assigned_name ||
                                                         "All Staff"}
                                                 </span>
@@ -2493,7 +2493,7 @@ function DocumentListView({
                                             <td className="px-5 py-4">
                                                 {document.retention_period ? (
                                                     <div className="flex flex-col">
-                                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
+                                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
                                                             <Package
                                                                 size={11}
                                                             />
@@ -2519,7 +2519,7 @@ function DocumentListView({
                                     )}
                                     <td className="px-5 py-4">
                                         {isDeletedView ? (
-                                            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400">
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-600 dark:text-red-400">
                                                 <Trash2 size={11} />
                                                 {formatDate(
                                                     document.deleted_at,
@@ -2545,13 +2545,13 @@ function DocumentListView({
                                                             : document.id,
                                                     )
                                                 }
-                                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-white/10 hover:text-white"
+                                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                             >
                                                 <MoreVertical size={18} />
                                             </button>
                                         )}
                                         {documentMenu === document.id && (
-                                            <div className="absolute right-5 top-14 z-30 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#090909] p-1 shadow-2xl">
+                                            <div className="absolute right-5 top-14 z-30 w-52 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#090909] p-1 shadow-2xl">
                                                 {isDeletedView ? (
                                                     <>
                                                         <button
@@ -2561,7 +2561,7 @@ function DocumentListView({
                                                                     document,
                                                                 )
                                                             }
-                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-green-400 hover:bg-green-500/10"
+                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-green-600 dark:text-green-400 hover:bg-green-500/10"
                                                         >
                                                             <RotateCcw
                                                                 size={15}
@@ -2575,7 +2575,7 @@ function DocumentListView({
                                                                     document,
                                                                 )
                                                             }
-                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10"
+                                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-500/10"
                                                         >
                                                             <Trash2 size={15} />
                                                             Permanently Delete
@@ -2592,7 +2592,7 @@ function DocumentListView({
                                                                             document,
                                                                         )
                                                                     }
-                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-300 hover:bg-white/10 hover:text-white"
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                                                 >
                                                                     <Eye
                                                                         size={
@@ -2608,7 +2608,7 @@ function DocumentListView({
                                                                             document,
                                                                         )
                                                                     }
-                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-300 hover:bg-white/10 hover:text-white"
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                                                 >
                                                                     <Download
                                                                         size={
@@ -2627,7 +2627,7 @@ function DocumentListView({
                                                                         document,
                                                                     )
                                                                 }
-                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-blue-300 hover:bg-blue-500/10"
+                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-500/10"
                                                             >
                                                                 <Pencil
                                                                     size={15}
@@ -2644,7 +2644,7 @@ function DocumentListView({
                                                                             document,
                                                                         )
                                                                     }
-                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-yellow-400 hover:bg-yellow-400/10"
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                                                                 >
                                                                     <Users
                                                                         size={
@@ -2668,8 +2668,8 @@ function DocumentListView({
                                                                 }
                                                                 className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${
                                                                     isArchived
-                                                                        ? "text-green-400 hover:bg-green-400/10"
-                                                                        : "text-yellow-400 hover:bg-yellow-400/10"
+                                                                        ? "text-green-600 dark:text-green-400 hover:bg-green-400/10"
+                                                                        : "text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                                                                 }`}
                                                             >
                                                                 <Archive
@@ -2688,7 +2688,7 @@ function DocumentListView({
                                                                         document,
                                                                     )
                                                                 }
-                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10"
+                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-500/10"
                                                             >
                                                                 <Trash2
                                                                     size={15}
@@ -2756,13 +2756,13 @@ function DocumentForm({
                         }`}
                     >
                         {isCompany ? (
-                            <Lock size={20} className="text-yellow-400" />
+                            <Lock size={20} className="text-yellow-600 dark:text-yellow-400" />
                         ) : (
-                            <File size={20} className="text-blue-400" />
+                            <File size={20} className="text-blue-600 dark:text-blue-400" />
                         )}
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold text-white">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                             {isCompany ? "Company Document" : "Client Document"}
                         </h3>
                         <p className="mt-1 text-xs leading-5 text-gray-500">
@@ -2776,22 +2776,22 @@ function DocumentForm({
 
             <div>
                 <div className="mb-2 flex items-center justify-between">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                         Document Files
                     </label>
                     {pendingFiles.length > 0 && (
-                        <span className="rounded-lg border border-purple-400/20 bg-purple-400/10 px-2 py-1 text-[10px] font-bold text-purple-300">
+                        <span className="rounded-lg border border-purple-400/20 bg-purple-400/10 px-2 py-1 text-[10px] font-bold text-purple-700 dark:text-purple-300">
                             {pendingFiles.length} file
                             {pendingFiles.length !== 1 ? "s" : ""} attached
                         </span>
                     )}
                 </div>
 
-                <label className="group flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-black/40 px-6 py-8 text-center transition hover:border-yellow-400/50 hover:bg-yellow-400/[0.03]">
+                <label className="group flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 dark:border-white/15 bg-white dark:bg-black/40 px-6 py-8 text-center transition hover:border-yellow-400/50 hover:bg-yellow-400/[0.03]">
                     <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-400/10 transition group-hover:scale-105">
-                        <FileUp size={28} className="text-yellow-400" />
+                        <FileUp size={28} className="text-yellow-600 dark:text-yellow-400" />
                     </div>
-                    <span className="text-sm font-bold text-white">
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">
                         {pendingFiles.length > 0
                             ? "Add more files"
                             : "Choose document files"}
@@ -2815,16 +2815,16 @@ function DocumentForm({
                         {pendingFiles.map((file, index) => (
                             <div
                                 key={`${file.name}-${index}`}
-                                className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                                className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-3"
                             >
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10">
                                     <FileText
                                         size={18}
-                                        className="text-yellow-400"
+                                        className="text-yellow-600 dark:text-yellow-400"
                                     />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-white">
+                                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                                         {file.name}
                                     </p>
                                     <p className="text-xs text-gray-500">
@@ -2834,7 +2834,7 @@ function DocumentForm({
                                 <button
                                     type="button"
                                     onClick={() => onRemoveFile(index)}
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-400 transition hover:bg-red-500/10"
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-600 dark:text-red-400 transition hover:bg-red-500/10"
                                 >
                                     <X size={15} />
                                 </button>
@@ -2844,14 +2844,14 @@ function DocumentForm({
                 )}
 
                 {(fileError || form.errors.files) && (
-                    <p className="mt-2 text-xs text-red-400">
+                    <p className="mt-2 text-xs text-red-600 dark:text-red-400">
                         {fileError || form.errors.files}
                     </p>
                 )}
             </div>
 
             <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Document Title{" "}
                     <span className="text-[10px] font-normal text-gray-600">
                         (optional)
@@ -2865,17 +2865,17 @@ function DocumentForm({
                         pendingFiles[0]?.name.replace(/\.[^.]+$/, "") ||
                         "Auto-based sa filename..."
                     }
-                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
+                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
                 />
                 {form.errors.title && (
-                    <p className="mt-2 text-xs text-red-400">
+                    <p className="mt-2 text-xs text-red-600 dark:text-red-400">
                         {form.errors.title}
                     </p>
                 )}
             </div>
 
             <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Document Type
                 </label>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -2887,7 +2887,7 @@ function DocumentForm({
                             className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition ${
                                 form.data.type === t
                                     ? "border-yellow-400 bg-yellow-400 text-black"
-                                    : "border-white/10 bg-white/5 text-gray-400 hover:border-white/30 hover:text-white"
+                                    : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white"
                             }`}
                         >
                             {t}
@@ -2899,10 +2899,10 @@ function DocumentForm({
             <div className="rounded-2xl border border-purple-400/20 bg-purple-400/[0.03] p-4">
                 <div className="flex items-start gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-400/10">
-                        <Timer size={17} className="text-purple-400" />
+                        <Timer size={17} className="text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="flex-1">
-                        <p className="text-sm font-bold text-white">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">
                             Auto-computed Retention
                         </p>
                         <p className="mt-0.5 text-[11px] text-gray-500">
@@ -2910,20 +2910,20 @@ function DocumentForm({
                         </p>
 
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
+                            <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2">
                                 <p className="text-[9px] font-bold uppercase tracking-wider text-gray-600">
                                     Retention
                                 </p>
-                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-300">
+                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-700 dark:text-purple-300">
                                     <Package size={11} />
                                     {autoRetention}
                                 </p>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
+                            <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2">
                                 <p className="text-[9px] font-bold uppercase tracking-wider text-gray-600">
                                     Expiry Date
                                 </p>
-                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-300">
+                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-700 dark:text-purple-300">
                                     <Calendar size={11} />
                                     {autoExpiry ?? "Permanent"}
                                 </p>
@@ -2934,7 +2934,7 @@ function DocumentForm({
             </div>
 
             <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Status
                 </label>
                 <div className="flex gap-2">
@@ -2946,9 +2946,9 @@ function DocumentForm({
                             className={`flex-1 rounded-xl border px-3 py-2.5 text-xs font-bold transition ${
                                 form.data.status === s
                                     ? s === "Active"
-                                        ? "border-green-400 bg-green-400/15 text-green-300"
-                                        : "border-gray-400 bg-gray-400/15 text-gray-300"
-                                    : "border-white/10 bg-white/5 text-gray-500 hover:border-white/30"
+                                        ? "border-green-400 bg-green-400/15 text-green-700 dark:text-green-300"
+                                        : "border-gray-400 bg-gray-400/15 text-gray-700 dark:text-gray-300"
+                                    : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-500 hover:border-gray-300 dark:hover:border-white/30"
                             }`}
                         >
                             {s}
@@ -2961,7 +2961,7 @@ function DocumentForm({
                 <div className="rounded-2xl border border-yellow-400/10 bg-yellow-400/[0.02] p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-semibold text-white">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">
                                 Lock Document
                             </p>
                             <p className="text-xs text-gray-500">
@@ -2976,7 +2976,7 @@ function DocumentForm({
                             className={`relative h-7 w-12 rounded-full transition ${
                                 form.data.is_locked
                                     ? "bg-yellow-400"
-                                    : "bg-white/20"
+                                    : "bg-gray-100 dark:bg-white/20"
                             }`}
                         >
                             <span
@@ -2989,11 +2989,11 @@ function DocumentForm({
                 </div>
             )}
 
-            <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-white/10 pt-5 sm:flex-row sm:justify-end">
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-gray-400 transition hover:bg-white/10 hover:text-white"
+                    className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-3 text-sm font-semibold text-gray-600 dark:text-gray-400 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                 >
                     Cancel
                 </button>
@@ -3047,10 +3047,10 @@ function EditDocumentForm({
             <div className="rounded-2xl border border-blue-400/20 bg-blue-400/[0.03] p-4">
                 <div className="flex items-start gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-400/10">
-                        <Pencil size={20} className="text-blue-400" />
+                        <Pencil size={20} className="text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold text-white">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                             Edit Metadata Only
                         </h3>
                         <p className="mt-1 text-xs leading-5 text-gray-500">
@@ -3063,25 +3063,25 @@ function EditDocumentForm({
             </div>
 
             <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Document Title
                 </label>
                 <input
                     type="text"
                     value={form.data.title}
                     onChange={(e) => form.setData("title", e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
+                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
                     required
                 />
                 {form.errors.title && (
-                    <p className="mt-2 text-xs text-red-400">
+                    <p className="mt-2 text-xs text-red-600 dark:text-red-400">
                         {form.errors.title}
                     </p>
                 )}
             </div>
 
             <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Document Type
                 </label>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -3093,7 +3093,7 @@ function EditDocumentForm({
                             className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition ${
                                 form.data.type === t
                                     ? "border-yellow-400 bg-yellow-400 text-black"
-                                    : "border-white/10 bg-white/5 text-gray-400 hover:border-white/30 hover:text-white"
+                                    : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white"
                             }`}
                         >
                             {t}
@@ -3105,10 +3105,10 @@ function EditDocumentForm({
             <div className="rounded-2xl border border-purple-400/20 bg-purple-400/[0.03] p-4">
                 <div className="flex items-start gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-400/10">
-                        <Timer size={17} className="text-purple-400" />
+                        <Timer size={17} className="text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="flex-1">
-                        <p className="text-sm font-bold text-white">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">
                             Auto-computed Retention
                         </p>
                         <p className="mt-0.5 text-[11px] text-gray-500">
@@ -3116,20 +3116,20 @@ function EditDocumentForm({
                         </p>
 
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
+                            <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2">
                                 <p className="text-[9px] font-bold uppercase tracking-wider text-gray-600">
                                     Retention
                                 </p>
-                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-300">
+                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-700 dark:text-purple-300">
                                     <Package size={11} />
                                     {autoRetention}
                                 </p>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
+                            <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 px-3 py-2">
                                 <p className="text-[9px] font-bold uppercase tracking-wider text-gray-600">
                                     Expiry Date
                                 </p>
-                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-300">
+                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-purple-700 dark:text-purple-300">
                                     <Calendar size={11} />
                                     {autoExpiry ?? "Permanent"}
                                 </p>
@@ -3143,7 +3143,7 @@ function EditDocumentForm({
                 <div className="rounded-2xl border border-yellow-400/10 bg-yellow-400/[0.02] p-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-semibold text-white">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">
                                 Lock Document
                             </p>
                             <p className="text-xs text-gray-500">
@@ -3159,7 +3159,7 @@ function EditDocumentForm({
                             className={`relative h-7 w-12 rounded-full transition ${
                                 form.data.is_locked
                                     ? "bg-yellow-400"
-                                    : "bg-white/20"
+                                    : "bg-gray-100 dark:bg-white/20"
                             }`}
                         >
                             <span
@@ -3173,7 +3173,7 @@ function EditDocumentForm({
             )}
 
             <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Assign Document
                 </label>
                 <div className="relative">
@@ -3186,7 +3186,7 @@ function EditDocumentForm({
                         onChange={(e) =>
                             form.setData("assigned_to", e.target.value)
                         }
-                        className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-black px-10 pr-10 text-sm text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
+                        className="h-12 w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-10 pr-10 text-sm text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
                     >
                         <option value="">All Staff</option>
                         {staff.map((member) => (
@@ -3202,8 +3202,8 @@ function EditDocumentForm({
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <label className="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-400">
+            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 p-4">
+                <label className="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Description
                 </label>
                 <textarea
@@ -3213,15 +3213,15 @@ function EditDocumentForm({
                     }
                     rows={4}
                     placeholder="Add document details..."
-                    className="w-full resize-none rounded-xl border border-white/10 bg-[#050505] px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-gray-700 focus:border-yellow-400/40 focus:ring-1 focus:ring-yellow-400/10"
+                    className="w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#050505] px-4 py-3 text-sm leading-6 text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-gray-700 focus:border-yellow-400/40 focus:ring-1 focus:ring-yellow-400/10"
                 />
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-white/10 pt-5 sm:flex-row sm:justify-end">
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-gray-400 transition hover:bg-white/10 hover:text-white"
+                    className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-3 text-sm font-semibold text-gray-600 dark:text-gray-400 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                 >
                     Cancel
                 </button>
@@ -3297,7 +3297,7 @@ function DocumentViewModal({
                 {attachments.length > 0 && activeFile ? (
                     <>
                         {attachments.length > 1 && (
-                            <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-2">
+                            <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-2">
                                 {attachments.map((att, index) => (
                                     <button
                                         key={`${att.file_name}-${index}`}
@@ -3306,7 +3306,7 @@ function DocumentViewModal({
                                         className={`inline-flex max-w-[240px] items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
                                             index === activeIndex
                                                 ? "bg-yellow-400 text-black"
-                                                : "bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
+                                                : "bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                         }`}
                                     >
                                         <Paperclip size={12} />
@@ -3318,7 +3318,7 @@ function DocumentViewModal({
                             </div>
                         )}
 
-                        <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
+                        <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black">
                             {activeFile.mime_type === "application/pdf" ||
                             activeFile.file_name
                                 ?.toLowerCase()
@@ -3338,7 +3338,7 @@ function DocumentViewModal({
                                 <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
                                     <FileText
                                         size={50}
-                                        className="mb-3 text-yellow-400"
+                                        className="mb-3 text-yellow-600 dark:text-yellow-400"
                                     />
                                     <p className="font-semibold">
                                         Preview not available
@@ -3362,8 +3362,8 @@ function DocumentViewModal({
                         </div>
                     </>
                 ) : (
-                    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border border-white/10 bg-black/30 text-center">
-                        <FileText size={50} className="mb-3 text-yellow-400" />
+                    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-center">
+                        <FileText size={50} className="mb-3 text-yellow-600 dark:text-yellow-400" />
                         <p className="font-semibold">Preview not available</p>
                     </div>
                 )}
@@ -3396,22 +3396,22 @@ function DocumentViewModal({
                 <div className="grid gap-3 sm:grid-cols-2">
                     {document.retention_period && (
                         <div className="rounded-xl border border-purple-400/20 bg-purple-400/[0.05] p-3">
-                            <p className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-purple-400">
+                            <p className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
                                 <Package size={10} />
                                 Retention
                             </p>
-                            <p className="mt-1 text-xs font-semibold text-purple-300">
+                            <p className="mt-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
                                 {document.retention_period}
                             </p>
                         </div>
                     )}
                     {document.expiry_date && (
                         <div className="rounded-xl border border-purple-400/20 bg-purple-400/[0.05] p-3">
-                            <p className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-purple-400">
+                            <p className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
                                 <Calendar size={10} />
                                 Expiry Date
                             </p>
-                            <p className="mt-1 text-xs font-semibold text-purple-300">
+                            <p className="mt-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
                                 {formatDate(document.expiry_date)}
                             </p>
                         </div>
@@ -3419,22 +3419,22 @@ function DocumentViewModal({
                 </div>
 
                 {document.description && (
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-4">
                         <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-600">
                             Description
                         </p>
-                        <p className="text-sm leading-6 text-gray-400">
+                        <p className="text-sm leading-6 text-gray-600 dark:text-gray-400">
                             {document.description}
                         </p>
                     </div>
                 )}
 
-                <div className="flex flex-col-reverse gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
+                <div className="flex flex-col-reverse gap-2 border-t border-gray-200 dark:border-white/10 pt-4 sm:flex-row sm:justify-end">
                     {attachments.length > 1 && (
                         <button
                             type="button"
                             onClick={onDownloadAll}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-purple-400/30 bg-purple-400/10 px-5 py-2.5 text-sm font-bold text-purple-300 hover:bg-purple-400/20"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-purple-400/30 bg-purple-400/10 px-5 py-2.5 text-sm font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-400/20"
                         >
                             <Package size={16} />
                             Download All (ZIP)
@@ -3483,9 +3483,9 @@ function PermissionModal({
             <div className="space-y-6">
                 <div className="rounded-2xl border border-yellow-400/10 bg-yellow-400/[0.03] p-4">
                     <div className="flex items-start gap-3">
-                        <Lock size={20} className="text-yellow-400" />
+                        <Lock size={20} className="text-yellow-600 dark:text-yellow-400" />
                         <div>
-                            <h4 className="font-bold text-white">
+                            <h4 className="font-bold text-gray-900 dark:text-white">
                                 Permission Control
                             </h4>
                             <p className="text-xs text-gray-500">
@@ -3500,12 +3500,12 @@ function PermissionModal({
                 </div>
 
                 <div>
-                    <h5 className="mb-3 text-sm font-bold text-white">
+                    <h5 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
                         Grant Access
                     </h5>
                     <div className="flex gap-2">
                         <select
-                            className="flex-1 rounded-xl border border-white/10 bg-black px-4 py-2.5 text-sm text-white outline-none focus:border-yellow-400/40"
+                            className="flex-1 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-4 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:border-yellow-400/40"
                             onChange={(e) =>
                                 setSelectedStaff(
                                     parseInt(e.target.value) || null,
@@ -3544,7 +3544,7 @@ function PermissionModal({
                 </div>
 
                 <div>
-                    <h5 className="mb-3 text-sm font-bold text-white">
+                    <h5 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
                         Staff with Access
                     </h5>
                     {document.granted_staff_ids &&
@@ -3557,17 +3557,17 @@ function PermissionModal({
                                 return staffMember ? (
                                     <div
                                         key={staffId}
-                                        className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                                        className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-3"
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-400/10">
                                                 <User
                                                     size={15}
-                                                    className="text-yellow-400"
+                                                    className="text-yellow-600 dark:text-yellow-400"
                                                 />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-semibold text-white">
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-white">
                                                     {staffMember.name}
                                                 </p>
                                                 <p className="text-xs text-gray-500">
@@ -3578,7 +3578,7 @@ function PermissionModal({
                                         <button
                                             type="button"
                                             onClick={() => onRevoke(staffId)}
-                                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+                                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10"
                                         >
                                             Revoke
                                         </button>
@@ -3587,7 +3587,7 @@ function PermissionModal({
                             })}
                         </div>
                     ) : (
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-center">
+                        <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-4 text-center">
                             <p className="text-sm text-gray-500">
                                 No staff members have been granted access yet.
                             </p>
@@ -3623,7 +3623,7 @@ function SearchInput({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="h-11 w-full rounded-xl border border-white/10 bg-black/60 pl-10 pr-4 text-sm text-white outline-none placeholder:text-gray-600 focus:border-yellow-400/40"
+                className="h-11 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/60 pl-10 pr-4 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-yellow-400/40"
             />
         </div>
     );
@@ -3647,13 +3647,13 @@ function FilterSelect({
             <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="h-11 w-full appearance-none rounded-xl border border-white/10 bg-black px-9 pr-9 text-sm text-gray-300 outline-none focus:border-yellow-400/40"
+                className="h-11 w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-9 pr-9 text-sm text-gray-700 dark:text-gray-300 outline-none focus:border-yellow-400/40"
             >
                 {options.map((option) => (
                     <option
                         key={option}
                         value={option}
-                        className="bg-black text-white"
+                        className="bg-white dark:bg-black text-gray-900 dark:text-white"
                     >
                         {option}
                     </option>
@@ -3681,7 +3681,7 @@ function BlackSelect({
             <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="h-11 w-full appearance-none rounded-xl border border-white/10 bg-black px-3 pr-9 text-sm text-gray-300 outline-none focus:border-yellow-400/40"
+                className="h-11 w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-3 pr-9 text-sm text-gray-700 dark:text-gray-300 outline-none focus:border-yellow-400/40"
             >
                 {children}
             </select>
@@ -3707,7 +3707,7 @@ function DarkSelectField({
     return (
         <div>
             {label && (
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     {label}
                 </label>
             )}
@@ -3715,13 +3715,13 @@ function DarkSelectField({
                 <select
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
-                    className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-black px-4 pr-10 text-sm font-medium text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
+                    className="h-12 w-full appearance-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-4 pr-10 text-sm font-medium text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/50 focus:ring-1 focus:ring-yellow-400/20"
                 >
                     {options.map((option) => (
                         <option
                             key={option}
                             value={option}
-                            className="bg-black text-white"
+                            className="bg-white dark:bg-black text-gray-900 dark:text-white"
                         >
                             {option || "—"}
                         </option>
@@ -3750,11 +3750,11 @@ function EmptyState({
     onAction: () => void;
 }) {
     return (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-5 text-center">
+        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] px-5 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-400/10">
-                <Icon size={26} className="text-yellow-400" />
+                <Icon size={26} className="text-yellow-600 dark:text-yellow-400" />
             </div>
-            <h3 className="font-bold text-white">{title}</h3>
+            <h3 className="font-bold text-gray-900 dark:text-white">{title}</h3>
             <p className="mt-1 max-w-sm text-xs leading-5 text-gray-600">
                 {description}
             </p>
@@ -3794,13 +3794,13 @@ function Modal({
                 className="absolute inset-0 bg-black/80 backdrop-blur-md"
             />
             <div
-                className={`relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-2xl border border-white/10 bg-[#0c0c0c] shadow-2xl shadow-black/70 ${
+                className={`relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0c0c0c] shadow-2xl shadow-black/70 ${
                     large ? "max-w-6xl" : "max-w-2xl"
                 }`}
             >
-                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/10 bg-[#0c0c0c]/95 px-5 py-4 backdrop-blur-xl">
+                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-[#0c0c0c]/95 px-5 py-4 backdrop-blur-xl">
                     <div className="min-w-0">
-                        <h2 className="truncate text-lg font-black text-white">
+                        <h2 className="truncate text-lg font-black text-gray-900 dark:text-white">
                             {title}
                         </h2>
                         {subtitle && (
@@ -3812,7 +3812,7 @@ function Modal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-gray-500 transition hover:bg-white/10 hover:text-white"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-gray-500 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                     >
                         <X size={18} />
                     </button>
@@ -3825,11 +3825,11 @@ function Modal({
 
 function InfoBox({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-3">
             <p className="text-[9px] font-bold uppercase tracking-wider text-gray-600">
                 {label}
             </p>
-            <p className="mt-1 truncate text-xs font-semibold text-gray-300">
+            <p className="mt-1 truncate text-xs font-semibold text-gray-700 dark:text-gray-300">
                 {value}
             </p>
         </div>

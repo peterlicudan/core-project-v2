@@ -1,11 +1,15 @@
 import React, { useEffect } from "react";
 import { router, usePage } from "@inertiajs/react";
 import { useTheme } from "../Context/ThemeContext";
+import AlibatonAssistant from "../Components/AI/AlibatonAssistant";
 
 import Sidebar from "../Components/Sidebar";
 import UserHeader from "../Components/UserHeader";
 import IdleWarningModal from "../Components/IdleWarningModal";
+import PaymentNotification from "../Components/PaymentNotification";
 import { useIdleLogout } from "../Hooks/useIdleLogout";
+
+
 
 type AuthUser = {
     id?: number;
@@ -29,43 +33,33 @@ export default function UserLayout({
 
     const { auth } = usePage<SharedPageProps>().props;
 
-    const userRole = String(
-        auth?.user?.role ?? ""
-    ).toLowerCase().trim();
+    const userRole = String(auth?.user?.role ?? "")
+        .toLowerCase()
+        .trim();
 
-   /*
-|--------------------------------------------------------------------------
-| IDLE LOGOUT (5 minutes)
-|--------------------------------------------------------------------------
-|
-| If the user does nothing (no mouse, no click, no type, no scroll)
-| for 5 minutes, they will be automatically logged out.
-|
-| 1 minute before logout, a warning modal will appear.
-|
-*/
+    /*
+    |--------------------------------------------------------------------------
+    | IDLE LOGOUT (5 minutes)
+    |--------------------------------------------------------------------------
+    */
 
 const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
-    timeout: 5 * 60 * 1000,         // 5 minutes idle
+    timeout: 10 * 60 * 1000, // 10 minutes idle
     warningDuration: 1 * 60 * 1000, // 1 minute warning
+    logoutUrl: "/logout",
+    redirectUrl: "/login",
 });
+
     useEffect(() => {
         /*
         |--------------------------------------------------------------------------
         | STAFF HEARTBEAT
         |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        | This heartbeat belongs ONLY to STAFF.
-        |
-        | Admin must NEVER call:
-        | POST /staff/heartbeat
-        |
         */
 
         if (userRole !== "staff") {
             console.log(
-                `Heartbeat disabled for role: ${userRole || "unknown"}`
+                `Heartbeat disabled for role: ${userRole || "unknown"}`,
             );
 
             return;
@@ -75,10 +69,6 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
         |--------------------------------------------------------------------------
         | EXTRA ADMIN PROTECTION
         |--------------------------------------------------------------------------
-        |
-        | Even if this layout somehow gets mounted under an admin URL,
-        | do not send the staff heartbeat.
-        |
         */
 
         const isAdminPath =
@@ -86,9 +76,7 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
             window.location.pathname.startsWith("/admin/");
 
         if (isAdminPath) {
-            console.log(
-                "Admin route detected - staff heartbeat disabled."
-            );
+            console.log("Admin route detected - staff heartbeat disabled.");
 
             return;
         }
@@ -100,20 +88,11 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
         */
 
         const sendHeartbeat = () => {
-            /*
-            | Re-check role before every request.
-            */
-
             if (userRole !== "staff") {
                 return;
             }
 
-            /*
-            | Re-check current URL before every request.
-            */
-
-            const currentPath =
-                window.location.pathname;
+            const currentPath = window.location.pathname;
 
             if (
                 currentPath === "/admin" ||
@@ -131,16 +110,11 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
                     replace: true,
 
                     onSuccess: () => {
-                        console.log(
-                            "Staff heartbeat sent."
-                        );
+                        console.log("Staff heartbeat sent.");
                     },
 
                     onError: (errors) => {
-                        console.error(
-                            "Staff heartbeat failed:",
-                            errors
-                        );
+                        console.error("Staff heartbeat failed:", errors);
                     },
 
                     onFinish: () => {
@@ -148,7 +122,7 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
                         | No redirect or page replacement here.
                         */
                     },
-                }
+                },
             );
         };
 
@@ -166,11 +140,7 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
         |--------------------------------------------------------------------------
         */
 
-        const interval =
-            window.setInterval(
-                sendHeartbeat,
-                30000
-            );
+        const interval = window.setInterval(sendHeartbeat, 30000);
 
         /*
         |--------------------------------------------------------------------------
@@ -194,7 +164,11 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
             <Sidebar />
 
             <div className="flex min-w-0 flex-1 flex-col">
-                <UserHeader />
+                {/* ✅ HEADER WITH NOTIFICATION BELL */}
+                <div className="relative">
+                    <UserHeader />
+
+                </div>
 
                 <main className="min-w-0 flex-1 px-4 pb-8 pt-20 sm:px-6 lg:px-8 lg:pt-8">
                     <div className="mx-auto w-full max-w-[1800px]">
@@ -221,6 +195,11 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
                     }}
                 />
             )}
+
+            {/* ✅ LOCAL AI ASSISTANT — ilipat mula admin */}
+<AlibatonAssistant />
+
         </div>
+
     );
 }

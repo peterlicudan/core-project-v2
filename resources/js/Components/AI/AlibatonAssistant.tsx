@@ -224,7 +224,45 @@ const getCsrfToken = (): string => {
         'meta[name="csrf-token"]',
     ) as HTMLMetaElement | null;
 
-    return meta?.content || "";
+    if (meta?.content) {
+        return meta.content;
+    }
+
+    // Fallback: XSRF-TOKEN cookie — sine-set ng Laravel sa bawat response,
+    // kaya ito ang pinaka-fresh na token kahit ma-regenerate ang session.
+    const cookie = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("XSRF-TOKEN="));
+
+    if (cookie) {
+        try {
+            return decodeURIComponent(cookie.split("=").slice(1).join("="));
+        } catch {
+            return "";
+        }
+    }
+
+    return "";
+};
+
+/*
+|--------------------------------------------------------------------------
+| ✅ CSRF: una ang XSRF-TOKEN cookie (fresh sa bawat response), fallback meta
+|--------------------------------------------------------------------------
+*/
+
+const getXsrfCookieToken = (): string => {
+    const cookie = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("XSRF-TOKEN="));
+
+    if (!cookie) return "";
+
+    try {
+        return decodeURIComponent(cookie.split("=").slice(1).join("="));
+    } catch {
+        return "";
+    }
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -886,8 +924,12 @@ export default function AlibatonAssistant({ reports = [] }: Props) {
                 method: "POST",
                 credentials: "same-origin",
                 headers: {
-                    "X-CSRF-TOKEN": getCsrfToken(),
-
+                    // ✅ Fresh token: XSRF-TOKEN cookie (sine-set sa bawat response).
+                    // Kapag walang cookie, fallback sa meta csrf-token.
+                    ...(getXsrfCookieToken()
+                        ? { "X-XSRF-TOKEN": getXsrfCookieToken() }
+                        : { "X-CSRF-TOKEN": getCsrfToken() }),
+                    "X-Requested-With": "XMLHttpRequest",
                     Accept: "application/json",
                 },
                 body: formData,

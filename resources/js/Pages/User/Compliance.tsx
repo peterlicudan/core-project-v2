@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Head, router, usePage } from "@inertiajs/react";
 import UserLayout from "../../Layouts/UserLayout";
 
+
 import {
     AlertCircle,
     Archive,
@@ -251,6 +252,36 @@ export default function Compliance({
     }, [serverDocuments, serverCompliance]);
 
     /* =====================================================
+   AUTO-OPEN DOCUMENT FROM NOTIFICATION (?document_id=X)
+===================================================== */
+
+useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const documentIdFromUrl = params.get("document_id");
+
+    if (!documentIdFromUrl) return;
+
+    const target = documents.find(
+        (d) => Number(d.id) === Number(documentIdFromUrl),
+    );
+
+    if (target) {
+        // Auto-set category
+        if (target.document_type === "client") {
+            setSelectedCategory("client");
+        } else if (target.document_type === "company") {
+            setSelectedCategory("company");
+        }
+
+        // Auto-open view modal
+        setViewDoc(target);
+
+        // Clear URL param
+        window.history.replaceState({}, "", "/compliance");
+    }
+}, [documents]);
+
+    /* =====================================================
        TOAST
     ===================================================== */
 
@@ -284,32 +315,38 @@ export default function Compliance({
         return () => window.removeEventListener("scroll", closeMenu, true);
     }, []);
 
-    /* =====================================================
-       AUTO-REFRESH — every 5 seconds
-    ===================================================== */
+/*
+|--------------------------------------------------------------------------
+| ✅ AUTO-REFRESH DISABLED — Manual refresh button na lang
+|--------------------------------------------------------------------------
+*/
 
-    useEffect(() => {
-        const interval = window.setInterval(() => {
-            if (viewDoc || menuDoc || sendDoc || accessDeniedDoc) {
-                return;
-            }
-
-            setIsRefreshing(true);
-            router.reload({
-                only: ["documents", "compliance"],
-                onSuccess: () => {
-                    setIsRefreshing(false);
-                    setLastRefresh(new Date());
-                },
-                onError: () => {
-                    setIsRefreshing(false);
-                },
-            });
-        }, AUTO_REFRESH_INTERVAL);
-
-        return () => window.clearInterval(interval);
-    }, [viewDoc, menuDoc, sendDoc, accessDeniedDoc]);
-
+// useEffect(() => {
+//     const interval = window.setInterval(() => {
+//         try {
+//             if (viewDoc || menuDoc || sendDoc || accessDeniedDoc) {
+//                 return;
+//             }
+//
+//             setIsRefreshing(true);
+//             router.reload({
+//                 only: ["documents", "compliance"],
+//                 onSuccess: () => {
+//                     setIsRefreshing(false);
+//                     setLastRefresh(new Date());
+//                 },
+//                 onError: () => {
+//                     setIsRefreshing(false);
+//                 },
+//             });
+//         } catch (err) {
+//             console.error("Auto-refresh failed:", err);
+//             setIsRefreshing(false);
+//         }
+//     }, AUTO_REFRESH_INTERVAL);
+//
+//     return () => window.clearInterval(interval);
+// }, [viewDoc, menuDoc, sendDoc, accessDeniedDoc]);
     /* =====================================================
        HELPERS
     ===================================================== */
@@ -703,65 +740,36 @@ return matchesSearch && matchesType;
                 }
             `}</style>
 
-            <div className="min-h-screen w-full overflow-x-hidden bg-transparent pb-10 pt-12 text-white sm:pt-6 lg:pt-2">
+            <div className="min-h-screen w-full overflow-x-hidden bg-transparent pb-10 pt-12 text-gray-900 dark:text-white sm:pt-6 lg:pt-2">
                 <div className="w-full max-w-[1500px] px-3 sm:px-5 lg:px-6">
                     {/* HEADER */}
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>
-                            <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-yellow-400">
+                            <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-yellow-600 dark:text-yellow-400">
                                 <ShieldCheck size={16} />
                                 ALIBATON DOCUMENT CONTROL
                             </div>
                             <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
                                 Documents & Regulatory Compliance
                             </h1>
-                            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+                            <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-slate-400">
                                 {selectedCategory
                                     ? `Viewing ${selectedCategory === "client" ? "Client" : "Company"} Documents`
                                     : "Choose a document category to view its records."}
                             </p>
                         </div>
 
-                        {/* LIVE SYNC INDICATOR */}
-                        <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={manualRefresh}
-                                disabled={isRefreshing}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400 disabled:opacity-50"
-                                title="Manual refresh"
-                            >
-                                <RefreshCw
-                                    size={13}
-                                    className={isRefreshing ? "animate-spin" : ""}
-                                />
-                                {isRefreshing ? "Syncing..." : "Refresh"}
-                            </button>
 
-                            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-                                </span>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                                    Live • {lastRefresh.toLocaleTimeString("en-PH", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                        second: "2-digit",
-                                    })}
-                                </span>
-                            </div>
-                        </div>
                     </div>
 
                     {/* STEP 1 — CATEGORY SELECTOR */}
                     {!selectedCategory && (
                         <div className="mt-10">
                             <div className="mb-6 text-center">
-                                <h2 className="text-2xl font-black text-white sm:text-3xl">
+                                <h2 className="text-2xl font-black text-gray-900 dark:text-white sm:text-3xl">
                                     Document Category
                                 </h2>
-                                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+                                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-gray-500 dark:text-slate-500">
                                     Choose which type of documents you want to
                                     view. Records will appear after you select a
                                     category.
@@ -775,26 +783,26 @@ return matchesSearch && matchesType;
                                     onClick={() =>
                                         setSelectedCategory("client")
                                     }
-                                    className="category-card group relative overflow-hidden rounded-3xl border-2 border-blue-500/20 bg-gradient-to-br from-blue-500/[0.06] via-slate-900 to-slate-900 p-6 text-left shadow-2xl hover:border-blue-400/50 hover:shadow-blue-500/10 sm:p-8"
+                                    className="category-card group relative overflow-hidden rounded-3xl border-2 border-blue-500/20 bg-gradient-to-br from-blue-500/[0.06] via-white to-white dark:via-slate-900 dark:to-slate-900 p-6 text-left shadow-2xl hover:border-blue-400/50 hover:shadow-blue-500/10 sm:p-8"
                                 >
                                     <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-500/10 blur-3xl transition group-hover:bg-blue-500/20" />
 
                                     <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400">
+                                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400">
                                             <Users size={30} />
                                         </div>
 
-                                        <h3 className="mt-5 text-4xl font-black text-white">
+                                        <h3 className="mt-5 text-4xl font-black text-gray-900 dark:text-white">
                                             Client Documents
                                         </h3>
-                                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                                        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-slate-400">
                                             Contracts, invoices, permits, and
                                             files related to clients.
                                         </p>
 
                                         <div className="mt-6 flex items-center justify-between">
                                             <div>
-                                                <p className="text-3xl font-black text-blue-400">
+                                                <p className="text-3xl font-black text-blue-600 dark:text-blue-400">
                                                     {clientDocs}
                                                 </p>
                                                 <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
@@ -819,26 +827,26 @@ return matchesSearch && matchesType;
                                     onClick={() =>
                                         setSelectedCategory("company")
                                     }
-                                    className="category-card group relative overflow-hidden rounded-3xl border-2 border-yellow-400/20 bg-gradient-to-br from-yellow-400/[0.06] via-slate-900 to-slate-900 p-6 text-left shadow-2xl hover:border-yellow-400/50 hover:shadow-yellow-400/10 sm:p-8"
+                                    className="category-card group relative overflow-hidden rounded-3xl border-2 border-yellow-400/20 bg-gradient-to-br from-yellow-400/[0.06] via-white to-white dark:via-slate-900 dark:to-slate-900 p-6 text-left shadow-2xl hover:border-yellow-400/50 hover:shadow-yellow-400/10 sm:p-8"
                                 >
                                     <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-yellow-400/10 blur-3xl transition group-hover:bg-yellow-400/20" />
 
                                     <div className="relative">
-                                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                             <Building2 size={30} />
                                         </div>
 
-                                        <h3 className="mt-5 text-4xl font-black text-white">
+                                        <h3 className="mt-5 text-4xl font-black text-gray-900 dark:text-white">
                                             Companies Documents
                                         </h3>
-                                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                                        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-slate-400">
                                             Internal ALIBATON records, policies,
                                             and company files.
                                         </p>
 
                                         <div className="mt-6 flex items-center justify-between">
                                             <div>
-                                                <p className="text-3xl font-black text-yellow-400">
+                                                <p className="text-3xl font-black text-yellow-600 dark:text-yellow-400">
                                                     {companyDocs}
                                                 </p>
                                                 <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
@@ -868,7 +876,7 @@ return matchesSearch && matchesType;
                                 <button
                                     type="button"
                                     onClick={resetCategory}
-                                    className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                                    className="inline-flex items-center gap-2 self-start rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                                 >
                                     <ChevronLeft size={16} />
                                     Back to Categories
@@ -876,12 +884,12 @@ return matchesSearch && matchesType;
 
                                 <div className="flex items-center gap-2">
                                     {selectedCategory === "client" ? (
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-400">
+                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
                                             <Users size={14} />
                                             Client Documents
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-bold text-yellow-400">
+                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-bold text-yellow-600 dark:text-yellow-400">
                                             <Building2 size={14} />
                                             Alibaton Regulatory Compliance
                                         </span>
@@ -890,12 +898,12 @@ return matchesSearch && matchesType;
                             </div>
 
                             {/* FILTERS */}
-                            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-xl sm:p-4">
+                            <div className="mt-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xl sm:p-4">
                                 <div className="grid gap-3 lg:grid-cols-[1fr_200px_auto]">
                                     <div className="relative">
                                         <Search
                                             size={17}
-                                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500"
                                         />
                                         <input
                                             value={search}
@@ -907,7 +915,7 @@ return matchesSearch && matchesType;
                                                     ? "client"
                                                     : "company"
                                             } document...`}
-                                            className="w-full rounded-xl border border-slate-800 bg-slate-950 py-3 pl-10 pr-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-yellow-400/50"
+                                            className="w-full rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 py-3 pl-10 pr-3 text-sm text-gray-900 dark:text-white outline-none placeholder:text-slate-600 focus:border-yellow-400/50"
                                         />
                                     </div>
 
@@ -916,7 +924,7 @@ return matchesSearch && matchesType;
     onChange={(event) =>
         setTypeFilter(event.target.value)
     }
-    className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-yellow-400/50"
+    className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-3 py-3 text-sm text-gray-900 dark:text-white outline-none focus:border-yellow-400/50"
 >
     <option value="All Types">All Types</option>
     <option value="Permit">Permit</option>
@@ -930,7 +938,7 @@ return matchesSearch && matchesType;
                                     <button
                                         type="button"
                                         onClick={resetFilters}
-                                        className="flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm font-bold text-slate-300 transition hover:border-yellow-400/30 hover:text-yellow-400"
+                                        className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-4 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/30 hover:text-yellow-600 dark:hover:text-yellow-400"
                                     >
                                         <RotateCcw size={15} />
                                         Reset
@@ -941,19 +949,19 @@ return matchesSearch && matchesType;
                             {/* RECORD HEADER */}
                             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
-                                    <h2 className="text-lg font-black text-white">
+                                    <h2 className="text-lg font-black text-gray-900 dark:text-white">
                                         {selectedCategory === "client"
                                             ? "Client Documents"
                                             : "Alibaton Regulatory Compliance"}
                                     </h2>
-                                    <p className="mt-1 text-xs text-slate-500">
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
                                         {filteredDocuments.length} record
                                         {filteredDocuments.length !== 1
                                             ? "s"
                                             : ""}{" "}
                                         found
                                         {shouldScroll && (
-                                            <span className="ml-2 text-yellow-400/60">
+                                            <span className="ml-2 text-yellow-600/60 dark:text-yellow-400/60">
                                                 (scroll to view more)
                                             </span>
                                         )}
@@ -962,7 +970,7 @@ return matchesSearch && matchesType;
                                 <div
                                     className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${
                                         isRefreshing
-                                            ? "sync-pulse text-yellow-400"
+                                            ? "sync-pulse text-yellow-600 dark:text-yellow-400"
                                             : "text-slate-600"
                                     }`}
                                 >
@@ -972,15 +980,15 @@ return matchesSearch && matchesType;
                                             isRefreshing ? "animate-spin" : ""
                                         }
                                     />
-                                    {isRefreshing
-                                        ? "Syncing with ALIBATON..."
-                                        : "Auto-synced every 10s"}
+                                  {isRefreshing
+    ? "Syncing with ALIBATON..."
+    : "Manual refresh enabled"}
                                 </div>
                             </div>
 
                             {/* TABLE */}
                             {filteredDocuments.length > 0 ? (
-                                <section className="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 shadow-xl">
+                                <section className="mt-4 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 shadow-xl">
                                     <div
                                         className="alibaton-scrollbar"
                                         style={{
@@ -994,30 +1002,30 @@ return matchesSearch && matchesType;
                                         }}
                                     >
                                         <table className="w-full table-fixed">
-                                            <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm">
-                                                <tr className="border-b border-slate-800 bg-slate-950/70">
-                                                    <th className="w-[22%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-950/95 backdrop-blur-sm">
+                                                <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70">
+                                                    <th className="w-[22%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Document
                                                     </th>
-                                                    <th className="w-[10%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                    <th className="w-[10%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Type
                                                     </th>
-                                                    <th className="w-[12%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                    <th className="w-[12%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Status
                                                     </th>
-                                                    <th className="w-[10%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                    <th className="w-[10%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         File Size
                                                     </th>
-                                                    <th className="w-[12%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                    <th className="w-[12%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Uploaded By
                                                     </th>
-                                                    <th className="w-[12%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                    <th className="w-[12%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Assigned To
                                                     </th>
-                                                    <th className="w-[10%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                    <th className="w-[10%] px-3 py-3 text-left text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Date
                                                     </th>
-                                                    <th className="w-[12%] px-3 py-3 text-right text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                    <th className="w-[12%] px-3 py-3 text-right text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                         Actions
                                                     </th>
                                                 </tr>
@@ -1040,7 +1048,7 @@ return matchesSearch && matchesType;
                                                         return (
                                                             <tr
                                                                 key={doc.id}
-                                                                className="border-b border-slate-800/70 transition hover:bg-yellow-400/[0.025]"
+                                                                className="border-b border-gray-200 dark:border-slate-800/70 transition hover:bg-yellow-400/[0.025]"
                                                             >
                                                                 <td className="px-3 py-3 align-top">
                                                                     <button
@@ -1055,8 +1063,8 @@ return matchesSearch && matchesType;
                                                                         <div
                                                                             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
                                                                                 isCompanyDoc
-                                                                                    ? "border-yellow-400/20 bg-yellow-400/10 text-yellow-400"
-                                                                                    : "border-blue-500/20 bg-blue-500/10 text-blue-400"
+                                                                                    ? "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                                                                    : "border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400"
                                                                             }`}
                                                                         >
                                                                             <DocumentIcon
@@ -1069,12 +1077,12 @@ return matchesSearch && matchesType;
                                                                             />
                                                                         </div>
                                                                         <div className="min-w-0">
-                                                                            <p className="truncate text-[11px] font-black text-white hover:text-yellow-400">
+                                                                            <p className="truncate text-[11px] font-black text-gray-900 dark:text-white hover:text-yellow-600 dark:hover:text-yellow-400">
                                                                                 {
                                                                                     doc.title
                                                                                 }
                                                                             </p>
-                                                                            <p className="mt-0.5 truncate text-[9px] text-slate-500">
+                                                                            <p className="mt-0.5 truncate text-[9px] text-gray-500 dark:text-slate-500">
                                                                                 {doc.attachment_count &&
                                                                                 doc.attachment_count >
                                                                                     1
@@ -1103,7 +1111,7 @@ return matchesSearch && matchesType;
                                                                         {isCompanyDoc &&
                                                                             isLocked && (
                                                                                 <span
-                                                                                    className={`inline-flex items-center gap-1 text-[9px] font-bold ${canView ? "text-yellow-400" : "text-red-400"}`}
+                                                                                    className={`inline-flex items-center gap-1 text-[9px] font-bold ${canView ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}
                                                                                 >
                                                                                     {canView ? (
                                                                                         <UnlockIcon
@@ -1127,28 +1135,28 @@ return matchesSearch && matchesType;
                                                                 </td>
 
                                                                 <td className="px-3 py-3 align-top">
-                                                                    <p className="truncate text-[10px] font-bold text-slate-300">
+                                                                    <p className="truncate text-[10px] font-bold text-gray-700 dark:text-slate-300">
                                                                         {doc.formatted_file_size ||
                                                                             "—"}
                                                                     </p>
                                                                 </td>
 
                                                                 <td className="px-3 py-3 align-top">
-                                                                    <p className="truncate text-[10px] text-slate-300">
+                                                                    <p className="truncate text-[10px] text-gray-700 dark:text-slate-300">
                                                                         {doc.uploaded_by_name ||
                                                                             "ALIBATON Admin"}
                                                                     </p>
                                                                 </td>
 
                                                                 <td className="px-3 py-3 align-top">
-                                                                    <p className="truncate text-[10px] text-slate-300">
+                                                                    <p className="truncate text-[10px] text-gray-700 dark:text-slate-300">
                                                                         {doc.assigned_name ||
                                                                             "All Staff"}
                                                                     </p>
                                                                 </td>
 
                                                                 <td className="px-3 py-3 align-top">
-                                                                    <p className="truncate text-[10px] text-slate-400">
+                                                                    <p className="truncate text-[10px] text-gray-500 dark:text-slate-400">
                                                                         {formatDate(
                                                                             doc.created_at,
                                                                             doc.formatted_created_at,
@@ -1170,8 +1178,8 @@ return matchesSearch && matchesType;
                                                                             }
                                                                             className={`inline-flex h-7 items-center justify-center gap-1 rounded-md border px-2 text-[9px] font-bold transition ${
                                                                                 canView
-                                                                                    ? "border-slate-700 text-slate-300 hover:border-yellow-400/40 hover:bg-slate-800 hover:text-yellow-400"
-                                                                                    : "cursor-not-allowed border-slate-900 text-slate-700"
+                                                                                    ? "border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:border-yellow-400/40 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-yellow-600 dark:hover:text-yellow-400"
+                                                                                    : "cursor-not-allowed border-gray-200 dark:border-slate-900 text-slate-700"
                                                                             }`}
                                                                         >
                                                                             <Eye
@@ -1200,8 +1208,8 @@ return matchesSearch && matchesType;
                                                                             className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition ${
                                                                                 menuDoc?.id ===
                                                                                 doc.id
-                                                                                    ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
-                                                                                    : "border-slate-700 text-slate-400 hover:border-yellow-400/40 hover:text-yellow-400"
+                                                                                    ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                                                                    : "border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                                                                             }`}
                                                                         >
                                                                             <MoreVertical
@@ -1221,15 +1229,15 @@ return matchesSearch && matchesType;
                                     </div>
                                 </section>
                             ) : (
-                                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900 px-5 py-20 text-center shadow-xl">
-                                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-slate-800 bg-slate-950 text-slate-700">
+                                <div className="mt-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-20 text-center shadow-xl">
+                                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-slate-700">
                                         {selectedCategory === "company" ? (
                                             <Building2 size={36} />
                                         ) : (
                                             <Users size={36} />
                                         )}
                                     </div>
-                                    <p className="mt-5 text-lg font-black text-slate-400">
+                                    <p className="mt-5 text-lg font-black text-gray-500 dark:text-slate-400">
                                         No documents found
                                     </p>
                                     <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
@@ -1260,13 +1268,13 @@ return matchesSearch && matchesType;
             {menuDoc && (
                 <div
                     data-document-action-menu
-                    className="fixed z-[99999] w-[250px] rounded-2xl border border-slate-700 bg-slate-950 p-2 shadow-[0_25px_80px_rgba(0,0,0,.85)]"
+                    className="fixed z-[99999] w-[250px] rounded-2xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 p-2 shadow-[0_25px_80px_rgba(0,0,0,.85)]"
                     style={{ top: menuPosition.top, left: menuPosition.left }}
                 >
-                    <div className="border-b border-slate-800 px-3 py-2.5">
+                    <div className="border-b border-gray-200 dark:border-slate-800 px-3 py-2.5">
                         <div className="flex items-center gap-2">
                             <div
-                                className={`flex h-8 w-8 items-center justify-center rounded-lg ${isCompanyDocument(menuDoc) ? "bg-yellow-400/10 text-yellow-400" : "bg-blue-400/10 text-blue-400"}`}
+                                className={`flex h-8 w-8 items-center justify-center rounded-lg ${isCompanyDocument(menuDoc) ? "bg-yellow-400/10 text-yellow-600 dark:text-yellow-400" : "bg-blue-400/10 text-blue-600 dark:text-blue-400"}`}
                             >
                                 {isCompanyDocument(menuDoc) ? (
                                     <Building2 size={15} />
@@ -1275,10 +1283,10 @@ return matchesSearch && matchesType;
                                 )}
                             </div>
                             <div className="min-w-0">
-                                <p className="truncate text-xs font-black text-white">
+                                <p className="truncate text-xs font-black text-gray-900 dark:text-white">
                                     {menuDoc.title}
                                 </p>
-                                <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                                <p className="mt-0.5 truncate text-[10px] text-gray-500 dark:text-slate-500">
                                     {menuDoc.attachment_count &&
                                     menuDoc.attachment_count > 1
                                         ? `${menuDoc.attachment_count} files`
@@ -1312,7 +1320,7 @@ return matchesSearch && matchesType;
                                     label="Print"
                                     onClick={() => printDocument(menuDoc)}
                                 />
-                                <div className="my-1 border-t border-slate-800" />
+                                <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
                                 <MenuItem
                                     icon={<Send size={16} />}
                                     label="Forward"
@@ -1338,7 +1346,7 @@ return matchesSearch && matchesType;
                                         className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-black transition ${
                                             hasRequestedAccess(menuDoc)
                                                 ? "cursor-not-allowed text-slate-600"
-                                                : "text-yellow-400 hover:bg-yellow-400/10"
+                                                : "text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10"
                                         }`}
                                     >
                                         {requestingAccessId === menuDoc.id ? (
@@ -1361,9 +1369,9 @@ return matchesSearch && matchesType;
                                         <div className="flex items-start gap-2">
                                             <Lock
                                                 size={14}
-                                                className="mt-0.5 shrink-0 text-red-400"
+                                                className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
                                             />
-                                            <p className="text-[10px] font-bold leading-4 text-red-400">
+                                            <p className="text-[10px] font-bold leading-4 text-red-600 dark:text-red-400">
                                                 This company document is locked.
                                                 Contents require administrator
                                                 permission.
@@ -1380,9 +1388,9 @@ return matchesSearch && matchesType;
                                     <div className="flex items-center gap-2">
                                         <UnlockIcon
                                             size={14}
-                                            className="text-yellow-400"
+                                            className="text-yellow-600 dark:text-yellow-400"
                                         />
-                                        <p className="text-[10px] font-bold leading-4 text-yellow-400">
+                                        <p className="text-[10px] font-bold leading-4 text-yellow-600 dark:text-yellow-400">
                                             You have permission to access this
                                             company document.
                                         </p>
@@ -1396,28 +1404,28 @@ return matchesSearch && matchesType;
             {/* ACCESS DENIED MODAL */}
             {accessDeniedDoc && (
                 <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-                    <div className="w-full max-w-md rounded-2xl border border-yellow-400/20 bg-slate-900 p-6 shadow-2xl">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-yellow-400/10 text-yellow-400">
+                    <div className="w-full max-w-md rounded-2xl border border-yellow-400/20 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                             <Lock size={32} />
                         </div>
-                        <h2 className="mt-4 text-xl font-black text-white">
+                        <h2 className="mt-4 text-xl font-black text-gray-900 dark:text-white">
                             Access Required
                         </h2>
-                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-slate-400">
                             This company document is locked. You need
                             administrator permission to open or download the
                             actual file.
                         </p>
-                        <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                        <div className="mt-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <Building2 size={18} />
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="truncate text-sm font-bold text-white">
+                                    <p className="truncate text-sm font-bold text-gray-900 dark:text-white">
                                         {accessDeniedDoc.title}
                                     </p>
-                                    <p className="mt-1 truncate text-xs text-slate-500">
+                                    <p className="mt-1 truncate text-xs text-gray-500 dark:text-slate-500">
                                         {accessDeniedDoc.file_name}
                                     </p>
                                 </div>
@@ -1427,7 +1435,7 @@ return matchesSearch && matchesType;
                             <button
                                 type="button"
                                 onClick={() => setAccessDeniedDoc(null)}
-                                className="rounded-xl border border-slate-800 bg-slate-950 px-6 py-3 text-sm font-bold text-white transition hover:border-yellow-400/40"
+                                className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-6 py-3 text-sm font-bold text-gray-900 dark:text-white transition hover:border-yellow-400/40"
                             >
                                 Cancel
                             </button>
@@ -1442,7 +1450,7 @@ return matchesSearch && matchesType;
                                 }
                                 className={`flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-black transition ${
                                     hasRequestedAccess(accessDeniedDoc)
-                                        ? "cursor-not-allowed bg-slate-800 text-slate-500"
+                                        ? "cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-500"
                                         : "bg-yellow-400 text-black hover:bg-yellow-300"
                                 }`}
                             >
@@ -1474,11 +1482,11 @@ return matchesSearch && matchesType;
             {/* VIEW MODAL */}
             {viewDoc && (
                 <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/80 p-3 backdrop-blur-md sm:p-5">
-                    <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-[0_30px_100px_rgba(0,0,0,.8)]">
-                        <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-4 sm:px-6">
+                    <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-[0_30px_100px_rgba(0,0,0,.8)]">
+                        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-4 py-4 sm:px-6">
                             <div className="flex min-w-0 items-center gap-3">
                                 <div
-                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${isCompanyDocument(viewDoc) ? "border-yellow-400/20 bg-yellow-400/10 text-yellow-400" : "border-blue-500/20 bg-blue-500/10 text-blue-400"}`}
+                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${isCompanyDocument(viewDoc) ? "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400" : "border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400"}`}
                                 >
                                     <DocumentIcon
                                         type={viewDoc.type}
@@ -1486,10 +1494,10 @@ return matchesSearch && matchesType;
                                     />
                                 </div>
                                 <div className="min-w-0">
-                                    <h2 className="truncate text-base font-black text-white sm:text-lg">
+                                    <h2 className="truncate text-base font-black text-gray-900 dark:text-white sm:text-lg">
                                         {viewDoc.title}
                                     </h2>
-                                    <p className="truncate text-xs text-slate-500">
+                                    <p className="truncate text-xs text-gray-500 dark:text-slate-500">
                                         {viewDoc.attachment_count &&
                                         viewDoc.attachment_count > 1
                                             ? `${viewDoc.attachment_count} files attached`
@@ -1500,7 +1508,7 @@ return matchesSearch && matchesType;
                             <button
                                 type="button"
                                 onClick={() => setViewDoc(null)}
-                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:border-yellow-400/40 hover:text-yellow-400"
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-500 dark:text-slate-400 hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                             >
                                 <X size={19} />
                             </button>
@@ -1508,11 +1516,11 @@ return matchesSearch && matchesType;
 
                         <div className="alibaton-scrollbar flex-1 overflow-y-auto">
                             <div className="grid lg:grid-cols-[320px_1fr]">
-                                <div className="border-b border-slate-800 bg-slate-900 p-4 sm:p-6 lg:border-b-0 lg:border-r">
-                                    <p className="text-[10px] font-black uppercase tracking-[.18em] text-yellow-400">
+                                <div className="border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-6 lg:border-b-0 lg:border-r">
+                                    <p className="text-[10px] font-black uppercase tracking-[.18em] text-yellow-600 dark:text-yellow-400">
                                         Document Information
                                     </p>
-                                    <h3 className="mt-1 text-xl font-black text-white">
+                                    <h3 className="mt-1 text-xl font-black text-gray-900 dark:text-white">
                                         Details
                                     </h3>
                                     <div className="mt-5 space-y-3">
@@ -1528,9 +1536,9 @@ return matchesSearch && matchesType;
     label="Category"
     value={
         isCompanyDocument(viewDoc) ? (
-            <span className="text-yellow-400">Company</span>
+            <span className="text-yellow-600 dark:text-yellow-400">Company</span>
         ) : (
-            <span className="text-blue-400">Client</span>
+            <span className="text-blue-600 dark:text-blue-400">Client</span>
         )
     }
 />
@@ -1562,7 +1570,7 @@ return matchesSearch && matchesType;
                                                 <InfoRow
                                                     label="Attachments"
                                                     value={
-                                                        <span className="text-purple-300">
+                                                        <span className="text-purple-600 dark:text-purple-300">
                                                             <Paperclip
                                                                 size={12}
                                                                 className="mr-1 inline"
@@ -1609,15 +1617,15 @@ return matchesSearch && matchesType;
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-900 p-4 sm:p-6">
-                                    <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
-                                        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+                                <div className="bg-white dark:bg-slate-900 p-4 sm:p-6">
+                                    <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
+                                        <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <Eye
                                                     size={16}
-                                                    className="text-yellow-400"
+                                                    className="text-yellow-600 dark:text-yellow-400"
                                                 />
-                                                <span className="text-xs font-black text-white">
+                                                <span className="text-xs font-black text-gray-900 dark:text-white">
                                                     Document Preview
                                                 </span>
                                             </div>
@@ -1631,11 +1639,11 @@ return matchesSearch && matchesType;
                             </div>
                         </div>
 
-                        <div className="flex shrink-0 flex-col gap-2 border-t border-slate-800 bg-slate-950 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
+                        <div className="flex shrink-0 flex-col gap-2 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
                             <button
                                 type="button"
                                 onClick={() => setViewDoc(null)}
-                                className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:border-yellow-400/40"
+                                className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3 text-sm font-bold text-gray-900 dark:text-white hover:border-yellow-400/40"
                             >
                                 Close
                             </button>
@@ -1646,8 +1654,8 @@ return matchesSearch && matchesType;
                                 disabled={!hasDocumentAccess(viewDoc)}
                                 className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-bold ${
                                     hasDocumentAccess(viewDoc)
-                                        ? "border-slate-700 bg-slate-900 text-white hover:border-yellow-400/40 hover:text-yellow-400"
-                                        : "cursor-not-allowed border-slate-900 bg-slate-950 text-slate-700"
+                                        ? "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
+                                        : "cursor-not-allowed border-gray-200 dark:border-slate-900 bg-gray-50 dark:bg-slate-950 text-slate-700"
                                 }`}
                             >
                                 <Download size={16} />
@@ -1660,7 +1668,7 @@ return matchesSearch && matchesType;
                                 className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-black ${
                                     hasDocumentAccess(viewDoc)
                                         ? "bg-yellow-400 text-black hover:bg-yellow-300"
-                                        : "cursor-not-allowed bg-slate-800 text-slate-600"
+                                        : "cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-slate-600"
                                 }`}
                             >
                                 <ExternalLink size={16} />
@@ -1674,31 +1682,31 @@ return matchesSearch && matchesType;
             {/* FORWARD MODAL */}
             {sendDoc && (
                 <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-                    <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+                    <div className="w-full max-w-lg rounded-2xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl">
                         <div className="mb-4 flex items-center gap-3">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-black">
                                 <Mail size={21} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-black text-white">
+                                <h2 className="text-xl font-black text-gray-900 dark:text-white">
                                     Forward Document
                                 </h2>
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-gray-500 dark:text-slate-500">
                                     Send this document via email
                                 </p>
                             </div>
                         </div>
 
-                        <div className="mb-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                        <div className="mb-5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10 text-yellow-400">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                     <FileText size={18} />
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="truncate text-sm font-black text-white">
+                                    <p className="truncate text-sm font-black text-gray-900 dark:text-white">
                                         {sendDoc.title}
                                     </p>
-                                    <p className="truncate text-xs text-slate-500">
+                                    <p className="truncate text-xs text-gray-500 dark:text-slate-500">
                                         {sendDoc.file_name}
                                     </p>
                                 </div>
@@ -1709,7 +1717,7 @@ return matchesSearch && matchesType;
                             <div>
                                 <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
                                     Recipient Email{" "}
-                                    <span className="text-red-400">*</span>
+                                    <span className="text-red-600 dark:text-red-400">*</span>
                                 </label>
                                 <div className="relative">
                                     <AtSign
@@ -1723,7 +1731,7 @@ return matchesSearch && matchesType;
                                             setForwardEmail(e.target.value)
                                         }
                                         placeholder="client@email.com"
-                                        className="w-full rounded-xl border border-white/10 bg-black px-10 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-yellow-400/50"
+                                        className="w-full rounded-xl border border-gray-200 bg-white px-10 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-yellow-400/50 dark:border-white/10 dark:bg-black dark:text-white dark:placeholder:text-gray-600"
                                     />
                                 </div>
                             </div>
@@ -1744,7 +1752,7 @@ return matchesSearch && matchesType;
                                             setForwardSubject(e.target.value)
                                         }
                                         placeholder="Document: [Document Name]"
-                                        className="w-full rounded-xl border border-white/10 bg-black px-10 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-yellow-400/50"
+                                        className="w-full rounded-xl border border-gray-200 bg-white px-10 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-yellow-400/50 dark:border-white/10 dark:bg-black dark:text-white dark:placeholder:text-gray-600"
                                     />
                                 </div>
                             </div>
@@ -1760,7 +1768,7 @@ return matchesSearch && matchesType;
                                     }
                                     rows={4}
                                     placeholder="Please find attached the document..."
-                                    className="w-full resize-none rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-yellow-400/50"
+                                    className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-yellow-400/50 dark:border-white/10 dark:bg-black dark:text-white dark:placeholder:text-gray-600"
                                 />
                             </div>
 
@@ -1768,11 +1776,11 @@ return matchesSearch && matchesType;
                                 <div className="flex items-center gap-2 text-xs text-gray-500">
                                     <Paperclip
                                         size={14}
-                                        className="text-yellow-400"
+                                        className="text-yellow-600 dark:text-yellow-400"
                                     />
                                     <span>
                                         Attachment:{" "}
-                                        <span className="text-white font-semibold">
+                                        <span className="text-gray-900 dark:text-white font-semibold">
                                             {sendDoc.file_name}
                                         </span>
                                     </span>
@@ -1784,7 +1792,7 @@ return matchesSearch && matchesType;
                             <button
                                 type="button"
                                 onClick={() => setSendDoc(null)}
-                                className="rounded-xl border border-slate-800 bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:border-yellow-400/40"
+                                className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-5 py-3 text-sm font-bold text-gray-900 dark:text-white hover:border-yellow-400/40"
                             >
                                 Cancel
                             </button>
@@ -1817,26 +1825,26 @@ return matchesSearch && matchesType;
             {/* TOAST */}
             {toast && (
                 <div
-                    className={`fixed bottom-5 right-5 z-[20000] max-w-sm rounded-xl border px-4 py-3 text-sm font-semibold text-white shadow-2xl ${
+                    className={`fixed bottom-5 right-5 z-[20000] max-w-sm rounded-xl border px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white shadow-2xl ${
                         toastType === "error"
                             ? "border-red-500/20 bg-red-900/80"
                             : toastType === "info"
                               ? "border-blue-500/20 bg-blue-900/80"
-                              : "border-slate-700 bg-slate-900"
+                              : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                     }`}
                 >
                     <div className="flex items-center gap-2">
                         {toastType === "success" && (
                             <CheckCircle2
                                 size={17}
-                                className="text-yellow-400"
+                                className="text-yellow-600 dark:text-yellow-400"
                             />
                         )}
                         {toastType === "error" && (
-                            <XCircle size={17} className="text-red-400" />
+                            <XCircle size={17} className="text-red-600 dark:text-red-400" />
                         )}
                         {toastType === "info" && (
-                            <AlertCircle size={17} className="text-blue-400" />
+                            <AlertCircle size={17} className="text-blue-600 dark:text-blue-400" />
                         )}
                         {toast}
                     </div>
@@ -1872,11 +1880,11 @@ function DocumentPreview({ document }: { document: DocumentRecord }) {
     if (attachments.length === 0 || !activeFile) {
         return (
             <div className="flex min-h-[480px] flex-col items-center justify-center p-8 text-center">
-                <Lock size={48} className="text-red-400" />
-                <h3 className="mt-4 text-lg font-black text-white">
+                <Lock size={48} className="text-red-600 dark:text-red-400" />
+                <h3 className="mt-4 text-lg font-black text-gray-900 dark:text-white">
                     File Locked
                 </h3>
-                <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+                <p className="mt-2 max-w-md text-sm leading-6 text-gray-500 dark:text-slate-500">
                     The actual file is protected until the administrator grants
                     access.
                 </p>
@@ -1891,7 +1899,7 @@ function DocumentPreview({ document }: { document: DocumentRecord }) {
         <div className="space-y-3 p-3">
             {/* ATTACHMENT SWITCHER */}
             {attachments.length > 1 && (
-                <div className="flex flex-wrap gap-2 rounded-xl border border-slate-800 bg-slate-900 p-2">
+                <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2">
                     {attachments.map((att, index) => (
                         <button
                             key={`${att.file_name}-${index}`}
@@ -1900,7 +1908,7 @@ function DocumentPreview({ document }: { document: DocumentRecord }) {
                             className={`inline-flex max-w-[240px] items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
                                 index === activeIndex
                                     ? "bg-yellow-400 text-black"
-                                    : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                                    : "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white"
                             }`}
                         >
                             <Paperclip size={12} />
@@ -1913,13 +1921,13 @@ function DocumentPreview({ document }: { document: DocumentRecord }) {
             {/* FILE PREVIEW */}
             {!url ? (
                 <div className="flex min-h-[480px] flex-col items-center justify-center p-8 text-center">
-                    <Lock size={48} className="text-red-400" />
-                    <h3 className="mt-4 text-lg font-black text-white">
+                    <Lock size={48} className="text-red-600 dark:text-red-400" />
+                    <h3 className="mt-4 text-lg font-black text-gray-900 dark:text-white">
                         File Locked
                     </h3>
                 </div>
             ) : mime.includes("pdf") ? (
-                <div className="h-[65vh] min-h-[480px] bg-slate-900">
+                <div className="h-[65vh] min-h-[480px] bg-white dark:bg-slate-900">
                     <iframe
                         src={url}
                         title={activeFile.file_name}
@@ -1927,7 +1935,7 @@ function DocumentPreview({ document }: { document: DocumentRecord }) {
                     />
                 </div>
             ) : mime.startsWith("image/") ? (
-                <div className="flex min-h-[480px] items-center justify-center overflow-auto bg-slate-950 p-6">
+                <div className="flex min-h-[480px] items-center justify-center overflow-auto bg-gray-50 dark:bg-slate-950 p-6">
                     <img
                         src={url}
                         alt={activeFile.file_name}
@@ -1935,17 +1943,17 @@ function DocumentPreview({ document }: { document: DocumentRecord }) {
                     />
                 </div>
             ) : (
-                <div className="flex min-h-[480px] flex-col items-center justify-center bg-slate-950 p-8 text-center">
-                    <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-slate-800 bg-slate-900 text-yellow-400">
+                <div className="flex min-h-[480px] flex-col items-center justify-center bg-gray-50 dark:bg-slate-950 p-8 text-center">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-yellow-600 dark:text-yellow-400">
                         <DocumentIcon
                             type={document.type}
                             mimeType={activeFile.mime_type}
                         />
                     </div>
-                    <h3 className="mt-5 text-lg font-black text-white">
+                    <h3 className="mt-5 text-lg font-black text-gray-900 dark:text-white">
                         Preview unavailable
                     </h3>
-                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    <p className="mt-2 max-w-md text-sm leading-6 text-gray-500 dark:text-slate-500">
                         This file type cannot be previewed directly in the
                         browser.
                     </p>
@@ -2007,12 +2015,12 @@ function DocumentIcon({
 
 function TypeBadge({ type }: { type: DocumentType }) {
 const config: Record<DocumentType, string> = {
-    Permit: "border-blue-500/20 bg-blue-500/10 text-blue-400",
-    Certificate: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-    Compliance: "border-purple-500/20 bg-purple-500/10 text-purple-400",
-    Safety: "border-orange-500/20 bg-orange-500/10 text-orange-400",
-    Company: "border-pink-500/20 bg-pink-500/10 text-pink-400",
-    Other: "border-slate-700 bg-slate-800 text-slate-300",
+    Permit: "border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    Certificate: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    Compliance: "border-purple-500/20 bg-purple-500/10 text-purple-600 dark:text-purple-400",
+    Safety: "border-orange-500/20 bg-orange-500/10 text-orange-600 dark:text-orange-400",
+    Company: "border-pink-500/20 bg-pink-500/10 text-pink-600 dark:text-pink-400",
+    Other: "border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300",
 };
 
     return (
@@ -2035,33 +2043,33 @@ function StatusBadge({ status }: { status: string }) {
         {
             Active: {
                 className:
-                    "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+                    "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
                 icon: <CheckCircle2 size={10} />,
             },
             Verified: {
                 className:
-                    "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+                    "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
                 icon: <CheckCircle2 size={10} />,
             },
             "Pending Review": {
-                className: "border-slate-700 bg-slate-800 text-slate-300",
+                className: "border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300",
                 icon: <Clock3 size={10} />,
             },
             Expiring: {
                 className:
-                    "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
+                    "border-yellow-500/20 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
                 icon: <AlertTriangle size={10} />,
             },
             Expired: {
-                className: "border-red-500/20 bg-red-500/10 text-red-400",
+                className: "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
                 icon: <XCircle size={10} />,
             },
             Rejected: {
-                className: "border-red-500/20 bg-red-500/10 text-red-400",
+                className: "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
                 icon: <XCircle size={10} />,
             },
             Archived: {
-                className: "border-slate-600 bg-slate-800 text-slate-400",
+                className: "border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400",
                 icon: <Archive size={10} />,
             },
         };
@@ -2084,11 +2092,11 @@ function StatusBadge({ status }: { status: string }) {
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
     return (
-        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                 {label}
             </p>
-            <div className="mt-1.5 break-words text-sm font-semibold text-white">
+            <div className="mt-1.5 break-words text-sm font-semibold text-gray-900 dark:text-white">
                 {value}
             </div>
         </div>
@@ -2112,9 +2120,9 @@ function MenuItem({
         <button
             type="button"
             onClick={onClick}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-200 transition hover:bg-slate-800 hover:text-white"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 dark:text-slate-200 transition hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
         >
-            <span className="text-slate-500">{icon}</span>
+            <span className="text-gray-500 dark:text-slate-500">{icon}</span>
             {label}
         </button>
     );

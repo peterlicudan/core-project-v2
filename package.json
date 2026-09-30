@@ -31,5 +31,8 @@
         "react-dom": "^19.2.8",
         "react-icons": "^5.7.0",
         "recharts": "^3.10.1"
+    },
+    "allowScripts": {
+        "core-js@3.50.0": true
     }
 }

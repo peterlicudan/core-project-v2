@@ -24,8 +24,6 @@ import {
     Phone,
     Wallet,
     StickyNote,
-    Bell,
-    BellRing,
     Ban,
     RotateCcw,
     AlertTriangle,
@@ -33,6 +31,7 @@ import {
     Percent,
     Calculator,
     CreditCard,
+    Plus,
 } from "lucide-react";
 
 /*
@@ -58,7 +57,12 @@ type InvoiceItem = {
 
 type Invoice = {
     id: number;
+    /** Invoice No. — NULL hanggang APPROVED ng admin */
     number: string;
+    /* ✅ May Invoice No. na? (false = billing record pa lang) */
+    hasInvoiceNumber?: boolean;
+    /* ✅ BILLING NUMBER (ipinapakita sa Billing Records) */
+    billingNumber?: string | null;
     client: string;
     clientEmail: string;
     clientAddress: string;
@@ -67,6 +71,14 @@ type Invoice = {
     items: InvoiceItem[];
     taxRate: number;
     amount: number;
+    /* ✅ VAT + ADDITIONAL CHARGES BREAKDOWN */
+    baseAmount?: number;
+    vatRate?: number;
+    vatAmount?: number;
+    additionalCharges?: number;
+    totalAmount?: number;
+    hasVat?: boolean;
+    hasAdditionalCharges?: boolean;
     status: InvoiceStatus;
     dueDate: string;
     createdAt: string;
@@ -79,13 +91,34 @@ type Invoice = {
     rejectedAt?: string | null;
     approvedAt?: string | null;
     approvedBy?: string | null;
+    verifiedAt?: string | null;
+    verifiedBy?: string | null;
     sentAt?: string | null;
     sentBy?: string | null;
-    vatAmount?: number;
-    netAmount?: number;
     withholdingTax?: number;
     totalAmountDue?: number;
     paymentMethod?: string | null;
+    serviceMonth?: string | null;
+    billingSequence?: number | null;
+    jobOrderNumber?: string | null;
+    matchesJobOrder?: boolean | null;
+};
+
+type JobOrderBilling = {
+    id: number;
+    number: string;
+    billingNumber?: string | null;
+    serviceMonth: string | null;
+    billingSequence: number | null;
+    amount: number;
+    baseAmount?: number;
+    vatAmount?: number;
+    additionalCharges?: number;
+    totalAmount?: number;
+    matchesJobOrder?: boolean | null;
+    status: string;
+    dueDate: string | null;
+    createdAt: string | null;
 };
 
 type JobOrder = {
@@ -120,24 +153,34 @@ type JobOrder = {
         dueDate?: string | null;
     } | null;
     rejectionReason?: string | null;
-};
 
-type Notification = {
-    id: number;
-    type: "info" | "success" | "warning" | "error";
-    title: string;
-    message: string;
-    read: boolean;
-    createdAt: string;
-    link?: string;
+    /* ✅ APPROVED QUOTATION + MONTHLY BILLING */
+    quotationTotal?: number | null;
+    billingMonths?: number | null;
+    monthlyAmount?: number | null;
+    billedCount?: number | null;
+    approvedCount?: number | null;
+    rejectedCount?: number | null;
+    pendingCount?: number | null;
+    totalBilled?: number | null;
+    remainingAmount?: number | null;
+    billings?: JobOrderBilling[] | null;
+
+    /* ✅ LOCK LOGIC (admin verification) */
+    canCreateBilling?: boolean;
+    isFullyBilled?: boolean;
+    isFullyCompleted?: boolean;
+    billingStatus?: string | null;
 };
 
 type PageProps = {
     invoices?: Invoice[];
     jobOrders?: JobOrder[];
     records?: JobOrder[];
-    notifications?: Notification[];
-    flash?: { success?: string; error?: string };
+    flash?: {
+        success?: string;
+        error?: string;
+    };
 };
 
 /*
@@ -210,11 +253,74 @@ const formatDateTime = (value: string | null | undefined, fallback = "—") => {
     });
 };
 
-const computeVAT = (amount: number) => {
-    const vatAmount = amount * VAT_RATE;
-    const netAmount = amount;
-    const totalAmountDue = netAmount + vatAmount;
-    return { vatAmount, netAmount, totalAmountDue };
+/*
+|--------------------------------------------------------------------------
+| MONTH HELPERS (Service Date = monthly)
+|--------------------------------------------------------------------------
+*/
+
+const MONTH_NAMES = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+];
+
+/** "2026-09" → "Sep 2026" */
+const formatMonth = (value: string | null | undefined, fallback = "—") => {
+    if (!value) return fallback;
+    const match = /^(\d{4})-(\d{2})$/.exec(String(value).trim());
+    if (!match) return String(value);
+    const year = match[1];
+    const monthIndex = Number(match[2]) - 1;
+    if (monthIndex < 0 || monthIndex > 11) return String(value);
+    return `${MONTH_NAMES[monthIndex]} ${year}`;
+};
+
+/** Date → "2026-09" */
+const toMonthKey = (value: string | Date | null | undefined) => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
+/** "2026-09" + 2 → "2026-11" */
+const addMonths = (monthKey: string, offset: number) => {
+    const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
+    if (!match) return monthKey;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1 + offset, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
+/** Bilang ng buwan between two dates (inclusive-ish, para sa quotation). */
+const monthsBetween = (
+    start: string | null | undefined,
+    end: string | null | undefined,
+) => {
+    const from = start ? new Date(start) : null;
+    const to = end ? new Date(end) : null;
+    if (
+        !from ||
+        !to ||
+        Number.isNaN(from.getTime()) ||
+        Number.isNaN(to.getTime())
+    ) {
+        return 0;
+    }
+    if (to < from) return 0;
+    const months =
+        (to.getFullYear() - from.getFullYear()) * 12 +
+        (to.getMonth() - from.getMonth());
+    return months <= 0 ? 1 : months;
 };
 
 const normalizeInvoice = (raw: any): Invoice => {
@@ -255,11 +361,43 @@ const normalizeInvoice = (raw: any): Invoice => {
                   },
               ];
 
-    const { vatAmount, netAmount, totalAmountDue } = computeVAT(amount);
+    const num = (v: any, fallback = 0) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ REAL BREAKDOWN (mula sa DB) — hindi na computed na assumed
+    | base + additional charges + VAT = amount (grand total)
+    |--------------------------------------------------------------------------
+    */
+    const baseAmount = num(raw?.baseAmount ?? raw?.base_amount, amount);
+    const vatAmount = num(raw?.vatAmount ?? raw?.vat_amount);
+    const additionalCharges = num(
+        raw?.additionalCharges ?? raw?.additional_charges,
+    );
+    const totalAmount = baseAmount + additionalCharges + vatAmount;
 
     return {
         id: Number(raw?.id ?? 0),
-        number: String(raw?.number ?? ""),
+        /* Invoice No. — empty string kapag wala pa (bago ma-approve) */
+        number: String(raw?.number ?? "") || "",
+        hasInvoiceNumber: Boolean(
+            raw?.hasInvoiceNumber ?? raw?.has_invoice_number ?? raw?.number,
+        ),
+        billingNumber:
+            (raw?.billingNumber ?? raw?.billing_number ?? null) || null,
+        baseAmount,
+        vatRate: num(raw?.vatRate ?? raw?.vat_rate),
+        vatAmount,
+        additionalCharges,
+        totalAmount,
+        hasVat: vatAmount > 0,
+        hasAdditionalCharges: additionalCharges > 0,
+        matchesJobOrder: raw?.matchesJobOrder ?? raw?.matches_job_order ?? null,
+        verifiedAt: raw?.verifiedAt ?? raw?.verified_at ?? null,
+        verifiedBy: raw?.verifiedBy ?? raw?.verified_by ?? null,
         client: String(raw?.client ?? raw?.clientName ?? "—"),
         clientEmail: String(raw?.clientEmail ?? raw?.client_email ?? ""),
         clientAddress: String(raw?.clientAddress ?? raw?.client_address ?? ""),
@@ -275,6 +413,13 @@ const normalizeInvoice = (raw: any): Invoice => {
         description: raw?.description ?? "",
         jobOrderId:
             raw?.jobOrderId ?? raw?.job_order_id ?? raw?.jobOrder?.id ?? null,
+        serviceMonth: raw?.serviceMonth ?? raw?.service_month ?? null,
+        billingSequence: (() => {
+            const seq = raw?.billingSequence ?? raw?.billing_sequence;
+            const parsed = Number(seq);
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        })(),
+        jobOrderNumber: raw?.jobOrderNumber ?? raw?.job_order_number ?? null,
         staffId: raw?.staffId ?? raw?.userId ?? raw?.user_id ?? undefined,
         staffName: raw?.staffName ?? raw?.user?.name ?? undefined,
         rejectionReason: raw?.rejectionReason ?? raw?.rejection_reason ?? null,
@@ -283,10 +428,8 @@ const normalizeInvoice = (raw: any): Invoice => {
         approvedBy: raw?.approvedBy ?? raw?.approved_by ?? null,
         sentAt: raw?.sentAt ?? raw?.sent_at ?? null,
         sentBy: raw?.sentBy ?? raw?.sent_by ?? null,
-        vatAmount,
-        netAmount,
         withholdingTax: 0,
-        totalAmountDue,
+        totalAmountDue: totalAmount,
         paymentMethod:
             raw?.paymentMethod ?? raw?.payment_method ?? "Bank Transfer",
     };
@@ -296,19 +439,82 @@ const getJobOrderNumber = (jobOrder: JobOrder) =>
     jobOrder.number ?? `JO-${jobOrder.id}`;
 const getJobOrderAmount = (jobOrder: JobOrder) => Number(jobOrder.amount ?? 0);
 
-/**
- * ✅ UPDATED: Treats both "Generated" AND "Pending Admin Approval" as generated
- * from the user's perspective. They can no longer click "Generate" once submitted.
- */
-const isJobOrderGenerated = (jobOrder: JobOrder) => {
-    const status = String(jobOrder.status ?? "").toLowerCase();
-    return (
-        status === "generated" ||
-        status === "pending admin approval" ||
-        Boolean(jobOrder.hasInvoice) ||
-        Boolean(jobOrder.invoiceId) ||
-        Boolean(jobOrder.invoice)
+/*
+|--------------------------------------------------------------------------
+| APPROVED QUOTATION + MONTHLY BILLING HELPERS
+|--------------------------------------------------------------------------
+*/
+
+const getJobOrderBillings = (jobOrder: JobOrder): JobOrderBilling[] =>
+    Array.isArray(jobOrder.billings) ? jobOrder.billings : [];
+
+/** Kabuuang halaga ng na-approve na quotation. */
+const getQuotationTotal = (jobOrder: JobOrder) =>
+    Number(jobOrder.quotationTotal ?? jobOrder.amount ?? 0);
+
+/** Ilang buwan ang saklaw ng quotation (3 = quarterly). 0 = hindi pa alam. */
+const getBillingMonths = (jobOrder: JobOrder) =>
+    Number(jobOrder.billingMonths ?? 0) > 0
+        ? Number(jobOrder.billingMonths)
+        : monthsBetween(jobOrder.startDate, jobOrder.endDate);
+
+const getMonthlyAmount = (jobOrder: JobOrder) => {
+    const months = getBillingMonths(jobOrder);
+    if (months < 1) return 0;
+    return getQuotationTotal(jobOrder) / months;
+};
+
+/** Ilang buwan na ang nai-bill (Rejected hindi kasama). */
+const getBilledCount = (jobOrder: JobOrder) => {
+    if (jobOrder.billedCount != null && jobOrder.rejectedCount) {
+        /* May rejected record — dili na sigurado, i-recompute */
+        return getBilledMonths(jobOrder).length;
+    }
+    if (jobOrder.billedCount != null) return Number(jobOrder.billedCount);
+    return getBilledMonths(jobOrder).length;
+};
+
+const getTotalBilled = (jobOrder: JobOrder) => {
+    if (jobOrder.totalBilled != null) return Number(jobOrder.totalBilled);
+    return getJobOrderBillings(jobOrder).reduce(
+        (sum, billing) => sum + Number(billing.amount ?? 0),
+        0,
     );
+};
+
+/**
+ * Mga buwan na nai-bill na (sorted).
+ *
+ * ✅ Ang Rejected ay HINDI kasama — para makapag-create pa rin
+ * ng corrected billing para sa parehong buwan.
+ */
+const getBilledMonths = (jobOrder: JobOrder) => {
+    const months = getJobOrderBillings(jobOrder)
+        .filter((billing) => billing.status !== "Rejected")
+        .map((billing) => billing.serviceMonth)
+        .filter((month): month is string => Boolean(month));
+
+    return Array.from(new Set(months)).sort();
+};
+
+/**
+ * Unang buwan na puwedeng i-bill.
+ * - Kung may nai-bill na → susunod sa huli
+ * - Kung wala → startDate month, o current month
+ */
+const getNextBillableMonth = (jobOrder: JobOrder) => {
+    const billed = getBilledMonths(jobOrder);
+    if (billed.length > 0) {
+        return addMonths(billed[billed.length - 1], 1);
+    }
+    return toMonthKey(jobOrder.startDate) ?? toMonthKey(new Date()) ?? "";
+};
+
+/** Nakalimutan na ba ang lahat ng buwan ng quotation? */
+const isFullyBilled = (jobOrder: JobOrder) => {
+    const months = getBillingMonths(jobOrder);
+    if (months < 1) return false;
+    return getBilledCount(jobOrder) >= months;
 };
 
 const SCROLL_THRESHOLD = 5;
@@ -323,23 +529,23 @@ const HEADER_HEIGHT = 56;
 
 export default function BillingInvoicing() {
     const page = usePage<PageProps>();
+    const url = page.url;
     const backendInvoices = page.props.invoices ?? [];
     const backendJobOrders = page.props.jobOrders ?? page.props.records ?? [];
-    const backendNotifications = page.props.notifications ?? [];
+
+    // ✅ DEBUG: Log notifications
+    console.log("=== BILLING PAGE DEBUG ===");
+    console.log("URL:", url);
+    console.log("Notifications:", page.props.notifications);
 
     const [invoices, setInvoices] = useState<Invoice[]>(
         backendInvoices.map(normalizeInvoice),
     );
     const [jobOrders, setJobOrders] = useState<JobOrder[]>(backendJobOrders);
-    const [notifications, setNotifications] =
-        useState<Notification[]>(backendNotifications);
-    const [unreadCount, setUnreadCount] = useState<number>(
-        backendNotifications.filter((n) => !n.read).length,
-    );
 
-    const [activeTab, setActiveTab] = useState<"job-orders" | "invoices">(
-        "job-orders",
-    );
+    const [activeTab, setActiveTab] = useState<
+        "job-orders" | "billing-records" | "service-invoice"
+    >("job-orders");
     const [search, setSearch] = useState("");
     const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<
         "All" | InvoiceStatus
@@ -356,8 +562,12 @@ export default function BillingInvoicing() {
     const [showInvoiceView, setShowInvoiceView] = useState(false);
     const [showJobOrderView, setShowJobOrderView] = useState(false);
     const [showInvoicePrint, setShowInvoicePrint] = useState(false);
-    const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+
     const [showSendEmailModal, setShowSendEmailModal] = useState(false);
+    const [billingJobOrder, setBillingJobOrder] = useState<JobOrder | null>(
+        null,
+    );
+    const [showCreateJobOrder, setShowCreateJobOrder] = useState(false);
 
     const [confirmDialog, setConfirmDialog] = useState<{
         open: boolean;
@@ -378,7 +588,8 @@ export default function BillingInvoicing() {
     });
 
     const [successMessage, setSuccessMessage] = useState("");
-    const [isGenerating, setIsGenerating] = useState(false);
+    const [isCreatingBilling, setIsCreatingBilling] = useState(false);
+    const [isCreatingJobOrder, setIsCreatingJobOrder] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isResubmitting, setIsResubmitting] = useState(false);
     const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -403,16 +614,41 @@ export default function BillingInvoicing() {
     }, [page.props.jobOrders, page.props.records]);
 
     useEffect(() => {
-        setNotifications(backendNotifications);
-        setUnreadCount(backendNotifications.filter((n) => !n.read).length);
-    }, [page.props.notifications]);
-
-    useEffect(() => {
         if (!flashSuccess) return;
         setSuccessMessage(String(flashSuccess));
         const timer = window.setTimeout(() => setSuccessMessage(""), 8000);
         return () => window.clearTimeout(timer);
     }, [flashSuccess]);
+
+    /* ------------------------------------------------------------------ */
+    /* ✅ NEW: Auto-open Job Order from notification (?job_order_id=X)    */
+    /* ------------------------------------------------------------------ */
+    useEffect(() => {
+        const params = new URLSearchParams(url.split("?")[1] || "");
+        const jobOrderIdFromUrl = params.get("job_order_id");
+
+        if (!jobOrderIdFromUrl) return;
+
+        const target = jobOrders.find(
+            (jo) => jo.id === Number(jobOrderIdFromUrl),
+        );
+
+        if (target) {
+            // Switch sa Job Orders tab
+            setActiveTab("job-orders");
+
+            // Auto-open yung Job Order details modal
+            setSelectedJobOrder(target);
+            setShowJobOrderView(true);
+
+            // Clear URL param (para hindi mag-loop)
+            window.history.replaceState({}, "", "/billing-invoicing");
+
+            console.log("✅ Auto-opened Job Order:", target.number);
+        } else {
+            console.warn("⚠️ Job Order not found for ID:", jobOrderIdFromUrl);
+        }
+    }, [url, jobOrders]);
 
     const filteredJobOrders = useMemo(() => {
         const keyword = search.trim().toLowerCase();
@@ -435,18 +671,48 @@ export default function BillingInvoicing() {
         });
     }, [jobOrders, search]);
 
-    const filteredInvoices = useMemo(() => {
+    /*
+    |----------------------------------------------------------------------
+    | CATEGORIES: Job Order | Billing Records | Service Invoice
+    |----------------------------------------------------------------------
+    |
+    | Billing Records = lahat ng billing na ginawa ng staff (Pending,
+    |                  Approved, Rejected). Keyed sa BILLING NO. +
+    |                  JOB ORDER NO. — WALANG invoice number dito.
+    |
+    | Service Invoice = APPROVED NA lang. Pag approve ng admin, doon na
+    |                  gumagawa ang invoice kaya mayroon nang Invoice No.
+    |                  (kasama pa rin ang Billing No. at Job Order No.)
+    |
+    */
+
+    const billingRecords = useMemo(
+        () => invoices.filter((invoice) => Boolean(invoice.jobOrderId)),
+        [invoices],
+    );
+
+    const serviceInvoices = useMemo(
+        () => invoices.filter((invoice) => invoice.status === "Approved"),
+        [invoices],
+    );
+
+    const filterInvoiceList = (list: Invoice[]) => {
         const keyword = search.trim().toLowerCase();
-        return invoices.filter((invoice) => {
+
+        return list.filter((invoice) => {
             const matchesSearch =
                 !keyword ||
                 [
                     invoice.number,
+                    invoice.billingNumber,
+                    invoice.jobOrderNumber,
                     invoice.client,
                     invoice.project,
                     invoice.clientEmail,
                     invoice.status,
-                    invoice.jobOrderId ? `JO-${invoice.jobOrderId}` : "",
+                    invoice.serviceMonth
+                        ? formatMonth(invoice.serviceMonth)
+                        : "",
                 ]
                     .filter(Boolean)
                     .some((value) =>
@@ -457,21 +723,40 @@ export default function BillingInvoicing() {
                 invoice.status === invoiceStatusFilter;
             return matchesSearch && matchesStatus;
         });
-    }, [invoices, search, invoiceStatusFilter]);
+    };
 
-    const pendingCount = invoices.filter((i) => i.status === "Pending").length;
-    const partialCount = invoices.filter((i) => i.status === "Partial").length;
-    const paidCount = invoices.filter((i) => i.status === "Paid").length;
-    const overdueCount = invoices.filter((i) => i.status === "Overdue").length;
-    const rejectedCount = invoices.filter(
-        (i) => i.status === "Rejected",
-    ).length;
-    const approvedCount = invoices.filter(
-        (i) => i.status === "Approved",
-    ).length;
+    const filteredBillingRecords = useMemo(
+        () => filterInvoiceList(billingRecords),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [billingRecords, search, invoiceStatusFilter],
+    );
+
+    const filteredServiceInvoices = useMemo(
+        () => filterInvoiceList(serviceInvoices),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [serviceInvoices, search, invoiceStatusFilter],
+    );
+
+    const countStatuses = (list: Invoice[]) => ({
+        pending: list.filter((i) => i.status === "Pending").length,
+        partial: list.filter((i) => i.status === "Partial").length,
+        paid: list.filter((i) => i.status === "Paid").length,
+        overdue: list.filter((i) => i.status === "Overdue").length,
+        rejected: list.filter((i) => i.status === "Rejected").length,
+        approved: list.filter((i) => i.status === "Approved").length,
+    });
+
+    const activeInvoiceList =
+        activeTab === "billing-records" ? billingRecords : serviceInvoices;
+    const activeFilteredInvoices =
+        activeTab === "billing-records"
+            ? filteredBillingRecords
+            : filteredServiceInvoices;
+    const activeCounts = countStatuses(activeInvoiceList);
 
     const jobOrderShouldScroll = filteredJobOrders.length >= SCROLL_THRESHOLD;
-    const invoiceShouldScroll = filteredInvoices.length >= SCROLL_THRESHOLD;
+    const invoiceShouldScroll =
+        activeFilteredInvoices.length >= SCROLL_THRESHOLD;
     const jobOrderMaxHeight = jobOrderShouldScroll
         ? HEADER_HEIGHT + SCROLL_THRESHOLD * ROW_HEIGHT
         : undefined;
@@ -490,17 +775,10 @@ export default function BillingInvoicing() {
     const refreshData = () => {
         setIsRefreshing(true);
         router.reload({
-            only: [
-                "invoices",
-                "jobOrders",
-                "records",
-                "flash",
-                "notifications",
-            ],
+            only: ["invoices", "jobOrders", "records", "flash"],
             onFinish: () => setIsRefreshing(false),
         });
     };
-
     const openConfirm = (options: {
         title: string;
         message: string;
@@ -524,88 +802,181 @@ export default function BillingInvoicing() {
         setConfirmDialog((prev) => ({ ...prev, open: false }));
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | ✅ GENERATE JOB ORDER (FIXED)
-    |--------------------------------------------------------------------------
-    |
-    | Changes:
-    | - Removed setActiveTab("invoices") — hindi na lumilipat sa Service Invoice
-    | - Updated success message — hindi na nagsasabing "invoice created"
-    | - Manatili sa job-orders tab
-    |
-    */
-
-    const generateJobOrder = (jobOrder: JobOrder) => {
-        const number = getJobOrderNumber(jobOrder);
-        if (isGenerating) return;
-        if (isJobOrderGenerated(jobOrder)) {
-            alert(
-                `Job Order ${number} has already been submitted for admin approval.`,
-            );
-            return;
-        }
-        const status = String(jobOrder.status ?? "");
-        if (!["Pending", "Received"].includes(status)) {
-            alert(
-                `Job Order ${number} cannot be generated while its status is ${status || "Unknown"}.`,
-            );
-            return;
-        }
-
-        openConfirm({
-            title: "Submit Job Order for Approval",
-            message: `Are you sure you want to submit Job Order ${number} for Admin approval?\n\nThe invoice will be created once Admin approves it.`,
-            confirmLabel: "Submit Now",
-            cancelLabel: "Cancel",
-            variant: "warning",
-            onConfirm: () => {
-                setSuccessMessage("");
-                setIsGenerating(true);
-
-                router.post(
-                    `/job-orders/${jobOrder.id}/generate`,
-                    {},
-                    {
-                        preserveScroll: true,
-                        onStart: () => {
-                            setSuccessMessage("");
-                            setIsGenerating(true);
-                        },
-                        onSuccess: () => {
-                            setIsGenerating(false);
-                            setSuccessMessage(
-                                `Job Order ${number} has been submitted for Admin approval. The invoice will appear in Service Invoices once approved.`,
-                            );
-                            // ✅ HUWAG lumipat sa invoices tab — manatili sa Job Orders
-                            setActiveTab("job-orders");
-                            setSearch("");
-                            setInvoiceStatusFilter("All");
-                            setSelectedJobOrder(null);
-                            setShowJobOrderView(false);
-                            // ✅ Refresh para makita agad ang bagong status
-                            refreshData();
-                        },
-                        onError: (errors) => {
-                            setIsGenerating(false);
-                            console.error("GENERATE JOB ORDER ERROR:", errors);
-                            const firstError = Object.values(errors ?? {})[0];
-                            alert(
-                                firstError
-                                    ? String(firstError)
-                                    : `Failed to submit Job Order ${number}. Please try again.`,
-                            );
-                        },
-                        onFinish: () => setIsGenerating(false),
-                    },
-                );
-            },
-        });
-    };
-
     const openJobOrder = (jobOrder: JobOrder) => {
         setSelectedJobOrder(jobOrder);
         setShowJobOrderView(true);
+    };
+
+    /*
+    |----------------------------------------------------------------------
+    | ✅ OPEN CREATE BILLING
+    |----------------------------------------------------------------------
+    */
+
+    const openCreateBilling = (jobOrder: JobOrder) => {
+        setSelectedJobOrder(null);
+        setShowJobOrderView(false);
+        setBillingJobOrder(jobOrder);
+    };
+
+    const closeCreateBilling = () => {
+        setBillingJobOrder(null);
+    };
+
+    /*
+    |----------------------------------------------------------------------
+    | ✅ CREATE JOB ORDER (demo — walang integration pa)
+    |----------------------------------------------------------------------
+    */
+
+    const submitCreateJobOrder = (payload: {
+        client: string;
+        clientEmail: string;
+        clientContact: string;
+        clientAddress: string;
+        project: string;
+        location: string;
+        equipment: string;
+        operator: string;
+        startDate: string;
+        endDate: string;
+        quotationTotal: number;
+        billingMonths: number;
+        description: string;
+        notes: string;
+    }) => {
+        if (isCreatingJobOrder) return;
+
+        setIsCreatingJobOrder(true);
+        setSuccessMessage("");
+
+        /* Empty string → undefined para hindi ma-trigger ang backend rules */
+        const opt = (value: string) =>
+            value.trim() ? value.trim() : undefined;
+
+        router.post(
+            "/job-orders",
+            {
+                client: payload.client,
+                client_email: opt(payload.clientEmail),
+                client_contact: opt(payload.clientContact),
+                client_address: opt(payload.clientAddress),
+                project: payload.project,
+                location: opt(payload.location),
+                equipment: opt(payload.equipment),
+                operator: opt(payload.operator),
+                start_date: opt(payload.startDate),
+                end_date: opt(payload.endDate),
+                amount: payload.quotationTotal,
+                quotation_total: payload.quotationTotal,
+                billing_months: payload.billingMonths,
+                description: opt(payload.description),
+                notes: opt(payload.notes),
+                return_to: "billing.invoicing",
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsCreatingJobOrder(false);
+                    setSuccessMessage(
+                        `Job Order for ${payload.client} has been created and is ready for monthly billing.`,
+                    );
+                    setShowCreateJobOrder(false);
+                    setSearch("");
+                    setInvoiceStatusFilter("All");
+                    refreshData();
+                },
+                onError: (errors) => {
+                    setIsCreatingJobOrder(false);
+                    console.error("CREATE JOB ORDER ERROR:", errors);
+                    const firstError = Object.values(errors ?? {})[0];
+                    alert(
+                        firstError
+                            ? String(firstError)
+                            : "Failed to create the Job Order. Please try again.",
+                    );
+                },
+                onFinish: () => setIsCreatingJobOrder(false),
+            },
+        );
+    };
+
+    /*
+    |----------------------------------------------------------------------
+    | ✅ SUBMIT CREATE BILLING
+    |----------------------------------------------------------------------
+    */
+
+    const submitCreateBilling = (payload: {
+        serviceMonth: string;
+        billingSequence: number | null;
+        baseAmount: number;
+        applyVat: boolean;
+        vatRate: number;
+        applyAdditionalCharges: boolean;
+        additionalCharges: number;
+        totalAmount: number;
+        dueDate: string;
+        description: string;
+        notes: string;
+        quotationTotal: number;
+        billingMonths: number;
+    }) => {
+        const jobOrder = billingJobOrder;
+        if (!jobOrder || isCreatingBilling) return;
+
+        const number = getJobOrderNumber(jobOrder);
+        setIsCreatingBilling(true);
+        setSuccessMessage("");
+
+        router.post(
+            "/billing-invoicing",
+            {
+                job_order_id: jobOrder.id,
+                client: jobOrder.client ?? "",
+                project: jobOrder.project ?? "",
+                client_email: jobOrder.clientEmail ?? null,
+                client_address: jobOrder.clientAddress ?? null,
+                /* ✅ Grand total (base + charges + VAT) */
+                amount: payload.totalAmount,
+                base_amount: payload.baseAmount,
+                apply_vat: payload.applyVat,
+                vat_rate: payload.vatRate,
+                apply_additional_charges: payload.applyAdditionalCharges,
+                additional_charges: payload.additionalCharges,
+                due_date: payload.dueDate || null,
+                description: payload.description || null,
+                notes: payload.notes || null,
+                service_month: payload.serviceMonth,
+                billing_sequence: payload.billingSequence,
+                quotation_total: payload.quotationTotal,
+                billing_months: payload.billingMonths,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsCreatingBilling(false);
+                    setSuccessMessage(
+                        `Billing record for ${formatMonth(payload.serviceMonth)} has been created for Job Order ${number}.`,
+                    );
+                    setBillingJobOrder(null);
+                    setSearch("");
+                    setInvoiceStatusFilter("All");
+                    refreshData();
+                },
+                onError: (errors) => {
+                    setIsCreatingBilling(false);
+                    console.error("CREATE BILLING ERROR:", errors);
+                    const firstError = Object.values(errors ?? {})[0];
+                    alert(
+                        firstError
+                            ? String(firstError)
+                            : `Failed to create the billing record for Job Order ${number}. Please try again.`,
+                    );
+                },
+                onFinish: () => setIsCreatingBilling(false),
+            },
+        );
     };
 
     const openInvoice = (invoice: Invoice) => {
@@ -613,12 +984,18 @@ export default function BillingInvoicing() {
         setShowInvoiceView(true);
     };
 
+    /** ✅ Reference label: Invoice No. kung approved, else Billing No. */
+    const refOf = (invoice: Invoice) =>
+        invoice.status === "Approved"
+            ? (invoice.number ?? invoice.billingNumber ?? `#${invoice.id}`)
+            : (invoice.billingNumber ?? `#${invoice.id}`);
+
     const resubmitInvoice = (invoice: Invoice) => {
         if (!invoice || isResubmitting) return;
 
         openConfirm({
-            title: "Resubmit Invoice",
-            message: `Resubmit invoice ${invoice.number}?\n\nThis will set the status back to PENDING for Admin review.`,
+            title: "Resubmit Billing Record",
+            message: `Resubmit billing record ${refOf(invoice)}?\n\nThis will set the status back to PENDING for Admin review.`,
             confirmLabel: "Resubmit",
             cancelLabel: "Cancel",
             variant: "info",
@@ -635,7 +1012,7 @@ export default function BillingInvoicing() {
                         onSuccess: () => {
                             setIsResubmitting(false);
                             setSuccessMessage(
-                                `Invoice ${invoice.number} has been resubmitted and is now PENDING for review.`,
+                                `Billing record ${refOf(invoice)} has been resubmitted and is now PENDING for review.`,
                             );
                             setShowInvoiceView(false);
                         },
@@ -662,10 +1039,16 @@ export default function BillingInvoicing() {
                 ? `\n\nRejection Reason: ${invoice.rejectionReason || "N/A"}\n\nPlease review the feedback and make the necessary adjustments.`
                 : "";
 
+        const isApprovedInvoice = invoice.status === "Approved";
+        const ref = refOf(invoice);
+        const docLabel = isApprovedInvoice
+            ? "Service Invoice"
+            : "Billing Record";
+
         setSendEmailData({
             email: invoice.clientEmail || "",
-            subject: `Invoice ${invoice.number} - ${invoice.status}`,
-            message: `Dear ${invoice.client},\n\nPlease find attached the invoice ${invoice.number} for your reference.\n\nStatus: ${invoice.status}\nAmount: ${money(invoice.amount, hideAmount)}\nDue Date: ${formatDate(invoice.dueDate)}${statusMessage}\n\nThank you,\nALIBATON Team`,
+            subject: `${docLabel} ${ref} - ${invoice.status}`,
+            message: `Dear ${invoice.client},\n\nPlease find attached the ${docLabel.toLowerCase()} ${ref} for your reference.\n\nStatus: ${invoice.status}\nAmount: ${money(invoice.amount, hideAmount)}\nDue Date: ${formatDate(invoice.dueDate)}${statusMessage}\n\nThank you,\nALIBATON Team`,
             invoiceId: invoice.id,
         });
         setShowSendEmailModal(true);
@@ -765,7 +1148,14 @@ export default function BillingInvoicing() {
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
             pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`${invoice.number || "invoice"}.pdf`);
+            /* Filename: Invoice No. kung approved, else Billing No. */
+            pdf.save(
+                `${
+                    invoice.status === "Approved"
+                        ? (invoice.number ?? invoice.billingNumber ?? "invoice")
+                        : (invoice.billingNumber ?? "billing-record")
+                }.pdf`,
+            );
         } catch (error) {
             console.error("PDF DOWNLOAD ERROR:", error);
             alert(
@@ -805,8 +1195,13 @@ export default function BillingInvoicing() {
                             <p style="font-size:11px;color:#999;margin:2px 0 0 0;">VAT Reg. TIN: 123-456-789-000</p>
                         </div>
                         <div style="text-align:right;">
-                            <p style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#999;margin:0;">${invoice.jobOrderId ? "Service Invoice" : "Sales Invoice"}</p>
-                            <p style="font-size:22px;font-weight:900;margin:5px 0 0 0;color:#1a1a2e;">${invoice.number}</p>
+                            ${
+                                invoice.status === "Approved"
+                                    ? `<p style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#999;margin:0;">Service Invoice</p>
+                            <p style="font-size:22px;font-weight:900;margin:5px 0 0 0;color:#1a1a2e;">${invoice.number ?? ""}</p>`
+                                    : `<p style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#999;margin:0;">Billing Record</p>
+                            <p style="font-size:22px;font-weight:900;margin:5px 0 0 0;color:#1a1a2e;">${invoice.billingNumber ?? ""}</p>`
+                            }
                             <p style="font-size:11px;color:#999;margin:8px 0 0 0;">Date: ${formatDate(invoice.createdAt)}</p>
                             <p style="font-size:11px;color:#999;margin:2px 0 0 0;">Due: ${formatDate(invoice.dueDate)}</p>
                         </div>
@@ -944,23 +1339,30 @@ export default function BillingInvoicing() {
                 .confirm-card {
                     animation: confirm-scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
                 }
+                @keyframes notif-pop {
+                    from { opacity: 0; transform: translateY(-6px) scale(0.95); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                .notif-pop {
+                    animation: notif-pop 0.2s ease-out;
+                }
             `}</style>
 
             <UserLayout>
-                <div className="min-h-screen bg-[#0a0a0a] text-white">
+                <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-black dark:text-white">
                     <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
                         {/* HEADER */}
                         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-400">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                         <Receipt size={25} />
                                     </div>
                                     <div>
-                                        <h1 className="text-2xl font-black uppercase tracking-wide text-white sm:text-3xl">
+                                        <h1 className="text-2xl font-black uppercase tracking-wide text-gray-900 dark:text-white sm:text-3xl">
                                             Billing & Invoicing
                                         </h1>
-                                        <p className="mt-1 text-sm text-slate-400">
+                                        <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                                             ALIBATON Heavy Equipment & Logistics
                                             Management System
                                         </p>
@@ -974,20 +1376,20 @@ export default function BillingInvoicing() {
                             <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-4 shadow-lg shadow-emerald-950/20">
                                 <CheckCircle2
                                     size={22}
-                                    className="mt-0.5 shrink-0 text-emerald-400"
+                                    className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                                 />
                                 <div className="min-w-0 flex-1">
-                                    <p className="font-black uppercase tracking-wide text-emerald-300">
+                                    <p className="font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
                                         Success
                                     </p>
-                                    <p className="mt-1 text-sm leading-6 text-emerald-400/80">
+                                    <p className="mt-1 text-sm leading-6 text-emerald-600/80 dark:text-emerald-400/80">
                                         {successMessage || flashSuccess}
                                     </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setSuccessMessage("")}
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-300"
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600 dark:text-emerald-400 transition hover:bg-emerald-400/10 hover:text-emerald-600 dark:hover:text-emerald-300"
                                 >
                                     <X size={17} />
                                 </button>
@@ -996,7 +1398,7 @@ export default function BillingInvoicing() {
 
                         {/* ERROR */}
                         {flashError && (
-                            <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-300">
+                            <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-4 text-sm text-red-600 dark:text-red-300">
                                 <AlertCircle
                                     size={20}
                                     className="mt-0.5 shrink-0"
@@ -1006,13 +1408,13 @@ export default function BillingInvoicing() {
                         )}
 
                         {/* TABS */}
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <TabCard
                                 active={activeTab === "job-orders"}
                                 icon={<BriefcaseBusiness size={27} />}
-                                title="Job Orders"
+                                title="Job Order"
                                 count={jobOrders.length}
-                                subtitle="Received job orders ready for billing"
+                                subtitle="Approved quotations ready for monthly billing"
                                 onClick={() => {
                                     setActiveTab("job-orders");
                                     setSearch("");
@@ -1020,54 +1422,106 @@ export default function BillingInvoicing() {
                                 }}
                             />
                             <TabCard
-                                active={activeTab === "invoices"}
+                                active={activeTab === "billing-records"}
+                                icon={<Wallet size={27} />}
+                                title="Billing Records"
+                                count={billingRecords.length}
+                                subtitle="Monthly billing per Job Order"
+                                onClick={() => {
+                                    setActiveTab("billing-records");
+                                    setSearch("");
+                                    setInvoiceStatusFilter("All");
+                                }}
+                            />
+                            <TabCard
+                                active={activeTab === "service-invoice"}
                                 icon={<FileText size={27} />}
                                 title="Service Invoice"
-                                count={invoices.length}
-                                subtitle="Generated invoices and payment status"
+                                count={serviceInvoices.length}
+                                subtitle="One-off invoices without a Job Order"
                                 onClick={() => {
-                                    setActiveTab("invoices");
+                                    setActiveTab("service-invoice");
                                     setSearch("");
+                                    setInvoiceStatusFilter("All");
                                 }}
                             />
                         </div>
 
                         {/* JOB ORDERS */}
                         {activeTab === "job-orders" && (
-                            <section className="mt-6 overflow-hidden rounded-3xl border border-yellow-400/10 bg-slate-900/80 shadow-2xl shadow-black/30">
-                                <div className="border-b border-slate-800 p-5 sm:p-6">
+                            <section className="mt-6 overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-slate-900/80 shadow-2xl shadow-black/30">
+                                <div className="border-b border-gray-200 dark:border-slate-800 p-5 sm:p-6">
                                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <BriefcaseBusiness
                                                     size={20}
-                                                    className="text-yellow-400"
+                                                    className="text-yellow-600 dark:text-yellow-400"
                                                 />
                                                 <h2 className="text-lg font-black uppercase tracking-wide">
                                                     Job Orders
                                                 </h2>
                                             </div>
-                                            <p className="mt-1 text-sm text-slate-500">
-                                                Submit a Job Order to Admin for
-                                                approval. Invoice will be created
-                                                once approved.
+                                            <p className="mt-1 text-sm text-gray-500 dark:text-slate-500">
+                                                Create a billing record per
+                                                month based on the approved
+                                                quotation.
                                             </p>
                                         </div>
-                                        <div className="relative w-full lg:w-96">
-                                            <Search
-                                                size={18}
-                                                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
-                                            />
-                                            <input
-                                                value={search}
-                                                onChange={(event) =>
-                                                    setSearch(
-                                                        event.target.value,
-                                                    )
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                            {/* ✅ HIDE / SHOW MONEY */}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setHideAmount((v) => !v)
                                                 }
-                                                placeholder="Search Job Order..."
-                                                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
-                                            />
+                                                aria-label={
+                                                    hideAmount
+                                                        ? "Show amounts"
+                                                        : "Hide amounts"
+                                                }
+                                                title={
+                                                    hideAmount
+                                                        ? "Show amounts"
+                                                        : "Hide amounts"
+                                                }
+                                                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 text-gray-500 dark:text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
+                                            >
+                                                {hideAmount ? (
+                                                    <EyeOff size={17} />
+                                                ) : (
+                                                    <Eye size={17} />
+                                                )}
+                                            </button>
+
+                                            <div className="relative min-w-0 sm:w-72">
+                                                <Search
+                                                    size={18}
+                                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500"
+                                                />
+                                                <input
+                                                    value={search}
+                                                    onChange={(event) =>
+                                                        setSearch(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Search Job Order..."
+                                                    className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-3 pl-11 pr-4 text-sm text-gray-900 dark:text-white outline-none transition placeholder:text-slate-600 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                                                />
+                                            </div>
+
+                                            {/* ✅ CREATE JOB ORDER */}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowCreateJobOrder(true)
+                                                }
+                                                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 text-xs font-black uppercase tracking-wide text-black transition hover:bg-yellow-300"
+                                            >
+                                                <Plus size={16} />
+                                                Create Job Order
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1087,25 +1541,22 @@ export default function BillingInvoicing() {
                                     <JobOrderTable
                                         jobOrders={filteredJobOrders}
                                         onView={openJobOrder}
-                                        onGenerate={generateJobOrder}
-                                        isGenerating={isGenerating}
+                                        onCreateBilling={openCreateBilling}
                                         hideAmount={hideAmount}
-                                        onToggleHideAmount={() =>
-                                            setHideAmount((v) => !v)
-                                        }
                                     />
                                 </div>
                             </section>
                         )}
 
-                        {/* INVOICES */}
-                        {activeTab === "invoices" && (
+                        {/* BILLING RECORDS / SERVICE INVOICE */}
+                        {(activeTab === "billing-records" ||
+                            activeTab === "service-invoice") && (
                             <section className="mt-6">
-                                <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <SummaryCard
                                         icon={<Clock size={20} />}
                                         label="Pending"
-                                        value={pendingCount}
+                                        value={activeCounts.pending}
                                         active={
                                             invoiceStatusFilter === "Pending"
                                         }
@@ -1115,43 +1566,21 @@ export default function BillingInvoicing() {
                                         color="yellow"
                                     />
                                     <SummaryCard
-                                        icon={<Receipt size={20} />}
-                                        label="Partial"
-                                        value={partialCount}
-                                        active={
-                                            invoiceStatusFilter === "Partial"
-                                        }
-                                        onClick={() =>
-                                            handleSummaryCardClick("Partial")
-                                        }
-                                        color="orange"
-                                    />
-                                    <SummaryCard
                                         icon={<CheckCircle2 size={20} />}
-                                        label="Paid"
-                                        value={paidCount}
-                                        active={invoiceStatusFilter === "Paid"}
+                                        label="Approved"
+                                        value={activeCounts.approved}
+                                        active={
+                                            invoiceStatusFilter === "Approved"
+                                        }
                                         onClick={() =>
-                                            handleSummaryCardClick("Paid")
+                                            handleSummaryCardClick("Approved")
                                         }
                                         color="emerald"
                                     />
                                     <SummaryCard
-                                        icon={<AlertCircle size={20} />}
-                                        label="Overdue"
-                                        value={overdueCount}
-                                        active={
-                                            invoiceStatusFilter === "Overdue"
-                                        }
-                                        onClick={() =>
-                                            handleSummaryCardClick("Overdue")
-                                        }
-                                        color="red"
-                                    />
-                                    <SummaryCard
                                         icon={<Ban size={20} />}
                                         label="Rejected"
-                                        value={rejectedCount}
+                                        value={activeCounts.rejected}
                                         active={
                                             invoiceStatusFilter === "Rejected"
                                         }
@@ -1160,39 +1589,39 @@ export default function BillingInvoicing() {
                                         }
                                         color="red"
                                     />
-                                    <SummaryCard
-                                        icon={<CheckCircle2 size={20} />}
-                                        label="Approved"
-                                        value={approvedCount}
-                                        active={
-                                            invoiceStatusFilter === "Approved"
-                                        }
-                                        onClick={() =>
-                                            handleSummaryCardClick("Approved")
-                                        }
-                                        color="blue"
-                                    />
                                 </div>
 
-                                <section className="mt-5 overflow-hidden rounded-3xl border border-yellow-400/10 bg-slate-900/80 shadow-2xl shadow-black/30">
-                                    <div className="border-b border-slate-800 p-5 sm:p-6">
+                                <section className="mt-5 overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-slate-900/80 shadow-2xl shadow-black/30">
+                                    <div className="border-b border-gray-200 dark:border-slate-800 p-5 sm:p-6">
                                         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                                             <div>
                                                 <div className="flex items-center gap-2">
-                                                    <FileText
-                                                        size={20}
-                                                        className="text-yellow-400"
-                                                    />
+                                                    {activeTab ===
+                                                    "billing-records" ? (
+                                                        <Wallet
+                                                            size={20}
+                                                            className="text-yellow-600 dark:text-yellow-400"
+                                                        />
+                                                    ) : (
+                                                        <FileText
+                                                            size={20}
+                                                            className="text-yellow-600 dark:text-yellow-400"
+                                                        />
+                                                    )}
                                                     <h2 className="text-lg font-black uppercase tracking-wide">
-                                                        Invoices
+                                                        {activeTab ===
+                                                        "billing-records"
+                                                            ? "Billing Records"
+                                                            : "Service Invoice"}
                                                     </h2>
                                                 </div>
-                                                <p className="mt-1 text-sm text-slate-500">
-                                                    Invoices automatically
-                                                    created from approved Job
-                                                    Orders. Includes 12% VAT.
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-slate-500">
+                                                    {activeTab ===
+                                                    "billing-records"
+                                                        ? "Monthly billing records from Job Orders. Billing No. + Job Order No. — walang invoice number hangga't hindi na-approve."
+                                                        : "Approved na billing, naging Service Invoice. May Invoice No., Billing No., at Job Order No."}
                                                     {invoiceShouldScroll && (
-                                                        <span className="ml-2 text-yellow-400/60">
+                                                        <span className="ml-2 text-yellow-600/60 dark:text-yellow-400/60">
                                                             (scroll to view
                                                             more)
                                                         </span>
@@ -1203,7 +1632,7 @@ export default function BillingInvoicing() {
                                                 <div className="relative min-w-0 sm:w-80">
                                                     <Search
                                                         size={18}
-                                                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
+                                                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500"
                                                     />
                                                     <input
                                                         value={search}
@@ -1213,8 +1642,13 @@ export default function BillingInvoicing() {
                                                                     .value,
                                                             )
                                                         }
-                                                        placeholder="Search invoice..."
-                                                        className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                                                        placeholder={
+                                                            activeTab ===
+                                                            "billing-records"
+                                                                ? "Search billing record..."
+                                                                : "Search invoice..."
+                                                        }
+                                                        className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-3 pl-11 pr-4 text-sm text-gray-900 dark:text-white outline-none transition placeholder:text-slate-600 focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
                                                     />
                                                 </div>
                                                 <select
@@ -1227,22 +1661,13 @@ export default function BillingInvoicing() {
                                                                 | InvoiceStatus,
                                                         )
                                                     }
-                                                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-200 outline-none focus:border-yellow-400/50"
+                                                    className="rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-4 py-3 text-sm font-semibold text-gray-800 dark:text-slate-200 outline-none focus:border-yellow-400/50"
                                                 >
                                                     <option value="All">
                                                         All Status
                                                     </option>
                                                     <option value="Pending">
                                                         Pending
-                                                    </option>
-                                                    <option value="Partial">
-                                                        Partial
-                                                    </option>
-                                                    <option value="Paid">
-                                                        Paid
-                                                    </option>
-                                                    <option value="Overdue">
-                                                        Overdue
                                                     </option>
                                                     <option value="Approved">
                                                         Approved
@@ -1269,7 +1694,10 @@ export default function BillingInvoicing() {
                                         }}
                                     >
                                         <InvoiceTable
-                                            invoices={filteredInvoices}
+                                            invoices={activeFilteredInvoices}
+                                            showServiceMonth={
+                                                activeTab === "billing-records"
+                                            }
                                             onView={openInvoice}
                                             onPrint={openPrintInvoice}
                                             onDownload={downloadInvoicePDF}
@@ -1303,47 +1731,68 @@ export default function BillingInvoicing() {
                         <button
                             type="button"
                             onClick={() => setShowJobOrderView(false)}
-                            className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-800"
+                            className="rounded-xl border border-gray-300 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
                         >
                             Close
                         </button>
-                        {!isJobOrderGenerated(selectedJobOrder) &&
-                            ["Pending", "Received"].includes(
-                                String(selectedJobOrder.status ?? ""),
-                            ) && (
-                                <button
-                                    type="button"
-                                    disabled={isGenerating}
-                                    onClick={() => {
-                                        setShowJobOrderView(false);
-                                        generateJobOrder(selectedJobOrder);
-                                    }}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-black text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {isGenerating ? (
-                                        <>
-                                            <RefreshCw
-                                                size={17}
-                                                className="animate-spin"
-                                            />{" "}
-                                            Submitting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Receipt size={17} /> Submit for
-                                            Approval
-                                        </>
-                                    )}
-                                </button>
-                            )}
+                        {isFullyBilled(selectedJobOrder) ? (
+                            <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-400/5 px-5 py-3 text-sm font-black text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 size={17} /> Completed
+                            </span>
+                        ) : selectedJobOrder.canCreateBilling === false ? (
+                            /* 🔒 LOCKED — may Pending billing na */
+                            <span
+                                title="May billing record na naghihintay ng admin verification. Hindi ka makapag-create hanggang ma-approve o ma-reject ng admin."
+                                className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-yellow-400/30 bg-yellow-400/5 px-5 py-3 text-sm font-black text-yellow-600 dark:text-yellow-400"
+                            >
+                                <Clock size={17} /> Awaiting Verification
+                            </span>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    openCreateBilling(selectedJobOrder)
+                                }
+                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-black text-black transition hover:bg-yellow-300"
+                            >
+                                <Wallet size={17} />
+                                {(selectedJobOrder.rejectedCount ?? 0) > 0
+                                    ? "Re-create Billing"
+                                    : "Create Billing"}
+                            </button>
+                        )}
                     </div>
                 </Modal>
+            )}
+
+            {/* CREATE BILLING */}
+            {billingJobOrder && (
+                <CreateBillingModal
+                    jobOrder={billingJobOrder}
+                    hideAmount={hideAmount}
+                    isSubmitting={isCreatingBilling}
+                    onClose={closeCreateBilling}
+                    onSubmit={submitCreateBilling}
+                />
+            )}
+
+            {/* ✅ CREATE JOB ORDER */}
+            {showCreateJobOrder && (
+                <CreateJobOrderModal
+                    isSubmitting={isCreatingJobOrder}
+                    onClose={() => setShowCreateJobOrder(false)}
+                    onSubmit={submitCreateJobOrder}
+                />
             )}
 
             {/* INVOICE VIEW */}
             {showInvoiceView && selectedInvoice && (
                 <Modal
-                    title={`Invoice ${selectedInvoice.number}`}
+                    title={
+                        selectedInvoice.status === "Approved"
+                            ? `Service Invoice ${selectedInvoice.number ?? ""}`
+                            : `Billing Record ${selectedInvoice.billingNumber ?? ""}`
+                    }
                     onClose={() => setShowInvoiceView(false)}
                     size="lg"
                 >
@@ -1368,7 +1817,7 @@ export default function BillingInvoicing() {
                         <button
                             type="button"
                             onClick={() => setShowInvoiceView(false)}
-                            className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-800"
+                            className="rounded-xl border border-gray-300 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
                         >
                             Close
                         </button>
@@ -1447,12 +1896,15 @@ export default function BillingInvoicing() {
                     >
                         <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-4">
                             <div className="flex items-center gap-3">
-                                <Send size={24} className="text-blue-400" />
+                                <Send
+                                    size={24}
+                                    className="text-blue-600 dark:text-blue-400"
+                                />
                                 <div>
-                                    <p className="font-bold text-blue-400">
+                                    <p className="font-bold text-blue-600 dark:text-blue-400">
                                         Send Invoice Email
                                     </p>
-                                    <p className="text-sm text-slate-400">
+                                    <p className="text-sm text-gray-500 dark:text-slate-400">
                                         The client will receive this invoice via
                                         email.
                                     </p>
@@ -1461,9 +1913,11 @@ export default function BillingInvoicing() {
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Client Email{" "}
-                                <span className="text-red-400">*</span>
+                                <span className="text-red-600 dark:text-red-400">
+                                    *
+                                </span>
                             </label>
                             <input
                                 type="email"
@@ -1475,14 +1929,14 @@ export default function BillingInvoicing() {
                                     }))
                                 }
                                 placeholder="client@example.com"
-                                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10"
+                                className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10"
                                 disabled={isSendingEmail}
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Subject
                             </label>
                             <input
@@ -1495,13 +1949,13 @@ export default function BillingInvoicing() {
                                     }))
                                 }
                                 placeholder="Invoice subject"
-                                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10"
+                                className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10"
                                 disabled={isSendingEmail}
                             />
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Message
                             </label>
                             <textarea
@@ -1514,7 +1968,7 @@ export default function BillingInvoicing() {
                                     }))
                                 }
                                 placeholder="Write your message to the client..."
-                                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-3 px-4 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10 resize-y"
+                                className="w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 py-3 px-4 text-sm text-gray-900 dark:text-white placeholder:text-slate-600 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10 resize-y"
                                 disabled={isSendingEmail}
                             />
                         </div>
@@ -1524,7 +1978,7 @@ export default function BillingInvoicing() {
                                 type="button"
                                 onClick={() => setShowSendEmailModal(false)}
                                 disabled={isSendingEmail}
-                                className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-xl border border-gray-300 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -1562,7 +2016,7 @@ export default function BillingInvoicing() {
                     onClick={closeConfirm}
                 >
                     <div
-                        className="confirm-card w-full max-w-md overflow-hidden rounded-3xl border border-yellow-400/20 bg-slate-900 shadow-[0_25px_80px_-20px_rgba(250,204,21,0.25)]"
+                        className="confirm-card w-full max-w-md overflow-hidden rounded-3xl border border-yellow-400/20 bg-white dark:bg-slate-900 shadow-[0_25px_80px_-20px_rgba(250,204,21,0.25)]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div
@@ -1581,12 +2035,12 @@ export default function BillingInvoicing() {
                                 className={[
                                     "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border",
                                     confirmDialog.variant === "warning"
-                                        ? "border-yellow-400/30 bg-yellow-400/15 text-yellow-400"
+                                        ? "border-yellow-400/30 bg-yellow-400/15 text-yellow-600 dark:text-yellow-400"
                                         : confirmDialog.variant === "danger"
-                                          ? "border-red-400/30 bg-red-400/15 text-red-400"
+                                          ? "border-red-400/30 bg-red-400/15 text-red-600 dark:text-red-400"
                                           : confirmDialog.variant === "success"
-                                            ? "border-emerald-400/30 bg-emerald-400/15 text-emerald-400"
-                                            : "border-blue-400/30 bg-blue-400/15 text-blue-400",
+                                            ? "border-emerald-400/30 bg-emerald-400/15 text-emerald-600 dark:text-emerald-400"
+                                            : "border-blue-400/30 bg-blue-400/15 text-blue-600 dark:text-blue-400",
                                 ].join(" ")}
                             >
                                 {confirmDialog.variant === "warning" ? (
@@ -1600,10 +2054,10 @@ export default function BillingInvoicing() {
                                 )}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <h3 className="text-lg font-black uppercase tracking-wide text-white">
+                                <h3 className="text-lg font-black uppercase tracking-wide text-gray-900 dark:text-white">
                                     {confirmDialog.title}
                                 </h3>
-                                <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                     {confirmDialog.variant === "warning"
                                         ? "Action Required"
                                         : confirmDialog.variant === "danger"
@@ -1616,23 +2070,23 @@ export default function BillingInvoicing() {
                             <button
                                 type="button"
                                 onClick={closeConfirm}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-800 hover:text-white"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 dark:text-slate-500 transition hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                             >
                                 <X size={16} />
                             </button>
                         </div>
 
                         <div className="p-6">
-                            <p className="whitespace-pre-line text-sm leading-6 text-slate-300">
+                            <p className="whitespace-pre-line text-sm leading-6 text-gray-700 dark:text-slate-300">
                                 {confirmDialog.message}
                             </p>
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 bg-slate-950/50 p-6 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 p-6 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={closeConfirm}
-                                className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 text-sm font-bold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                                className="rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                             >
                                 {confirmDialog.cancelLabel}
                             </button>
@@ -1675,7 +2129,7 @@ export default function BillingInvoicing() {
                         </div>
                     </div>
 
-                    <div className="fixed bottom-5 left-1/2 z-[110] flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl print:hidden">
+                    <div className="fixed bottom-5 left-1/2 z-[110] flex -translate-x-1/2 gap-2 rounded-2xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950/95 p-2 shadow-2xl print:hidden">
                         <button
                             type="button"
                             onClick={printInvoice}
@@ -1686,14 +2140,14 @@ export default function BillingInvoicing() {
                         <button
                             type="button"
                             onClick={() => downloadInvoicePDF(selectedInvoice)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-5 py-3 text-sm font-bold text-slate-200 hover:bg-slate-700"
+                            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 px-5 py-3 text-sm font-bold text-gray-800 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700"
                         >
                             <Download size={17} /> PDF
                         </button>
                         <button
                             type="button"
                             onClick={() => setShowInvoicePrint(false)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-200 hover:bg-slate-800"
+                            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-800 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800"
                         >
                             <X size={17} /> Close
                         </button>
@@ -1709,119 +2163,6 @@ export default function BillingInvoicing() {
 | COMPONENTS
 |--------------------------------------------------------------------------
 */
-
-function NotificationPanel({
-    notifications,
-    onClose,
-    onMarkAllRead,
-}: {
-    notifications: Notification[];
-    onClose: () => void;
-    onMarkAllRead: () => void;
-}) {
-    const unreadCount = notifications.filter((n) => !n.read).length;
-
-    return (
-        <div className="absolute right-0 top-full z-[80] mt-3 w-80 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 shadow-2xl backdrop-blur-md sm:w-96">
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <Bell size={16} className="text-yellow-400" />
-                    <p className="text-sm font-black uppercase tracking-wide text-white">
-                        Notifications
-                    </p>
-                    {unreadCount > 0 && (
-                        <span className="rounded-full bg-yellow-400/15 px-2 py-0.5 text-[10px] font-black text-yellow-400">
-                            {unreadCount} new
-                        </span>
-                    )}
-                </div>
-                <div className="flex items-center gap-1">
-                    {unreadCount > 0 && (
-                        <button
-                            type="button"
-                            onClick={onMarkAllRead}
-                            className="rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-yellow-400 transition hover:bg-yellow-400/10"
-                        >
-                            Mark all read
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
-                    >
-                        <X size={15} />
-                    </button>
-                </div>
-            </div>
-
-            <div className="max-h-96 overflow-y-auto billing-scroll">
-                {notifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-                        <Bell size={28} className="text-slate-700" />
-                        <p className="mt-3 text-sm font-bold text-slate-400">
-                            No notifications
-                        </p>
-                        <p className="mt-1 text-xs text-slate-600">
-                            You're all caught up.
-                        </p>
-                    </div>
-                ) : (
-                    notifications.map((notification) => (
-                        <div
-                            key={notification.id}
-                            className={[
-                                "flex items-start gap-3 border-b border-slate-800/70 px-4 py-3 transition hover:bg-slate-800/40",
-                                !notification.read
-                                    ? "bg-yellow-400/[0.04]"
-                                    : "",
-                            ].join(" ")}
-                        >
-                            <div
-                                className={[
-                                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                                    notification.type === "success"
-                                        ? "bg-emerald-400/10 text-emerald-400"
-                                        : notification.type === "error"
-                                          ? "bg-red-400/10 text-red-400"
-                                          : notification.type === "warning"
-                                            ? "bg-yellow-400/10 text-yellow-400"
-                                            : "bg-blue-400/10 text-blue-400",
-                                ].join(" ")}
-                            >
-                                {notification.type === "success" ? (
-                                    <CheckCircle2 size={16} />
-                                ) : notification.type === "error" ? (
-                                    <AlertCircle size={16} />
-                                ) : notification.type === "warning" ? (
-                                    <AlertTriangle size={16} />
-                                ) : (
-                                    <Bell size={16} />
-                                )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-start justify-between gap-2">
-                                    <p className="truncate text-sm font-bold text-white">
-                                        {notification.title}
-                                    </p>
-                                    {!notification.read && (
-                                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-yellow-400" />
-                                    )}
-                                </div>
-                                <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-400">
-                                    {notification.message}
-                                </p>
-                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                                    {formatDateTime(notification.createdAt)}
-                                </p>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
-    );
-}
 
 function TabCard({
     active,
@@ -1846,7 +2187,7 @@ function TabCard({
                 "group relative overflow-hidden rounded-3xl border p-5 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400/30 sm:p-6",
                 active
                     ? "border-yellow-400/70 bg-yellow-400/10 shadow-[0_0_35px_rgba(250,204,21,0.10)]"
-                    : "border-slate-800 bg-slate-900/80 hover:border-yellow-400/40 hover:bg-slate-900",
+                    : "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-yellow-400/40 hover:bg-white dark:hover:bg-slate-900",
             ].join(" ")}
         >
             <div className="flex items-center justify-between gap-4">
@@ -1855,8 +2196,8 @@ function TabCard({
                         className={[
                             "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border transition",
                             active
-                                ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-400"
-                                : "border-slate-700 bg-slate-950 text-slate-400 group-hover:border-yellow-400/30 group-hover:text-yellow-400",
+                                ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                : "border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 text-gray-500 dark:text-slate-400 group-hover:border-yellow-400/30 group-hover:text-yellow-600 dark:group-hover:text-yellow-400",
                         ].join(" ")}
                     >
                         {icon}
@@ -1865,12 +2206,14 @@ function TabCard({
                         <p
                             className={[
                                 "text-lg font-black uppercase tracking-wider",
-                                active ? "text-yellow-400" : "text-white",
+                                active
+                                    ? "text-yellow-600 dark:text-yellow-400"
+                                    : "text-gray-900 dark:text-white",
                             ].join(" ")}
                         >
                             {title}
                         </p>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-gray-500 dark:text-slate-500">
                             {subtitle}
                         </p>
                     </div>
@@ -1879,12 +2222,14 @@ function TabCard({
                     <p
                         className={[
                             "text-2xl font-black sm:text-3xl",
-                            active ? "text-yellow-400" : "text-white",
+                            active
+                                ? "text-yellow-600 dark:text-yellow-400"
+                                : "text-gray-900 dark:text-white",
                         ].join(" ")}
                     >
                         {count}
                     </p>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         {count === 1 ? "record" : "records"}
                     </p>
                 </div>
@@ -1915,57 +2260,57 @@ function SummaryCard({
 }) {
     const colorMap = {
         slate: {
-            base: "border-slate-800 bg-slate-900/80 hover:border-slate-700",
+            base: "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-gray-300 dark:hover:border-slate-700",
             active: "border-slate-400/40 bg-slate-400/[0.08] shadow-lg shadow-slate-400/5",
-            iconBase: "text-slate-500",
-            iconActive: "text-slate-200",
-            valueBase: "text-white",
-            valueActive: "text-slate-100",
+            iconBase: "text-gray-500 dark:text-slate-500",
+            iconActive: "text-gray-800 dark:text-slate-200",
+            valueBase: "text-gray-900 dark:text-white",
+            valueActive: "text-gray-900 dark:text-slate-100",
             dot: "bg-slate-400",
         },
         yellow: {
-            base: "border-slate-800 bg-slate-900/80 hover:border-yellow-400/40",
+            base: "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-yellow-400/40",
             active: "border-yellow-400/50 bg-yellow-400/[0.08] shadow-lg shadow-yellow-400/5",
-            iconBase: "text-slate-500",
-            iconActive: "text-yellow-400",
-            valueBase: "text-white",
-            valueActive: "text-yellow-300",
+            iconBase: "text-gray-500 dark:text-slate-500",
+            iconActive: "text-yellow-600 dark:text-yellow-400",
+            valueBase: "text-gray-900 dark:text-white",
+            valueActive: "text-yellow-600 dark:text-yellow-300",
             dot: "bg-yellow-400",
         },
         orange: {
-            base: "border-slate-800 bg-slate-900/80 hover:border-orange-400/40",
+            base: "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-orange-400/40",
             active: "border-orange-400/50 bg-orange-400/[0.08] shadow-lg shadow-orange-400/5",
-            iconBase: "text-slate-500",
-            iconActive: "text-orange-400",
-            valueBase: "text-white",
-            valueActive: "text-orange-300",
+            iconBase: "text-gray-500 dark:text-slate-500",
+            iconActive: "text-orange-600 dark:text-orange-400",
+            valueBase: "text-gray-900 dark:text-white",
+            valueActive: "text-orange-600 dark:text-orange-300",
             dot: "bg-orange-400",
         },
         emerald: {
-            base: "border-slate-800 bg-slate-900/80 hover:border-emerald-400/40",
+            base: "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-emerald-400/40",
             active: "border-emerald-400/50 bg-emerald-400/[0.08] shadow-lg shadow-emerald-400/5",
-            iconBase: "text-slate-500",
-            iconActive: "text-emerald-400",
-            valueBase: "text-white",
-            valueActive: "text-emerald-300",
+            iconBase: "text-gray-500 dark:text-slate-500",
+            iconActive: "text-emerald-600 dark:text-emerald-400",
+            valueBase: "text-gray-900 dark:text-white",
+            valueActive: "text-emerald-600 dark:text-emerald-300",
             dot: "bg-emerald-400",
         },
         red: {
-            base: "border-slate-800 bg-slate-900/80 hover:border-red-400/40",
+            base: "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-red-400/40",
             active: "border-red-400/50 bg-red-400/[0.08] shadow-lg shadow-red-400/5",
-            iconBase: "text-slate-500",
-            iconActive: "text-red-400",
-            valueBase: "text-white",
-            valueActive: "text-red-300",
+            iconBase: "text-gray-500 dark:text-slate-500",
+            iconActive: "text-red-600 dark:text-red-400",
+            valueBase: "text-gray-900 dark:text-white",
+            valueActive: "text-red-600 dark:text-red-300",
             dot: "bg-red-400",
         },
         blue: {
-            base: "border-slate-800 bg-slate-900/80 hover:border-blue-400/40",
+            base: "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-blue-400/40",
             active: "border-blue-400/50 bg-blue-400/[0.08] shadow-lg shadow-blue-400/5",
-            iconBase: "text-slate-500",
-            iconActive: "text-blue-400",
-            valueBase: "text-white",
-            valueActive: "text-blue-300",
+            iconBase: "text-gray-500 dark:text-slate-500",
+            iconActive: "text-blue-600 dark:text-blue-400",
+            valueBase: "text-gray-900 dark:text-white",
+            valueActive: "text-blue-600 dark:text-blue-300",
             dot: "bg-blue-400",
         },
     };
@@ -2003,7 +2348,9 @@ function SummaryCard({
             <p
                 className={[
                     "mt-3 text-xs font-bold uppercase tracking-wider transition-colors",
-                    active ? "text-slate-300" : "text-slate-500",
+                    active
+                        ? "text-gray-700 dark:text-slate-300"
+                        : "text-gray-500 dark:text-slate-500",
                 ].join(" ")}
             >
                 {label}
@@ -2024,17 +2371,13 @@ function SummaryCard({
 function JobOrderTable({
     jobOrders,
     onView,
-    onGenerate,
-    isGenerating,
+    onCreateBilling,
     hideAmount,
-    onToggleHideAmount,
 }: {
     jobOrders: JobOrder[];
     onView: (jobOrder: JobOrder) => void;
-    onGenerate: (jobOrder: JobOrder) => void;
-    isGenerating: boolean;
+    onCreateBilling: (jobOrder: JobOrder) => void;
     hideAmount: boolean;
-    onToggleHideAmount: () => void;
 }) {
     if (jobOrders.length === 0) {
         return (
@@ -2048,48 +2391,52 @@ function JobOrderTable({
 
     return (
         <table className="w-full table-fixed">
-            <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm">
-                <tr className="border-b border-slate-800 bg-slate-950/70">
-                    <th className="w-[11%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-950/95 backdrop-blur-sm">
+                <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70">
+                    <th className="w-[11%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Job Order
                     </th>
-                    <th className="w-[16%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[15%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Client
                     </th>
-                    <th className="w-[15%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[14%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Project
                     </th>
-                    <th className="w-[14%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[13%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Equipment
                     </th>
-                    <th className="w-[12%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[13%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Service Date
                     </th>
-                    <th className="w-[10%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[9%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Amount
                     </th>
-                    <th className="w-[9%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[9%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Status
                     </th>
-                    <th className="w-[13%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[16%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Action
                     </th>
                 </tr>
             </thead>
             <tbody>
                 {jobOrders.map((jobOrder) => {
-                    const generated = isJobOrderGenerated(jobOrder);
-                    const status = String(jobOrder.status ?? "");
-                    const canGenerate =
-                        !generated &&
-                        !["Generated", "Pending Admin Approval"].includes(
-                            status,
-                        ) &&
-                        ["Pending", "Received"].includes(status);
+                    const billedCount = getBilledCount(jobOrder);
+                    const billingMonths = getBillingMonths(jobOrder);
+                    const fullyBilled = isFullyBilled(jobOrder);
+                    const nextMonth = getNextBillableMonth(jobOrder);
+
+                    /* ✅ LOCK: isang Pending billing lang kada JO */
+                    const pendingCount = jobOrder.pendingCount ?? 0;
+                    const rejectedCount = jobOrder.rejectedCount ?? 0;
+                    const awaitingVerification =
+                        pendingCount > 0 && jobOrder.canCreateBilling === false;
+                    const canCreate = jobOrder.canCreateBilling ?? !fullyBilled;
+
                     return (
                         <tr
                             key={jobOrder.id}
-                            className="border-b border-slate-800/70 transition hover:bg-yellow-400/[0.025]"
+                            className="border-b border-gray-200 dark:border-slate-800/70 transition hover:bg-yellow-400/[0.025]"
                         >
                             <td className="px-3 py-3 align-top">
                                 <button
@@ -2097,12 +2444,12 @@ function JobOrderTable({
                                     onClick={() => onView(jobOrder)}
                                     className="text-left"
                                 >
-                                    <p className="truncate text-xs font-black text-white hover:text-yellow-400">
+                                    <p className="truncate text-xs font-black text-gray-900 dark:text-white hover:text-yellow-600 dark:hover:text-yellow-400">
                                         {getJobOrderNumber(jobOrder)}
                                     </p>
-                                    {jobOrder.invoiceNumber && (
-                                        <p className="mt-0.5 truncate text-[10px] text-emerald-400">
-                                            {jobOrder.invoiceNumber}
+                                    {rejectedCount > 0 && (
+                                        <p className="mt-0.5 truncate text-[10px] font-bold text-red-600 dark:text-red-400">
+                                            Billing rejected
                                         </p>
                                     )}
                                 </button>
@@ -2115,7 +2462,7 @@ function JobOrderTable({
                                         className="mt-0.5 shrink-0 text-slate-600"
                                     />
                                     <div className="min-w-0">
-                                        <p className="truncate text-[11px] font-semibold text-slate-200">
+                                        <p className="truncate text-[11px] font-semibold text-gray-800 dark:text-slate-200">
                                             {jobOrder.client ?? "—"}
                                         </p>
                                         {jobOrder.clientEmail && (
@@ -2130,7 +2477,7 @@ function JobOrderTable({
                             </td>
 
                             <td className="px-3 py-3 align-top">
-                                <p className="truncate text-[11px] text-slate-300">
+                                <p className="truncate text-[11px] text-gray-700 dark:text-slate-300">
                                     {jobOrder.project ?? "—"}
                                 </p>
                                 {jobOrder.location && (
@@ -2147,7 +2494,7 @@ function JobOrderTable({
                             </td>
 
                             <td className="px-3 py-3 align-top">
-                                <p className="truncate text-[11px] text-slate-300">
+                                <p className="truncate text-[11px] text-gray-700 dark:text-slate-300">
                                     {jobOrder.equipment ?? "—"}
                                 </p>
                                 {jobOrder.operator && (
@@ -2157,63 +2504,74 @@ function JobOrderTable({
                                 )}
                             </td>
 
+                            {/* ✅ SERVICE DATE = MONTHLY */}
                             <td className="px-3 py-3 align-top">
                                 <div className="flex items-start gap-1.5">
                                     <CalendarDays
                                         size={12}
-                                        className="mt-0.5 shrink-0 text-slate-600"
+                                        className={[
+                                            "mt-0.5 shrink-0",
+                                            fullyBilled
+                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                : "text-slate-600",
+                                        ].join(" ")}
                                     />
                                     <div className="min-w-0">
-                                        <p className="truncate text-[11px] text-slate-300">
-                                            {formatDate(jobOrder.startDate)}
+                                        <p
+                                            className={[
+                                                "truncate text-[11px] font-semibold",
+                                                fullyBilled
+                                                    ? "text-emerald-600 dark:text-emerald-400"
+                                                    : "text-gray-700 dark:text-slate-300",
+                                            ].join(" ")}
+                                        >
+                                            {fullyBilled
+                                                ? "Fully Billed"
+                                                : formatMonth(nextMonth)}
                                         </p>
-                                        {jobOrder.endDate && (
-                                            <p className="mt-0.5 truncate text-[10px] text-slate-600">
-                                                to{" "}
-                                                {formatDate(jobOrder.endDate)}
-                                            </p>
-                                        )}
+                                        <p className="mt-0.5 truncate text-[10px] text-slate-600">
+                                            {billingMonths > 0
+                                                ? `${billedCount} of ${billingMonths} month${
+                                                      billingMonths > 1
+                                                          ? "s"
+                                                          : ""
+                                                  } billed`
+                                                : billedCount > 0
+                                                  ? `${billedCount} month${
+                                                        billedCount > 1
+                                                            ? "s"
+                                                            : ""
+                                                    } billed`
+                                                  : "Not yet billed"}
+                                        </p>
                                     </div>
                                 </div>
                             </td>
 
                             <td className="px-3 py-3 align-top">
-                                <div className="flex items-center justify-end gap-1.5">
-                                    <button
-                                        type="button"
-                                        onClick={onToggleHideAmount}
-                                        aria-label={
-                                            hideAmount
-                                                ? "Show amounts"
-                                                : "Hide amounts"
-                                        }
-                                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500 transition hover:text-yellow-400"
-                                    >
-                                        {hideAmount ? (
-                                            <EyeOff size={12} />
-                                        ) : (
-                                            <Eye size={12} />
-                                        )}
-                                    </button>
-                                    <p className="truncate text-xs font-black text-white">
-                                        {money(
-                                            getJobOrderAmount(jobOrder),
-                                            hideAmount,
-                                        )}
-                                    </p>
-                                </div>
+                                <p className="truncate text-right text-xs font-black text-gray-900 dark:text-white">
+                                    {money(
+                                        getJobOrderAmount(jobOrder),
+                                        hideAmount,
+                                    )}
+                                </p>
                             </td>
 
                             <td className="px-3 py-3 text-center align-top">
                                 <StatusBadge
                                     status={
-                                        generated ||
-                                        String(jobOrder.status ?? "").toLowerCase() ===
-                                            "pending admin approval"
-                                            ? "Generated"
-                                            : (jobOrder.status ?? "Pending")
+                                        jobOrder.billingStatus ??
+                                        jobOrder.status ??
+                                        "Pending"
                                     }
                                 />
+                                {awaitingVerification && (
+                                    <p className="mt-1 text-[9px] font-bold uppercase leading-tight tracking-wide text-yellow-600 dark:text-yellow-400">
+                                        Awaiting
+                                        <br />
+                                        Verification
+                                    </p>
+                                )}
                             </td>
 
                             <td className="px-3 py-3 align-top">
@@ -2221,38 +2579,48 @@ function JobOrderTable({
                                     <button
                                         type="button"
                                         onClick={() => onView(jobOrder)}
-                                        className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-700 px-2 text-[10px] font-bold text-slate-300 transition hover:border-yellow-400/40 hover:bg-slate-800 hover:text-yellow-400"
+                                        className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-gray-300 dark:border-slate-700 px-2 text-[10px] font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-yellow-600 dark:hover:text-yellow-400"
                                     >
                                         <Eye size={12} />
                                         View
                                     </button>
-                                    {canGenerate ? (
+
+                                    {fullyBilled ? (
+                                        <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                            <CheckCircle2 size={12} />
+                                            Completed
+                                        </span>
+                                    ) : awaitingVerification ? (
+                                        /* 🔒 LOCKED — hintayin ang admin */
+                                        <span
+                                            title="May billing record na naghihintay ng admin verification. Hindi ka makakapag-create hanggang ma-approve o ma-reject."
+                                            className="inline-flex h-8 cursor-not-allowed items-center gap-1 rounded-lg border border-yellow-400/25 bg-yellow-400/5 px-2 text-[10px] font-bold text-yellow-600 dark:text-yellow-400"
+                                        >
+                                            <Clock size={12} />
+                                            Created
+                                        </span>
+                                    ) : (
                                         <button
                                             type="button"
-                                            disabled={isGenerating}
-                                            onClick={() => onGenerate(jobOrder)}
-                                            className="inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-yellow-400 px-2 text-[10px] font-black text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                            onClick={() =>
+                                                onCreateBilling(jobOrder)
+                                            }
+                                            title={
+                                                rejectedCount > 0
+                                                    ? `May na-reject na billing. Gumawa ng corrected billing para sa ${formatMonth(
+                                                          nextMonth,
+                                                      )}.`
+                                                    : `Create billing record for ${formatMonth(
+                                                          nextMonth,
+                                                      )}`
+                                            }
+                                            className="inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-yellow-400 px-2 text-[10px] font-black text-black transition hover:bg-yellow-300"
                                         >
-                                            {isGenerating ? (
-                                                <>
-                                                    <RefreshCw
-                                                        size={12}
-                                                        className="animate-spin"
-                                                    />
-                                                    ...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Receipt size={12} />
-                                                    Submit
-                                                </>
-                                            )}
+                                            <Wallet size={12} />
+                                            {rejectedCount > 0
+                                                ? "Re-create"
+                                                : "Create Billing"}
                                         </button>
-                                    ) : (
-                                        <span className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-2 text-[10px] font-bold text-emerald-400">
-                                            <CheckCircle2 size={12} />
-                                            Generated
-                                        </span>
                                     )}
                                 </div>
                             </td>
@@ -2266,6 +2634,7 @@ function JobOrderTable({
 
 function InvoiceTable({
     invoices,
+    showServiceMonth = false,
     onView,
     onPrint,
     onDownload,
@@ -2275,6 +2644,7 @@ function InvoiceTable({
     onToggleHideAmount,
 }: {
     invoices: Invoice[];
+    showServiceMonth?: boolean;
     onView: (invoice: Invoice) => void;
     onPrint: (invoice: Invoice) => void;
     onDownload: (invoice: Invoice) => void;
@@ -2286,154 +2656,270 @@ function InvoiceTable({
     if (invoices.length === 0) {
         return (
             <EmptyState
-                icon={<FileText size={28} />}
-                title="No Invoices Found"
-                description="Invoices will appear here once Admin approves your Job Orders."
+                icon={
+                    showServiceMonth ? (
+                        <Wallet size={28} />
+                    ) : (
+                        <FileText size={28} />
+                    )
+                }
+                title={
+                    showServiceMonth
+                        ? "No Billing Records Found"
+                        : "No Approved Billing Yet"
+                }
+                description={
+                    showServiceMonth
+                        ? "Create a billing record from a Job Order to bill a specific month."
+                        : "Lalabas lang dito pag na-approve na ng admin ang billing. Doon na nabubuo ang Invoice No."
+                }
             />
         );
     }
 
     return (
         <table className="w-full table-fixed">
-            <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm">
-                <tr className="border-b border-slate-800 bg-slate-950/70">
-                    <th className="w-[11%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
-                        Invoice
+            <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-950/95 backdrop-blur-sm">
+                <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70">
+                    {/*
+                    |------------------------------------------------------------------
+                    | ✅ Billing Records: Billing No. + Job Order No. — WALANG invoice.
+                    | ✅ Service Invoice: Invoice No. (may JO No. at Billing No. sa ilalim)
+                    */}
+                    <th className="w-[14%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                        {showServiceMonth ? "Billing No." : "Invoice No."}
                     </th>
-                    <th className="w-[10%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[10%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Job Order
                     </th>
-                    <th className="w-[16%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[15%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Client
                     </th>
-                    <th className="w-[15%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[14%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Project
                     </th>
-                    <th className="w-[11%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    {showServiceMonth && (
+                        <th className="w-[11%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                            Service Date
+                        </th>
+                    )}
+                    <th className="w-[11%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Amount
                     </th>
-                    <th className="w-[10%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[10%] px-3 py-3 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Due Date
                     </th>
-                    <th className="w-[10%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[10%] px-3 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Status
                     </th>
-                    <th className="w-[17%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <th className="w-[17%] px-3 py-3 text-right text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Actions
                     </th>
                 </tr>
             </thead>
             <tbody>
-                {invoices.map((invoice) => (
-                    <tr
-                        key={invoice.id}
-                        className="border-b border-slate-800/70 transition hover:bg-yellow-400/[0.025]"
-                    >
-                        <td className="px-3 py-3 align-top">
-                            <button
-                                type="button"
-                                onClick={() => onView(invoice)}
-                                className="text-left"
-                            >
-                                <p className="truncate text-xs font-black text-white hover:text-yellow-400">
-                                    {invoice.number}
-                                </p>
-                                <p className="mt-0.5 truncate text-[10px] text-slate-600">
-                                    {formatDate(invoice.createdAt)}
-                                </p>
-                            </button>
-                        </td>
+                {invoices.map((invoice) => {
+                    const hasBreakdown =
+                        (invoice.vatAmount ?? 0) > 0 ||
+                        (invoice.additionalCharges ?? 0) > 0;
 
-                        <td className="px-3 py-3 align-top">
-                            {invoice.jobOrderId ? (
-                                <span className="inline-flex rounded-lg border border-yellow-400/20 bg-yellow-400/5 px-2 py-0.5 text-[10px] font-bold text-yellow-400">
-                                    JO-{invoice.jobOrderId}
-                                </span>
-                            ) : (
-                                <span className="text-[10px] text-slate-600">
-                                    —
-                                </span>
-                            )}
-                        </td>
-
-                        <td className="px-3 py-3 align-top">
-                            <p className="truncate text-[11px] font-semibold text-slate-200">
-                                {invoice.client}
-                            </p>
-                            {invoice.clientEmail && (
-                                <p
-                                    className={[
-                                        "mt-0.5 truncate text-[10px]",
-                                        invoice.status === "Approved"
-                                            ? "text-emerald-400"
-                                            : "text-slate-600",
-                                    ].join(" ")}
-                                    title={
-                                        invoice.status === "Approved"
-                                            ? invoice.clientEmail
-                                            : undefined
-                                    }
-                                >
-                                    {displayClientEmail(
-                                        invoice.clientEmail,
-                                        invoice.status,
-                                    )}
-                                </p>
-                            )}
-                        </td>
-
-                        <td className="px-3 py-3 align-top">
-                            <p className="truncate text-[11px] text-slate-300">
-                                {invoice.project}
-                            </p>
-                        </td>
-
-                        <td className="px-3 py-3 align-top">
-                            <div className="flex items-center justify-end gap-1.5">
+                    return (
+                        <tr
+                            key={invoice.id}
+                            className="border-b border-gray-200 dark:border-slate-800/70 transition hover:bg-yellow-400/[0.025]"
+                        >
+                            <td className="px-3 py-3 align-top">
                                 <button
                                     type="button"
-                                    onClick={onToggleHideAmount}
-                                    aria-label={
-                                        hideAmount
-                                            ? "Show amounts"
-                                            : "Hide amounts"
-                                    }
-                                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500 transition hover:text-yellow-400"
+                                    onClick={() => onView(invoice)}
+                                    className="text-left"
                                 >
-                                    {hideAmount ? (
-                                        <EyeOff size={12} />
+                                    {/*
+                                    |--------------------------------------------------------------
+                                    | SERVICE INVOICE (approved) → Invoice No. ang pangunahing
+                                    | numero, at Billing No. + Job Order No. sa ilalim.
+                                    |
+                                    | BILLING RECORDS → Billing No. lang. Walang invoice number
+                                    | hangga't hindi na-approve ng admin.
+                                    */}
+                                    <p className="truncate text-xs font-black text-gray-900 dark:text-white hover:text-yellow-600 dark:hover:text-yellow-400">
+                                        {showServiceMonth
+                                            ? (invoice.billingNumber ?? "—")
+                                            : (invoice.number ??
+                                              invoice.billingNumber ??
+                                              "—")}
+                                    </p>
+                                    {showServiceMonth ? (
+                                        <p className="mt-0.5 truncate text-[10px] text-slate-600">
+                                            {formatDate(invoice.createdAt)}
+                                        </p>
                                     ) : (
-                                        <Eye size={12} />
+                                        invoice.billingNumber && (
+                                            <p className="mt-0.5 truncate text-[10px] font-bold text-yellow-600 dark:text-yellow-400">
+                                                {invoice.billingNumber}
+                                            </p>
+                                        )
                                     )}
                                 </button>
-                                <p className="truncate text-xs font-black text-white">
-                                    {money(invoice.amount, hideAmount)}
+                            </td>
+
+                            <td className="px-3 py-3 align-top">
+                                {invoice.jobOrderNumber ? (
+                                    <span className="inline-flex truncate rounded-lg border border-yellow-400/20 bg-yellow-400/5 px-2 py-0.5 text-[10px] font-bold text-yellow-600 dark:text-yellow-400">
+                                        {invoice.jobOrderNumber}
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] text-slate-600">
+                                        —
+                                    </span>
+                                )}
+                            </td>
+
+                            <td className="px-3 py-3 align-top">
+                                <p className="truncate text-[11px] font-semibold text-gray-800 dark:text-slate-200">
+                                    {invoice.client}
                                 </p>
-                            </div>
-                        </td>
+                                {invoice.clientEmail && (
+                                    <p
+                                        className={[
+                                            "mt-0.5 truncate text-[10px]",
+                                            invoice.status === "Approved"
+                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                : "text-slate-600",
+                                        ].join(" ")}
+                                        title={
+                                            invoice.status === "Approved"
+                                                ? invoice.clientEmail
+                                                : undefined
+                                        }
+                                    >
+                                        {displayClientEmail(
+                                            invoice.clientEmail,
+                                            invoice.status,
+                                        )}
+                                    </p>
+                                )}
+                            </td>
 
-                        <td className="px-3 py-3 align-top">
-                            <p className="truncate text-[11px] text-slate-300">
-                                {formatDate(invoice.dueDate)}
-                            </p>
-                        </td>
+                            <td className="px-3 py-3 align-top">
+                                <p className="truncate text-[11px] text-gray-700 dark:text-slate-300">
+                                    {invoice.project}
+                                </p>
+                            </td>
 
-                        <td className="px-3 py-3 text-center align-top">
-                            <StatusBadge status={invoice.status} />
-                        </td>
+                            {/* ✅ SERVICE DATE = MONTHLY (billing records) */}
+                            {showServiceMonth && (
+                                <td className="px-3 py-3 align-top">
+                                    {invoice.serviceMonth ? (
+                                        <div className="flex items-start gap-1.5">
+                                            <CalendarDays
+                                                size={12}
+                                                className="mt-0.5 shrink-0 text-slate-600"
+                                            />
+                                            <div className="min-w-0">
+                                                <p className="truncate text-[11px] font-semibold text-gray-800 dark:text-slate-200">
+                                                    {formatMonth(
+                                                        invoice.serviceMonth,
+                                                    )}
+                                                </p>
+                                                {invoice.billingSequence && (
+                                                    <p className="mt-0.5 truncate text-[10px] text-slate-600">
+                                                        Month{" "}
+                                                        {
+                                                            invoice.billingSequence
+                                                        }
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-slate-600">
+                                            —
+                                        </span>
+                                    )}
+                                </td>
+                            )}
 
-                        <td className="px-3 py-3 align-top">
-                            <InvoiceActions
-                                invoice={invoice}
-                                onView={onView}
-                                onPrint={onPrint}
-                                onDownload={onDownload}
-                                onSendEmail={onSendEmail}
-                                isSendingEmail={isSendingEmail}
-                            />
-                        </td>
-                    </tr>
-                ))}
+                            <td className="px-3 py-3 align-top">
+                                <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={onToggleHideAmount}
+                                        aria-label={
+                                            hideAmount
+                                                ? "Show amounts"
+                                                : "Hide amounts"
+                                        }
+                                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-500 dark:text-slate-500 transition hover:text-yellow-600 dark:hover:text-yellow-400"
+                                    >
+                                        {hideAmount ? (
+                                            <EyeOff size={12} />
+                                        ) : (
+                                            <Eye size={12} />
+                                        )}
+                                    </button>
+                                    <div className="min-w-0 text-right">
+                                        <p className="truncate text-xs font-black text-gray-900 dark:text-white">
+                                            {money(invoice.amount, hideAmount)}
+                                        </p>
+                                        {hasBreakdown && (
+                                            <p className="mt-0.5 truncate text-[10px] text-slate-600">
+                                                base{" "}
+                                                {money(
+                                                    invoice.baseAmount ?? 0,
+                                                    hideAmount,
+                                                )}
+                                                {(invoice.additionalCharges ??
+                                                    0) > 0 && (
+                                                    <>
+                                                        {" + "}
+                                                        {money(
+                                                            invoice.additionalCharges ??
+                                                                0,
+                                                            hideAmount,
+                                                        )}
+                                                    </>
+                                                )}
+                                                {(invoice.vatAmount ?? 0) >
+                                                    0 && (
+                                                    <>
+                                                        {" + VAT "}
+                                                        {money(
+                                                            invoice.vatAmount ??
+                                                                0,
+                                                            hideAmount,
+                                                        )}
+                                                    </>
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td className="px-3 py-3 align-top">
+                                <p className="truncate text-[11px] text-gray-700 dark:text-slate-300">
+                                    {formatDate(invoice.dueDate)}
+                                </p>
+                            </td>
+
+                            <td className="px-3 py-3 text-center align-top">
+                                <StatusBadge status={invoice.status} />
+                            </td>
+
+                            <td className="px-3 py-3 align-top">
+                                <InvoiceActions
+                                    invoice={invoice}
+                                    onView={onView}
+                                    onPrint={onPrint}
+                                    onDownload={onDownload}
+                                    onSendEmail={onSendEmail}
+                                    isSendingEmail={isSendingEmail}
+                                />
+                            </td>
+                        </tr>
+                    );
+                })}
             </tbody>
         </table>
     );
@@ -2530,15 +3016,21 @@ function InvoiceActions({
                     ref={buttonRef}
                     type="button"
                     onClick={() => setOpen((current) => !current)}
-                    aria-label={`Actions for ${invoice.number}`}
+                    aria-label={`Actions for ${
+                        invoice.status === "Approved"
+                            ? (invoice.number ??
+                              invoice.billingNumber ??
+                              invoice.id)
+                            : (invoice.billingNumber ?? invoice.id)
+                    }`}
                     aria-expanded={open}
                     className={[
                         "inline-flex h-8 w-8 items-center justify-center rounded-lg",
-                        "border border-slate-700 bg-slate-950 text-slate-400",
+                        "border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 text-gray-500 dark:text-slate-400",
                         "transition-all duration-200",
-                        "hover:border-yellow-400/40 hover:bg-slate-800 hover:text-yellow-400",
+                        "hover:border-yellow-400/40 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-yellow-600 dark:hover:text-yellow-400",
                         open
-                            ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
+                            ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
                             : "",
                     ].join(" ")}
                 >
@@ -2548,13 +3040,13 @@ function InvoiceActions({
             {open && (
                 <div
                     ref={menuRef}
-                    className="fixed z-[9999] w-48 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl shadow-black/50"
+                    className="fixed z-[9999] w-48 overflow-hidden rounded-2xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 shadow-2xl shadow-black/50"
                     style={{
                         top: `${menuPosition.top}px`,
                         left: `${menuPosition.left}px`,
                     }}
                 >
-                    <div className="border-b border-slate-800 px-4 py-2.5">
+                    <div className="border-b border-gray-200 dark:border-slate-800 px-4 py-2.5">
                         <p className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-slate-600">
                             Invoice Actions
                         </p>
@@ -2581,7 +3073,7 @@ function InvoiceActions({
                                 isSendingEmail ? "Sending..." : "Send to Client"
                             }
                             onClick={() => action(() => onSendEmail(invoice))}
-                            className="text-blue-400 hover:bg-blue-400/10"
+                            className="text-blue-600 dark:text-blue-400 hover:bg-blue-400/10"
                             disabled={isSendingEmail}
                         />
                     )}
@@ -2610,7 +3102,7 @@ function ActionItem({
             onClick={onClick}
             disabled={disabled}
             className={[
-                "flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-300 transition hover:bg-yellow-400/10 hover:text-yellow-400 disabled:cursor-not-allowed disabled:opacity-50",
+                "flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-slate-300 transition hover:bg-yellow-400/10 hover:text-yellow-600 dark:hover:text-yellow-400 disabled:cursor-not-allowed disabled:opacity-50",
                 className,
             ].join(" ")}
         >
@@ -2621,24 +3113,34 @@ function ActionItem({
 
 function StatusBadge({ status }: { status: string }) {
     const normalized = status.toLowerCase();
-    let classes = "border-slate-700 bg-slate-800/60 text-slate-300";
+    let classes =
+        "border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800/60 text-gray-700 dark:text-slate-300";
 
     const statusMap: Record<string, string> = {
-        pending: "border-yellow-400/20 bg-yellow-400/10 text-yellow-400",
-        partial: "border-orange-400/20 bg-orange-400/10 text-orange-400",
-        paid: "border-emerald-400/20 bg-emerald-400/10 text-emerald-400",
-        overdue: "border-red-400/20 bg-red-400/10 text-red-400",
-        rejected: "border-red-400/20 bg-red-400/10 text-red-400",
-        approved: "border-blue-400/20 bg-blue-400/10 text-blue-400",
-        generated: "border-emerald-400/20 bg-emerald-400/10 text-emerald-400",
-        // ✅ Ituring na Generated ang "Pending Admin Approval"
+        pending:
+            "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400",
+        partial:
+            "border-orange-400/20 bg-orange-400/10 text-orange-600 dark:text-orange-400",
+        paid: "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400",
+        overdue:
+            "border-red-400/20 bg-red-400/10 text-red-600 dark:text-red-400",
+        rejected:
+            "border-red-400/20 bg-red-400/10 text-red-600 dark:text-red-400",
+        approved:
+            "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400",
+        generated:
+            "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400",
+        /* ✅ BILLING STATUS */
+        created:
+            "border-yellow-400/20 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400",
+        completed:
+            "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400",
         "pending admin approval":
-            "border-emerald-400/20 bg-emerald-400/10 text-emerald-400",
+            "border-emerald-400/20 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400",
     };
 
     classes = statusMap[normalized] || classes;
 
-    // ✅ Ipakita as "Generated" kapag "Pending Admin Approval"
     const displayStatus =
         normalized === "pending admin approval"
             ? "Generated"
@@ -2663,30 +3165,142 @@ function JobOrderDetails({
     jobOrder: JobOrder;
     hideAmount: boolean;
 }) {
-    const generated = isJobOrderGenerated(jobOrder);
+    const quotationTotal = getQuotationTotal(jobOrder);
+    const billingMonths = getBillingMonths(jobOrder);
+    const monthlyAmount = getMonthlyAmount(jobOrder);
+    const billedCount = getBilledCount(jobOrder);
+    const totalBilled = getTotalBilled(jobOrder);
+    const remainingAmount = Math.max(0, quotationTotal - totalBilled);
+    const billings = getJobOrderBillings(jobOrder);
+    const progress =
+        billingMonths > 0
+            ? Math.min(100, Math.round((billedCount / billingMonths) * 100))
+            : 0;
+    const fullyBilled = isFullyBilled(jobOrder);
 
     return (
         <div className="space-y-5">
-            <div className="rounded-2xl border border-yellow-400/10 bg-slate-950/70 p-5">
+            <div className="rounded-2xl border border-yellow-400/10 bg-gray-50 dark:bg-slate-950/70 p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <p className="text-xs font-black uppercase tracking-wider text-slate-600">
                             Job Order Number
                         </p>
-                        <p className="mt-1 text-2xl font-black text-yellow-400">
+                        <p className="mt-1 text-2xl font-black text-yellow-600 dark:text-yellow-400">
                             {getJobOrderNumber(jobOrder)}
                         </p>
                     </div>
-                    <StatusBadge
-                        status={
-                            generated ||
-                            String(jobOrder.status ?? "").toLowerCase() ===
-                                "pending admin approval"
-                                ? "Generated"
-                                : (jobOrder.status ?? "Pending")
-                        }
-                    />
+                    <StatusBadge status={jobOrder.status ?? "Pending"} />
                 </div>
+            </div>
+
+            {/* ✅ APPROVED QUOTATION — monthly billing basis */}
+            <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/[0.06] p-5">
+                <div className="flex items-center gap-2">
+                    <StickyNote
+                        size={18}
+                        className="text-yellow-600 dark:text-yellow-400"
+                    />
+                    <p className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                        Approved Quotation
+                    </p>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                            Total Amount
+                        </p>
+                        <p className="mt-1 text-base font-black text-gray-900 dark:text-white">
+                            {money(quotationTotal, hideAmount)}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                            Months
+                        </p>
+                        <p className="mt-1 text-base font-black text-gray-900 dark:text-white">
+                            {billingMonths > 0
+                                ? `${billingMonths} month${
+                                      billingMonths > 1 ? "s" : ""
+                                  }`
+                                : "—"}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                            Monthly Amount
+                        </p>
+                        <p className="mt-1 text-base font-black text-yellow-600 dark:text-yellow-400">
+                            {monthlyAmount > 0
+                                ? money(monthlyAmount, hideAmount)
+                                : "—"}
+                        </p>
+                    </div>
+                </div>
+
+                {billingMonths > 0 && (
+                    <div className="mt-4">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                            <span className="text-gray-700 dark:text-slate-300">
+                                {billedCount} of {billingMonths} month
+                                {billingMonths > 1 ? "s" : ""} billed
+                            </span>
+                            <span
+                                className={[
+                                    "font-black",
+                                    fullyBilled
+                                        ? "text-emerald-600 dark:text-emerald-400"
+                                        : "text-yellow-600 dark:text-yellow-400",
+                                ].join(" ")}
+                            >
+                                {fullyBilled
+                                    ? "Completed"
+                                    : `${formatMonth(
+                                          getNextBillableMonth(jobOrder),
+                                      )} — next`}
+                            </span>
+                        </div>
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-slate-800">
+                            <div
+                                className={[
+                                    "h-full rounded-full transition-all",
+                                    fullyBilled
+                                        ? "bg-emerald-500"
+                                        : "bg-yellow-400",
+                                ].join(" ")}
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-slate-600">
+                            <span>
+                                Total Billed:{" "}
+                                <span className="font-black text-gray-800 dark:text-slate-200">
+                                    {money(totalBilled, hideAmount)}
+                                </span>
+                            </span>
+                            <span>
+                                Remaining:{" "}
+                                <span className="font-black text-gray-800 dark:text-slate-200">
+                                    {money(remainingAmount, hideAmount)}
+                                </span>
+                            </span>
+                        </div>
+
+                        {/* ✅ VERIFICATION COUNTS */}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-yellow-400/25 bg-yellow-400/5 px-2 py-0.5 text-[10px] font-bold text-yellow-600 dark:text-yellow-400">
+                                Pending: {jobOrder.pendingCount ?? 0}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/25 bg-emerald-400/5 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                Approved: {jobOrder.approvedCount ?? 0}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-red-400/25 bg-red-400/5 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:text-red-400">
+                                Rejected: {jobOrder.rejectedCount ?? 0}
+                            </span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -2718,33 +3332,81 @@ function JobOrderDetails({
                     label="End Date"
                     value={formatDate(jobOrder.endDate)}
                 />
-                <DetailBox
-                    label="Amount"
-                    value={money(getJobOrderAmount(jobOrder), hideAmount)}
-                    highlight
-                />
-                <DetailBox
-                    label="Invoice"
-                    value={
-                        jobOrder.invoiceNumber ??
-                        jobOrder.invoice?.number ??
-                        "Not generated"
-                    }
-                    highlight={Boolean(
-                        jobOrder.invoiceNumber ?? jobOrder.invoice?.number,
-                    )}
-                />
             </div>
+
+            {/* ✅ MONTHLY BILLING HISTORY */}
+            {billings.length > 0 && (
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60">
+                    <div className="border-b border-gray-200 dark:border-slate-800 px-5 py-4">
+                        <p className="text-xs font-black uppercase tracking-wider text-slate-600">
+                            Monthly Billing History
+                        </p>
+                    </div>
+                    <ul className="divide-y divide-gray-200 dark:divide-slate-800">
+                        {billings.map((billing) => (
+                            <li
+                                key={billing.id}
+                                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+                            >
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <CalendarDays
+                                        size={15}
+                                        className="shrink-0 text-slate-600"
+                                    />
+                                    <div className="min-w-0">
+                                        <p className="truncate text-xs font-black text-gray-900 dark:text-white">
+                                            {formatMonth(billing.serviceMonth)}
+                                        </p>
+                                        <p className="truncate text-[10px] text-slate-600">
+                                            {billing.billingNumber ??
+                                                `#${billing.id}`}
+                                            {billing.billingSequence
+                                                ? ` · Month ${billing.billingSequence}`
+                                                : ""}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="text-right">
+                                        <span className="text-xs font-black text-gray-900 dark:text-white">
+                                            {money(
+                                                billing.totalAmount ??
+                                                    billing.amount,
+                                                hideAmount,
+                                            )}
+                                        </span>
+                                        {(billing.vatAmount ?? 0) > 0 &&
+                                            (billing.additionalCharges ?? 0) >
+                                                0 && (
+                                                <span className="block text-[10px] text-slate-600">
+                                                    base{" "}
+                                                    {money(
+                                                        billing.baseAmount ?? 0,
+                                                        hideAmount,
+                                                    )}
+                                                </span>
+                                            )}
+                                    </div>
+                                    <StatusBadge status={billing.status} />
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
 
             {jobOrder.rejectionReason && (
                 <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5">
                     <div className="flex items-start gap-3">
-                        <Ban size={20} className="mt-0.5 text-red-400" />
+                        <Ban
+                            size={20}
+                            className="mt-0.5 text-red-600 dark:text-red-400"
+                        />
                         <div>
-                            <p className="font-bold text-red-400">
+                            <p className="font-bold text-red-600 dark:text-red-400">
                                 Rejection Reason
                             </p>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-slate-300">
                                 {jobOrder.rejectionReason}
                             </p>
                         </div>
@@ -2753,22 +3415,22 @@ function JobOrderDetails({
             )}
 
             {jobOrder.description && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-5">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-600">
                         Description
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-300">
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-gray-700 dark:text-slate-300">
                         {jobOrder.description}
                     </p>
                 </div>
             )}
 
             {jobOrder.notes && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-5">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-600">
                         Notes
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-300">
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-gray-700 dark:text-slate-300">
                         {jobOrder.notes}
                     </p>
                 </div>
@@ -2779,13 +3441,13 @@ function JobOrderDetails({
                     <div className="flex items-start gap-3">
                         <CheckCircle2
                             size={20}
-                            className="mt-0.5 text-emerald-400"
+                            className="mt-0.5 text-emerald-600 dark:text-emerald-400"
                         />
                         <div>
-                            <p className="font-bold text-emerald-400">
+                            <p className="font-bold text-emerald-600 dark:text-emerald-400">
                                 Job Order Submitted
                             </p>
-                            <p className="mt-1 text-sm text-slate-400">
+                            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                                 Submitted on{" "}
                                 {formatDateTime(jobOrder.generatedAt)}
                             </p>
@@ -2817,48 +3479,162 @@ function InvoiceDetails({
     isSendingEmail?: boolean;
     hideAmount: boolean;
 }) {
+    const hasBreakdown =
+        (invoice.vatAmount ?? 0) > 0 || (invoice.additionalCharges ?? 0) > 0;
+    const baseAmount = invoice.baseAmount ?? invoice.amount;
+    const vatAmount = invoice.vatAmount ?? 0;
+    const additionalCharges = invoice.additionalCharges ?? 0;
     const totalSales = invoice.amount;
-    const vatAmount = totalSales * VAT_RATE;
-    const netOfVAT = totalSales;
     const withholdingTax = 0;
-    const totalAmountDue = netOfVAT + vatAmount;
-
-    const invoiceType = invoice.items.some(
-        (item) =>
-            item.description?.toLowerCase().includes("equipment") ||
-            item.description?.toLowerCase().includes("logistics") ||
-            item.description?.toLowerCase().includes("service"),
-    )
-        ? "Service Invoice"
-        : "Sales Invoice";
+    const totalAmountDue = invoice.totalAmount ?? invoice.amount;
 
     const isApproved = invoice.status === "Approved";
 
+    /* Para sa items table lang (Billing Record vs Service Invoice) */
+    const itemLabel = isApproved ? "Service Invoice Items" : "Billing Items";
+
     return (
         <div className="space-y-5">
-            <div className="rounded-2xl border border-yellow-400/10 bg-slate-950/70 p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
+            <div className="rounded-2xl border border-yellow-400/10 bg-gray-50 dark:bg-slate-950/70 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                        {/*
+                        |--------------------------------------------------------------
+                        | ✅ WALANG "Invoice" label sa taas ng Billing Record.
+                        | Billing Record  → "Billing Record" + Billing No.
+                        | Service Invoice → "Service Invoice" + Invoice No.
+                        |--------------------------------------------------------------
+                        */}
                         <p className="text-xs font-black uppercase tracking-wider text-slate-600">
-                            {invoiceType}
+                            {isApproved ? "Service Invoice" : "Billing Record"}
                         </p>
-                        <p className="mt-1 text-2xl font-black text-yellow-400">
-                            {invoice.number}
-                        </p>
+
+                        {isApproved ? (
+                            <>
+                                <p className="mt-1 text-2xl font-black text-yellow-600 dark:text-yellow-400">
+                                    {invoice.number ?? "—"}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
+                                    {invoice.billingNumber && (
+                                        <span>
+                                            Billing No.:{" "}
+                                            <span className="font-bold text-gray-700 dark:text-slate-300">
+                                                {invoice.billingNumber}
+                                            </span>
+                                        </span>
+                                    )}
+                                    {invoice.jobOrderNumber && (
+                                        <span>
+                                            Job Order:{" "}
+                                            <span className="font-bold text-gray-700 dark:text-slate-300">
+                                                {invoice.jobOrderNumber}
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="mt-1 text-2xl font-black text-yellow-600 dark:text-yellow-400">
+                                    {invoice.billingNumber ?? "—"}
+                                </p>
+                                {invoice.jobOrderNumber && (
+                                    <p className="mt-1 text-[11px] text-slate-600">
+                                        Job Order:{" "}
+                                        <span className="font-bold text-gray-700 dark:text-slate-300">
+                                            {invoice.jobOrderNumber}
+                                        </span>
+                                    </p>
+                                )}
+                                <p className="mt-2 rounded-lg border border-yellow-400/20 bg-yellow-400/[0.06] px-2.5 py-1.5 text-[11px] text-slate-600">
+                                    Walang invoice number pa. Magigigawa ito pag
+                                    na-approve ng admin.
+                                </p>
+                            </>
+                        )}
                     </div>
                     <StatusBadge status={invoice.status} />
                 </div>
             </div>
 
+            {/* ✅ BILLING BREAKDOWN */}
+            {hasBreakdown && (
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-5">
+                    <p className="mb-3 text-xs font-black uppercase tracking-wider text-slate-600">
+                        Billing Breakdown
+                    </p>
+                    <dl className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                            <dt className="text-slate-600">Base Amount</dt>
+                            <dd className="font-bold text-gray-900 dark:text-white">
+                                {money(baseAmount, hideAmount)}
+                            </dd>
+                        </div>
+                        {additionalCharges > 0 && (
+                            <div className="flex items-center justify-between gap-3">
+                                <dt className="text-slate-600">
+                                    Additional Charges
+                                </dt>
+                                <dd className="font-bold text-blue-600 dark:text-blue-400">
+                                    + {money(additionalCharges, hideAmount)}
+                                </dd>
+                            </div>
+                        )}
+                        {vatAmount > 0 && (
+                            <div className="flex items-center justify-between gap-3">
+                                <dt className="text-slate-600">
+                                    VAT ({invoice.vatRate ?? 12}%)
+                                </dt>
+                                <dd className="font-bold text-emerald-600 dark:text-emerald-400">
+                                    + {money(vatAmount, hideAmount)}
+                                </dd>
+                            </div>
+                        )}
+                    </dl>
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-200 dark:border-slate-800 pt-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                            Grand Total
+                        </span>
+                        <span className="text-lg font-black text-yellow-600 dark:text-yellow-400">
+                            {money(totalSales, hideAmount)}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ SERVICE DATE (monthly) + MONTH SEQUENCE */}
+            {invoice.serviceMonth && (
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-yellow-400/30 bg-yellow-400/[0.06] px-5 py-4">
+                    <CalendarDays
+                        size={18}
+                        className="shrink-0 text-yellow-600 dark:text-yellow-400"
+                    />
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                            Service Date
+                        </p>
+                        <p className="text-sm font-black text-gray-900 dark:text-white">
+                            {formatMonth(invoice.serviceMonth)}
+                            {invoice.billingSequence
+                                ? ` · Month ${invoice.billingSequence}`
+                                : ""}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {invoice.sentAt && (
                 <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5">
                     <div className="flex items-start gap-3">
-                        <Mail size={20} className="mt-0.5 text-blue-400" />
+                        <Mail
+                            size={20}
+                            className="mt-0.5 text-blue-600 dark:text-blue-400"
+                        />
                         <div>
-                            <p className="font-bold text-blue-400">
+                            <p className="font-bold text-blue-600 dark:text-blue-400">
                                 Sent to Client
                             </p>
-                            <p className="mt-1 text-sm text-slate-400">
+                            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                                 Sent on {formatDateTime(invoice.sentAt)}
                             </p>
                             {invoice.sentBy && (
@@ -2874,12 +3650,15 @@ function InvoiceDetails({
             {invoice.status === "Rejected" && invoice.rejectionReason && (
                 <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5">
                     <div className="flex items-start gap-3">
-                        <Ban size={20} className="mt-0.5 text-red-400" />
+                        <Ban
+                            size={20}
+                            className="mt-0.5 text-red-600 dark:text-red-400"
+                        />
                         <div>
-                            <p className="font-bold text-red-400">
+                            <p className="font-bold text-red-600 dark:text-red-400">
                                 Rejection Reason
                             </p>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-slate-300">
                                 {invoice.rejectionReason}
                             </p>
                             {invoice.rejectedAt && (
@@ -2914,14 +3693,15 @@ function InvoiceDetails({
             {invoice.status === "Approved" && invoice.approvedAt && (
                 <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5">
                     <div className="flex items-start gap-3">
-                        <CheckCircle2                            size={20}
-                            className="mt-0.5 text-blue-400"
+                        <CheckCircle2
+                            size={20}
+                            className="mt-0.5 text-blue-600 dark:text-blue-400"
                         />
                         <div>
-                            <p className="font-bold text-blue-400">
+                            <p className="font-bold text-blue-600 dark:text-blue-400">
                                 Invoice Approved
                             </p>
-                            <p className="mt-1 text-sm text-slate-400">
+                            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                                 Approved on {formatDateTime(invoice.approvedAt)}
                             </p>
                             {invoice.approvedBy && (
@@ -2993,44 +3773,40 @@ function InvoiceDetails({
                 />
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-800">
-                <div className="border-b border-slate-800 bg-slate-950 px-5 py-4">
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">
-                        {invoiceType} Items
+            <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
+                <div className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 px-5 py-4">
+                    <p className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                        {itemLabel}
                     </p>
                 </div>
 
-                <div className="grid grid-cols-12 gap-2 border-b border-slate-800 bg-slate-950/50 px-5 py-3 text-xs font-black uppercase tracking-wider text-slate-500">
+                <div className="grid grid-cols-12 gap-2 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 px-5 py-3 text-xs font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                     <div className="col-span-1">Qty</div>
                     <div className="col-span-5">
-                        {invoiceType === "Service Invoice"
-                            ? "Description"
-                            : "Particulars"}
+                        {isApproved ? "Description" : "Particulars"}
                     </div>
                     <div className="col-span-2 text-right">
-                        {invoiceType === "Service Invoice"
-                            ? "Unit Cost"
-                            : "Unit Price"}
+                        {isApproved ? "Unit Cost" : "Unit Price"}
                     </div>
                     <div className="col-span-4 text-right">Amount</div>
                 </div>
 
-                <div className="divide-y divide-slate-800">
+                <div className="divide-y divide-gray-200 dark:divide-slate-800">
                     {invoice.items.map((item) => (
                         <div
                             key={item.id}
                             className="grid grid-cols-12 gap-2 px-5 py-4"
                         >
-                            <div className="col-span-1 font-semibold text-slate-300">
+                            <div className="col-span-1 font-semibold text-gray-700 dark:text-slate-300">
                                 {item.quantity}
                             </div>
-                            <div className="col-span-5 text-slate-200">
+                            <div className="col-span-5 text-gray-800 dark:text-slate-200">
                                 {item.description}
                             </div>
-                            <div className="col-span-2 text-right text-slate-300">
+                            <div className="col-span-2 text-right text-gray-700 dark:text-slate-300">
                                 {money(item.unitPrice, hideAmount)}
                             </div>
-                            <div className="col-span-4 text-right font-bold text-white">
+                            <div className="col-span-4 text-right font-bold text-gray-900 dark:text-white">
                                 {money(
                                     item.quantity * item.unitPrice,
                                     hideAmount,
@@ -3040,63 +3816,81 @@ function InvoiceDetails({
                     ))}
                 </div>
 
-                <div className="border-t border-slate-800 bg-slate-950/50 px-5 py-4">
+                <div className="border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/50 px-5 py-4">
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <span className="font-bold uppercase tracking-wide text-slate-400">
-                                Total Sales
+                            <span className="font-bold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                                Base Amount
                             </span>
-                            <span className="text-lg font-bold text-white">
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
+                                {money(baseAmount, hideAmount)}
+                            </span>
+                        </div>
+
+                        {additionalCharges > 0 && (
+                            <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3">
+                                <span className="font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                                    Additional Charges
+                                </span>
+                                <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                    + {money(additionalCharges, hideAmount)}
+                                </span>
+                            </div>
+                        )}
+
+                        <div
+                            className={[
+                                "flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3",
+                                vatAmount > 0 ? "" : "opacity-40",
+                            ].join(" ")}
+                        >
+                            <div className="flex items-center gap-2">
+                                <Percent
+                                    size={16}
+                                    className="text-yellow-600 dark:text-yellow-400"
+                                />
+                                <span className="font-bold uppercase tracking-wide text-yellow-600 dark:text-yellow-400">
+                                    VAT ({invoice.vatRate ?? 12}%)
+                                </span>
+                            </div>
+                            <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
+                                {vatAmount > 0
+                                    ? `+ ${money(vatAmount, hideAmount)}`
+                                    : "—"}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3">
+                            <div className="flex items-center gap-2">
+                                <Calculator
+                                    size={16}
+                                    className="text-gray-500 dark:text-slate-400"
+                                />
+                                <span className="font-bold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+                                    Total Sales
+                                </span>
+                            </div>
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
                                 {money(totalSales, hideAmount)}
                             </span>
                         </div>
 
-                        <div className="flex items-center justify-between border-t border-slate-800/50 pt-3">
-                            <div className="flex items-center gap-2">
-                                <Percent
-                                    size={16}
-                                    className="text-yellow-400"
-                                />
-                                <span className="font-bold uppercase tracking-wide text-yellow-400">
-                                    VAT (12%)
-                                </span>
-                            </div>
-                            <span className="text-lg font-bold text-yellow-400">
-                                {money(vatAmount, hideAmount)}
-                            </span>
-                        </div>
-
-                        <div className="flex items-center justify-between border-t border-slate-800/50 pt-3">
-                            <div className="flex items-center gap-2">
-                                <Calculator
-                                    size={16}
-                                    className="text-slate-400"
-                                />
-                                <span className="font-bold uppercase tracking-wide text-slate-400">
-                                    Net of VAT
-                                </span>
-                            </div>
-                            <span className="text-lg font-bold text-white">
-                                {money(netOfVAT, hideAmount)}
-                            </span>
-                        </div>
-
                         {withholdingTax > 0 && (
-                            <div className="flex items-center justify-between border-t border-slate-800/50 pt-3">
-                                <span className="font-bold uppercase tracking-wide text-orange-400">
+                            <div className="flex items-center justify-between border-t border-gray-200 dark:border-slate-800/50 pt-3">
+                                <span className="font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
                                     Withholding Tax
                                 </span>
-                                <span className="text-lg font-bold text-orange-400">
+                                <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
                                     - {money(withholdingTax, hideAmount)}
                                 </span>
                             </div>
                         )}
 
                         <div className="flex items-center justify-between border-t-2 border-yellow-400/30 pt-4">
-                            <span className="text-xl font-black uppercase tracking-wide text-yellow-400">
+                            <span className="text-xl font-black uppercase tracking-wide text-yellow-600 dark:text-yellow-400">
                                 Total Amount Due
                             </span>
-                            <span className="text-2xl font-black text-yellow-400">
+                            <span className="text-2xl font-black text-yellow-600 dark:text-yellow-400">
                                 {money(totalAmountDue, hideAmount)}
                             </span>
                         </div>
@@ -3105,22 +3899,22 @@ function InvoiceDetails({
             </div>
 
             {invoice.description && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-5">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-600">
                         Description
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-300">
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-gray-700 dark:text-slate-300">
                         {invoice.description}
                     </p>
                 </div>
             )}
 
             {invoice.notes && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-5">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-600">
                         Notes
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-300">
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-gray-700 dark:text-slate-300">
                         {invoice.notes}
                     </p>
                 </div>
@@ -3139,14 +3933,16 @@ function DetailBox({
     highlight?: boolean;
 }) {
     return (
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
             <p className="text-[11px] font-black uppercase tracking-wider text-slate-600">
                 {label}
             </p>
             <p
                 className={[
                     "mt-2 break-words text-sm font-semibold",
-                    highlight ? "text-yellow-400" : "text-slate-200",
+                    highlight
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-gray-800 dark:text-slate-200",
                 ].join(" ")}
             >
                 {value}
@@ -3166,16 +3962,980 @@ function EmptyState({
 }) {
     return (
         <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950 text-slate-600">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 text-slate-600">
                 {icon}
             </div>
-            <h3 className="mt-5 text-lg font-black uppercase tracking-wide text-slate-300">
+            <h3 className="mt-5 text-lg font-black uppercase tracking-wide text-gray-700 dark:text-slate-300">
                 {title}
             </h3>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
                 {description}
             </p>
         </div>
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| CREATE BILLING MODAL
+|--------------------------------------------------------------------------
+|
+| Isang billing record kada buwan base sa approved quotation.
+| Halimbawa: quotation ₱90,000 para sa 3 buwan → ₱30,000 kada buwan.
+|
+*/
+
+function CreateBillingModal({
+    jobOrder,
+    hideAmount,
+    isSubmitting,
+    onClose,
+    onSubmit,
+}: {
+    jobOrder: JobOrder;
+    hideAmount: boolean;
+    isSubmitting: boolean;
+    onClose: () => void;
+    onSubmit: (payload: {
+        serviceMonth: string;
+        billingSequence: number | null;
+        baseAmount: number;
+        applyVat: boolean;
+        vatRate: number;
+        applyAdditionalCharges: boolean;
+        additionalCharges: number;
+        totalAmount: number;
+        dueDate: string;
+        description: string;
+        notes: string;
+        quotationTotal: number;
+        billingMonths: number;
+    }) => void;
+}) {
+    const existingMonths = getBillingMonths(jobOrder);
+    const billedMonths = getBilledMonths(jobOrder);
+
+    /*
+    |----------------------------------------------------------------------
+    | ✅ READ-ONLY: galing ito sa ibang department (Sales/Contract)
+    |----------------------------------------------------------------------
+    */
+
+    const total = getQuotationTotal(jobOrder) || getJobOrderAmount(jobOrder);
+    const months = existingMonths > 0 ? existingMonths : 1;
+
+    const [serviceMonth, setServiceMonth] = useState<string>(() =>
+        getNextBillableMonth(jobOrder),
+    );
+    const [amount, setAmount] = useState<string>(() => {
+        const m = existingMonths > 0 ? existingMonths : 1;
+        const t = getQuotationTotal(jobOrder) || getJobOrderAmount(jobOrder);
+        return (t / m).toFixed(2);
+    });
+    const [dueDate, setDueDate] = useState<string>(() => {
+        const month = getNextBillableMonth(jobOrder);
+        if (!month) return "";
+        /* 15th of the FOLLOWING month (UTC-based para walang timezone shift) */
+        const [year, mon] = month.split("-").map(Number);
+        const nextMonthIndex = mon; // mon is 1-based → next month
+        const dueYear = year + Math.floor(nextMonthIndex / 12);
+        const dueMonth = ((nextMonthIndex % 12) + 12) % 12;
+        return `${dueYear}-${String(dueMonth).padStart(2, "0")}-15`;
+    });
+    const [description, setDescription] = useState<string>(() => {
+        const month = getNextBillableMonth(jobOrder);
+        return `Monthly Service — ${formatMonth(month)} — ${
+            jobOrder.project ?? "Service"
+        }`;
+    });
+    const [notes, setNotes] = useState<string>("");
+    const [amountTouched, setAmountTouched] = useState(false);
+
+    /* ✅ VAT + ADDITIONAL CHARGES (checkboxes) */
+    const [applyVat, setApplyVat] = useState(false);
+    const [vatRate, setVatRate] = useState("12");
+    const [applyAdditionalCharges, setApplyAdditionalCharges] = useState(false);
+    const [additionalCharges, setAdditionalCharges] = useState("");
+
+    /* Fallback auto-compute kung walang months mula sa ibang dept */
+    useEffect(() => {
+        if (amountTouched) return;
+        if (existingMonths > 0) return;
+        const t = getQuotationTotal(jobOrder) || getJobOrderAmount(jobOrder);
+        if (!Number.isFinite(t) || t < 0) return;
+        setAmount(t.toFixed(2));
+    }, [existingMonths, amountTouched, jobOrder]);
+
+    /* I-update ang default description pag nagpalit ng Service Date */
+    useEffect(() => {
+        setDescription(
+            `Monthly Service — ${formatMonth(serviceMonth)} — ${
+                jobOrder.project ?? "Service"
+            }`,
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [serviceMonth]);
+
+    const baseAmount = Number(amount);
+
+    /* ✅ LIVE BREAKDOWN — visible habang ginagawa ang billing */
+    const chargeAmount = applyAdditionalCharges
+        ? Number(additionalCharges) || 0
+        : 0;
+    const rate = applyVat ? Number(vatRate) || 0 : 0;
+    const vatAmount = ((baseAmount + chargeAmount) * rate) / 100;
+    const grandTotal = baseAmount + chargeAmount + vatAmount;
+
+    const isDuplicateMonth =
+        Boolean(serviceMonth) && billedMonths.includes(serviceMonth);
+    const isAmountInvalid = !Number.isFinite(baseAmount) || baseAmount < 0;
+    const isChargeInvalid =
+        applyAdditionalCharges &&
+        (!Number.isFinite(chargeAmount) || chargeAmount < 0);
+    const isVatInvalid =
+        applyVat && (!Number.isFinite(rate) || rate < 0 || rate > 100);
+    const canSubmit =
+        Boolean(serviceMonth) &&
+        !isDuplicateMonth &&
+        !isAmountInvalid &&
+        !isChargeInvalid &&
+        !isVatInvalid &&
+        !isSubmitting;
+
+    const handleSubmit = () => {
+        if (!canSubmit) return;
+        onSubmit({
+            serviceMonth,
+            billingSequence: billedMonths.length + 1,
+            baseAmount,
+            applyVat,
+            vatRate: rate,
+            applyAdditionalCharges,
+            additionalCharges: chargeAmount,
+            totalAmount: grandTotal,
+            dueDate,
+            description,
+            notes,
+            quotationTotal: total,
+            billingMonths: months,
+        });
+    };
+
+    const fieldClass =
+        "w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10";
+    const labelClass =
+        "mb-1.5 block text-[11px] font-black uppercase tracking-wider text-slate-600";
+
+    return (
+        <Modal
+            title={`Create Billing — ${getJobOrderNumber(jobOrder)}`}
+            onClose={onClose}
+            size="lg"
+        >
+            <div className="space-y-6">
+                {/* CLIENT INFO */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                            Client
+                        </p>
+                        <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
+                            {jobOrder.client ?? "—"}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                            Project
+                        </p>
+                        <p className="mt-1 truncate text-sm font-bold text-gray-900 dark:text-white">
+                            {jobOrder.project ?? "—"}
+                        </p>
+                    </div>
+                </div>
+
+                {/* ✅ APPROVED QUOTATION — READ ONLY (galing sa ibang dept) */}
+                <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/[0.06] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                            Approved Quotation
+                        </p>
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-gray-300 dark:border-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                            <StickyNote size={10} />
+                            from Sales
+                        </span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                Total Amount
+                            </p>
+                            <p className="mt-1 text-base font-black text-gray-900 dark:text-white">
+                                {money(total, hideAmount)}
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                Months
+                            </p>
+                            <p className="mt-1 text-base font-black text-gray-900 dark:text-white">
+                                {existingMonths > 0
+                                    ? `${existingMonths} month${
+                                          existingMonths > 1 ? "s" : ""
+                                      }`
+                                    : "—"}
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-yellow-400/40 bg-yellow-400/[0.08] p-3">
+                            <label
+                                htmlFor="cb-amount"
+                                className="text-[10px] font-bold uppercase tracking-wider text-slate-600"
+                            >
+                                Monthly Amount
+                            </label>
+                            <input
+                                id="cb-amount"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={amount}
+                                onChange={(event) => {
+                                    setAmountTouched(true);
+                                    setAmount(event.target.value);
+                                }}
+                                className="mt-1 w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1.5 text-base font-black text-yellow-600 dark:text-yellow-400 outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10"
+                            />
+                        </div>
+                    </div>
+
+                    {existingMonths > 0 && (
+                        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-600">
+                            <Calculator size={12} />
+                            Auto-computed: {money(total, hideAmount)} ÷ {months}{" "}
+                            month{months > 1 ? "s" : ""} ={" "}
+                            <span className="font-black text-gray-800 dark:text-slate-200">
+                                {money(total / months, hideAmount)}
+                            </span>
+                            . Puwede mong i-adjust ang Monthly Amount.
+                        </p>
+                    )}
+                </div>
+
+                {/* ✅ VAT + ADDITIONAL CHARGES (checkboxes) */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {/* VAT */}
+                    <div
+                        className={[
+                            "rounded-2xl border p-4 transition",
+                            applyVat
+                                ? "border-emerald-400/40 bg-emerald-400/[0.06]"
+                                : "border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60",
+                        ].join(" ")}
+                    >
+                        <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                                type="checkbox"
+                                checked={applyVat}
+                                onChange={(event) =>
+                                    setApplyVat(event.target.checked)
+                                }
+                                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-emerald-500"
+                            />
+                            <span className="min-w-0">
+                                <span className="block text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                                    Apply VAT
+                                </span>
+                                <span className="mt-0.5 block text-[11px] text-slate-600">
+                                    {applyVat
+                                        ? `+ ${money(vatAmount, hideAmount)}`
+                                        : "Hindi kasama sa total"}
+                                </span>
+                            </span>
+                        </label>
+
+                        {applyVat && (
+                            <div className="mt-3 flex items-center gap-2">
+                                <label
+                                    htmlFor="cb-vat-rate"
+                                    className="text-[10px] font-bold uppercase tracking-wider text-slate-600"
+                                >
+                                    Rate
+                                </label>
+                                <div className="relative w-24">
+                                    <input
+                                        id="cb-vat-rate"
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        value={vatRate}
+                                        onChange={(event) =>
+                                            setVatRate(event.target.value)
+                                        }
+                                        className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1.5 pr-6 text-sm font-black text-emerald-600 dark:text-emerald-400 outline-none transition focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/10"
+                                    />
+                                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs font-black text-slate-500">
+                                        %
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ADDITIONAL CHARGES */}
+                    <div
+                        className={[
+                            "rounded-2xl border p-4 transition",
+                            applyAdditionalCharges
+                                ? "border-blue-400/40 bg-blue-400/[0.06]"
+                                : "border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60",
+                        ].join(" ")}
+                    >
+                        <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                                type="checkbox"
+                                checked={applyAdditionalCharges}
+                                onChange={(event) =>
+                                    setApplyAdditionalCharges(
+                                        event.target.checked,
+                                    )
+                                }
+                                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-blue-500"
+                            />
+                            <span className="min-w-0">
+                                <span className="block text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                                    Additional Charges
+                                </span>
+                                <span className="mt-0.5 block text-[11px] text-slate-600">
+                                    {applyAdditionalCharges
+                                        ? `+ ${money(chargeAmount, hideAmount)}`
+                                        : "Hindi kasama sa total"}
+                                </span>
+                            </span>
+                        </label>
+
+                        {applyAdditionalCharges && (
+                            <div className="mt-3 flex items-center gap-2">
+                                <label
+                                    htmlFor="cb-additional"
+                                    className="text-[10px] font-bold uppercase tracking-wider text-slate-600"
+                                >
+                                    Amount
+                                </label>
+                                <div className="relative flex-1">
+                                    <input
+                                        id="cb-additional"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={additionalCharges}
+                                        onChange={(event) =>
+                                            setAdditionalCharges(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="0.00"
+                                        className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1.5 pr-8 text-sm font-black text-blue-600 dark:text-blue-400 outline-none transition focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/10"
+                                    />
+                                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-500">
+                                        ₱
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ✅ LIVE BREAKDOWN — visible habang ginagawa ang billing */}
+                <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/60 p-4">
+                    <p className="mb-3 text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                        Billing Breakdown
+                    </p>
+
+                    <dl className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                            <dt className="text-slate-600">
+                                Monthly Amount (base)
+                            </dt>
+                            <dd className="font-bold text-gray-900 dark:text-white">
+                                {money(baseAmount, hideAmount)}
+                            </dd>
+                        </div>
+
+                        <div
+                            className={[
+                                "flex items-center justify-between gap-3",
+                                !applyAdditionalCharges ? "opacity-40" : "",
+                            ].join(" ")}
+                        >
+                            <dt className="text-slate-600">
+                                Additional Charges
+                            </dt>
+                            <dd className="font-bold text-blue-600 dark:text-blue-400">
+                                {applyAdditionalCharges
+                                    ? `+ ${money(chargeAmount, hideAmount)}`
+                                    : "—"}
+                            </dd>
+                        </div>
+
+                        <div
+                            className={[
+                                "flex items-center justify-between gap-3",
+                                !applyVat ? "opacity-40" : "",
+                            ].join(" ")}
+                        >
+                            <dt className="text-slate-600">
+                                VAT {applyVat ? `(${rate}%)` : ""}
+                            </dt>
+                            <dd className="font-bold text-emerald-600 dark:text-emerald-400">
+                                {applyVat
+                                    ? `+ ${money(vatAmount, hideAmount)}`
+                                    : "—"}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-200 dark:border-slate-800 pt-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                            Grand Total
+                        </span>
+                        <span className="text-xl font-black text-yellow-600 dark:text-yellow-400">
+                            {money(grandTotal, hideAmount)}
+                        </span>
+                    </div>
+
+                    <p className="mt-2 text-[11px] text-slate-600">
+                        Ang admin ang mag-v-verify:{" "}
+                        <span className="font-bold">
+                            {money(baseAmount, hideAmount)}
+                        </span>{" "}
+                        ang ihihambing sa monthly amount ng Job Order (hindi
+                        kasama ang VAT at charges).
+                    </p>
+                </div>
+
+                {/* SERVICE DATE (MONTHLY) */}
+                <div>
+                    <label htmlFor="cb-service-month" className={labelClass}>
+                        Service Date (Month)
+                    </label>
+                    <input
+                        id="cb-service-month"
+                        type="month"
+                        value={serviceMonth}
+                        onChange={(event) =>
+                            setServiceMonth(event.target.value)
+                        }
+                        className={fieldClass}
+                    />
+                    {isDuplicateMonth && (
+                        <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs font-bold text-red-600 dark:text-red-300">
+                            <AlertTriangle
+                                size={13}
+                                className="mt-0.5 shrink-0"
+                            />
+                            May billing record na para sa{" "}
+                            {formatMonth(serviceMonth)}. Pumili ng ibang buwan.
+                        </p>
+                    )}
+                    {billedMonths.length > 0 && (
+                        <div className="mt-3">
+                            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                Already Billed
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {billedMonths.map((month) => (
+                                    <span
+                                        key={month}
+                                        className="rounded-lg border border-emerald-400/25 bg-emerald-400/5 px-2 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
+                                    >
+                                        {formatMonth(month)}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* DUE DATE */}
+                <div>
+                    <label htmlFor="cb-due" className={labelClass}>
+                        Due Date
+                    </label>
+                    <input
+                        id="cb-due"
+                        type="date"
+                        value={dueDate}
+                        onChange={(event) => setDueDate(event.target.value)}
+                        className={fieldClass}
+                    />
+                </div>
+
+                {/* DESCRIPTION */}
+                <div>
+                    <label htmlFor="cb-desc" className={labelClass}>
+                        Description
+                    </label>
+                    <input
+                        id="cb-desc"
+                        type="text"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        className={fieldClass}
+                    />
+                </div>
+
+                {/* NOTES */}
+                <div>
+                    <label htmlFor="cb-notes" className={labelClass}>
+                        Notes (optional)
+                    </label>
+                    <textarea
+                        id="cb-notes"
+                        rows={3}
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        placeholder="e.g. 50% downpayment, adjustments, ..."
+                        className={[fieldClass, "resize-none"].join(" ")}
+                    />
+                </div>
+
+                {/* TOTAL PREVIEW */}
+                <div className="flex items-center justify-between rounded-2xl border border-yellow-400/30 bg-yellow-400/[0.06] px-5 py-4">
+                    <span className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                        Total Amount to Bill
+                    </span>
+                    <span className="text-lg font-black text-yellow-600 dark:text-yellow-400">
+                        {money(grandTotal, hideAmount)}
+                    </span>
+                </div>
+
+                {/* ACTIONS */}
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isSubmitting}
+                        className="rounded-xl border border-gray-300 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:bg-gray-100 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={!canSubmit}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-black text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <RefreshCw size={16} className="animate-spin" />
+                                Creating...
+                            </>
+                        ) : (
+                            <>
+                                <Wallet size={16} /> Create Billing
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| CREATE JOB ORDER MODAL
+|--------------------------------------------------------------------------
+|
+| Pansamantala — para pa lang sa demo dahil wala pang integration sa
+| ibang department (Sales / Contract). Kapag may integration na, mawawala
+| na itong button.
+|
+*/
+
+function CreateJobOrderModal({
+    isSubmitting,
+    onClose,
+    onSubmit,
+}: {
+    isSubmitting: boolean;
+    onClose: () => void;
+    onSubmit: (payload: {
+        client: string;
+        clientEmail: string;
+        clientContact: string;
+        clientAddress: string;
+        project: string;
+        location: string;
+        equipment: string;
+        operator: string;
+        startDate: string;
+        endDate: string;
+        quotationTotal: number;
+        billingMonths: number;
+        description: string;
+        notes: string;
+    }) => void;
+}) {
+    /* Local "today" — hindi UTC, kasi 12 AM–8 AM PH ay maling araw */
+    const today = useMemo(() => {
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, "0");
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+            now.getDate(),
+        )}`;
+    }, []);
+
+    const [client, setClient] = useState("");
+    const [clientEmail, setClientEmail] = useState("");
+    const [clientContact, setClientContact] = useState("");
+    const [clientAddress, setClientAddress] = useState("");
+    const [project, setProject] = useState("");
+    const [location, setLocation] = useState("");
+    const [equipment, setEquipment] = useState("");
+    const [operator, setOperator] = useState("");
+    const [startDate, setStartDate] = useState(today);
+    const [billingMonths, setBillingMonths] = useState("3");
+    const [quotationTotal, setQuotationTotal] = useState("");
+    const [description, setDescription] = useState("");
+    const [notes, setNotes] = useState("");
+
+    const total = Number(quotationTotal);
+    const months = Number(billingMonths);
+    const monthly = months > 0 ? total / months : 0;
+    /* UTC-based para hindi ma-off-by-one sa timezone (PH = UTC+8) */
+    const endDate = useMemo(() => {
+        if (!startDate || !Number.isFinite(months) || months < 1) return "";
+        const [year, month, day] = startDate.split("-").map(Number);
+        if (!year || !month || !day) return "";
+
+        const targetMonthIndex = month - 1 + months;
+        const targetYear = year + Math.floor(targetMonthIndex / 12);
+        const targetMonth = (((targetMonthIndex % 12) + 12) % 12) + 1;
+
+        /* Clamp sa last day ng target month (Jan 31 + 1 month = Feb 28) */
+        const lastDay = new Date(
+            Date.UTC(targetYear, targetMonth, 0),
+        ).getUTCDate();
+
+        const pad = (n: number) => String(n).padStart(2, "0");
+        return `${targetYear}-${pad(targetMonth)}-${pad(
+            Math.min(day, lastDay),
+        )}`;
+    }, [startDate, months]);
+
+    const isTotalValid = Number.isFinite(total) && total > 0;
+    const isMonthsValid = Number.isFinite(months) && months >= 1;
+    const canSubmit =
+        client.trim().length > 0 &&
+        project.trim().length > 0 &&
+        isTotalValid &&
+        isMonthsValid &&
+        !isSubmitting;
+
+    const handleSubmit = () => {
+        if (!canSubmit) return;
+        onSubmit({
+            client: client.trim(),
+            clientEmail: clientEmail.trim(),
+            clientContact: clientContact.trim(),
+            clientAddress: clientAddress.trim(),
+            project: project.trim(),
+            location: location.trim(),
+            equipment: equipment.trim(),
+            operator: operator.trim(),
+            startDate,
+            endDate,
+            quotationTotal: total,
+            billingMonths: months,
+            description: description.trim(),
+            notes: notes.trim(),
+        });
+    };
+
+    const fieldClass =
+        "w-full rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/10";
+    const labelClass =
+        "mb-1.5 block text-[11px] font-black uppercase tracking-wider text-slate-600";
+
+    return (
+        <Modal title="Create Job Order" onClose={onClose} size="lg">
+            <div className="space-y-6">
+                {/* CLIENT */}
+                <div>
+                    <p className="mb-3 text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                        Client Details
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                            <label htmlFor="cjo-client" className={labelClass}>
+                                Client <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                id="cjo-client"
+                                type="text"
+                                value={client}
+                                onChange={(event) =>
+                                    setClient(event.target.value)
+                                }
+                                placeholder="e.g. San Miguel Corporation"
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="cjo-client-email"
+                                className={labelClass}
+                            >
+                                Client Email
+                            </label>
+                            <input
+                                id="cjo-client-email"
+                                type="email"
+                                value={clientEmail}
+                                onChange={(event) =>
+                                    setClientEmail(event.target.value)
+                                }
+                                placeholder="client@company.com"
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="cjo-client-contact"
+                                className={labelClass}
+                            >
+                                Client Contact
+                            </label>
+                            <input
+                                id="cjo-client-contact"
+                                type="text"
+                                value={clientContact}
+                                onChange={(event) =>
+                                    setClientContact(event.target.value)
+                                }
+                                placeholder="e.g. 0917 123 4567"
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label
+                                htmlFor="cjo-client-address"
+                                className={labelClass}
+                            >
+                                Address
+                            </label>
+                            <input
+                                id="cjo-client-address"
+                                type="text"
+                                value={clientAddress}
+                                onChange={(event) =>
+                                    setClientAddress(event.target.value)
+                                }
+                                placeholder="Quezon City, Metro Manila"
+                                className={fieldClass}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* PROJECT */}
+                <div>
+                    <p className="mb-3 text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                        Project
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                            <label htmlFor="cjo-project" className={labelClass}>
+                                Project Name{" "}
+                                <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                id="cjo-project"
+                                type="text"
+                                value={project}
+                                onChange={(event) =>
+                                    setProject(event.target.value)
+                                }
+                                placeholder="e.g. Road Construction Project"
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="cjo-location"
+                                className={labelClass}
+                            >
+                                Location
+                            </label>
+                            <input
+                                id="cjo-location"
+                                type="text"
+                                value={location}
+                                onChange={(event) =>
+                                    setLocation(event.target.value)
+                                }
+                                placeholder="e.g. Batangas City"
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="cjo-equipment"
+                                className={labelClass}
+                            >
+                                Equipment
+                            </label>
+                            <input
+                                id="cjo-equipment"
+                                type="text"
+                                value={equipment}
+                                onChange={(event) =>
+                                    setEquipment(event.target.value)
+                                }
+                                placeholder="e.g. 2x Dump Truck, 1x Backhoe"
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label
+                                htmlFor="cjo-operator"
+                                className={labelClass}
+                            >
+                                Operator
+                            </label>
+                            <input
+                                id="cjo-operator"
+                                type="text"
+                                value={operator}
+                                onChange={(event) =>
+                                    setOperator(event.target.value)
+                                }
+                                placeholder="e.g. J. Dela Cruz"
+                                className={fieldClass}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* ✅ APPROVED QUOTATION */}
+                <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/[0.06] p-4">
+                    <p className="mb-3 text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                        Approved Quotation
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div>
+                            <label htmlFor="cjo-total" className={labelClass}>
+                                Total Amount{" "}
+                                <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                id="cjo-total"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={quotationTotal}
+                                onChange={(event) =>
+                                    setQuotationTotal(event.target.value)
+                                }
+                                placeholder="90000.00"
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="cjo-months" className={labelClass}>
+                                Number of Months{" "}
+                                <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                id="cjo-months"
+                                type="number"
+                                min="1"
+                                max="120"
+                                value={billingMonths}
+                                onChange={(event) =>
+                                    setBillingMonths(event.target.value)
+                                }
+                                className={fieldClass}
+                            />
+                        </div>
+                        <div>
+                            <p className={labelClass}>Monthly Amount</p>
+                            <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-black text-yellow-600 dark:text-yellow-400">
+                                {monthly > 0 ? money(monthly, false) : "—"}
+                            </div>
+                        </div>
+                    </div>
+                    <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-600">
+                        <CalendarDays size={12} />
+                        {startDate
+                            ? `${formatDate(startDate)} — ${formatDate(endDate)}`
+                            : "Walang start date"}{" "}
+                        · {months || 0} monthly billing record
+                        {months > 1 ? "s" : ""}
+                    </p>
+                </div>
+
+                {/* DESCRIPTION */}
+                <div>
+                    <label htmlFor="cjo-desc" className={labelClass}>
+                        Description
+                    </label>
+                    <textarea
+                        id="cjo-desc"
+                        rows={3}
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        placeholder="Scope of work, deliverables, ..."
+                        className={[fieldClass, "resize-none"].join(" ")}
+                    />
+                </div>
+
+                {/* NOTES */}
+                <div>
+                    <label htmlFor="cjo-notes" className={labelClass}>
+                        Notes (optional)
+                    </label>
+                    <textarea
+                        id="cjo-notes"
+                        rows={2}
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        className={[fieldClass, "resize-none"].join(" ")}
+                    />
+                </div>
+
+                {/* ACTIONS */}
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isSubmitting}
+                        className="rounded-xl border border-gray-300 dark:border-slate-700 px-5 py-3 text-sm font-bold text-gray-700 dark:text-slate-300 transition hover:bg-gray-100 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={!canSubmit}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-black text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <RefreshCw size={16} className="animate-spin" />
+                                Creating...
+                            </>
+                        ) : (
+                            <>
+                                <Plus size={16} /> Create Job Order
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </Modal>
     );
 }
 
@@ -3197,18 +4957,18 @@ function Modal({
         <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm">
             <div
                 className={[
-                    "w-full overflow-hidden rounded-3xl border border-yellow-400/10 bg-slate-900 shadow-2xl",
+                    "w-full overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-slate-900 shadow-2xl",
                     sizeClass,
                 ].join(" ")}
             >
-                <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4 sm:px-6">
-                    <h2 className="text-lg font-black uppercase tracking-wide text-white">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 px-5 py-4 sm:px-6">
+                    <h2 className="text-lg font-black uppercase tracking-wide text-gray-900 dark:text-white">
                         {title}
                     </h2>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-400"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 transition hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                     >
                         <X size={18} />
                     </button>
@@ -3234,18 +4994,11 @@ function PrintPreview({
     const withholdingTax = 0;
     const totalAmountDue = netOfVAT + vatAmount;
 
-    const invoiceType = invoice.items.some(
-        (item) =>
-            item.description?.toLowerCase().includes("equipment") ||
-            item.description?.toLowerCase().includes("logistics") ||
-            item.description?.toLowerCase().includes("service"),
-    )
-        ? "Service Invoice"
-        : "Sales Invoice";
+    const isApproved = invoice.status === "Approved";
 
     return (
         <div className="bg-white p-8 text-slate-900 sm:p-12">
-            <div className="border-b-4 border-slate-900 pb-6">
+            <div className="border-b-4 border-gray-200 dark:border-slate-900 pb-6">
                 <div className="flex items-start justify-between gap-8">
                     <div>
                         <h1 className="text-3xl font-black tracking-wide">
@@ -3254,24 +5007,26 @@ function PrintPreview({
                         <p className="mt-1 text-sm font-bold uppercase tracking-[0.18em] text-slate-600">
                             Heavy Equipment & Logistics
                         </p>
-                        <p className="mt-3 text-xs text-slate-500">
+                        <p className="mt-3 text-xs text-gray-500 dark:text-slate-500">
                             Quezon City, Metro Manila
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
                             VAT Reg. TIN: 123-456-789-000
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                            {invoiceType}
+                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
+                            {isApproved ? "Service Invoice" : "Billing Record"}
                         </p>
                         <p className="mt-1 text-2xl font-black">
-                            {invoice.number}
+                            {isApproved
+                                ? (invoice.number ?? "—")
+                                : (invoice.billingNumber ?? "—")}
                         </p>
-                        <p className="mt-2 text-xs text-slate-500">
+                        <p className="mt-2 text-xs text-gray-500 dark:text-slate-500">
                             Date: {formatDate(invoice.createdAt)}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-slate-500">
                             Due: {formatDate(invoice.dueDate)}
                         </p>
                     </div>
@@ -3280,7 +5035,7 @@ function PrintPreview({
 
             <div className="mt-8 grid grid-cols-2 gap-8">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Bill To
                     </p>
                     <p className="mt-2 text-lg font-black">{invoice.client}</p>
@@ -3304,7 +5059,7 @@ function PrintPreview({
                     )}
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                         Reference
                     </p>
                     <p className="mt-2 text-sm font-bold">
@@ -3393,7 +5148,7 @@ function PrintPreview({
                             {money(withholdingTax, hideAmount)}
                         </span>
                     </div>
-                    <div className="flex justify-between py-4 border-t-2 border-slate-900">
+                    <div className="flex justify-between py-4 border-t-2 border-gray-200 dark:border-slate-900">
                         <span className="text-lg font-black uppercase">
                             Total Amount Due
                         </span>
@@ -3426,16 +5181,16 @@ function PrintPreview({
                 </div>
             )}
 
-            <div className="mt-12 border-t-2 border-slate-900 pt-5">
+            <div className="mt-12 border-t-2 border-gray-200 dark:border-slate-900 pt-5">
                 <div className="flex items-end justify-between gap-8">
                     <div>
                         <p className="text-xs font-bold">ALIBATON</p>
-                        <p className="mt-1 text-[11px] text-slate-500">
+                        <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-500">
                             Heavy Equipment & Logistics Management System
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-slate-500">
                             Status
                         </p>
                         <p className="mt-1 text-sm font-black uppercase">

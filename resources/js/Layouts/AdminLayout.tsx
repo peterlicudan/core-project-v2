@@ -2,6 +2,8 @@ import React, { ReactNode, useState } from "react";
 import { Head, router } from "@inertiajs/react";
 import AdminSidebar from "../Components/Admin/AdminSidebar";
 import IdleWarningModal from "../Components/IdleWarningModal";
+import AdminNotificationBell from "../Components/Admin/AdminNotificationBell";
+
 import { useIdleLogout } from "../Hooks/useIdleLogout";
 
 type AdminLayoutProps = {
@@ -13,39 +15,39 @@ export default function AdminLayout({
     children,
     title = "Admin Panel",
 }: AdminLayoutProps) {
-    const [sidebarCollapsed, setSidebarCollapsed] =
-        useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     /*
     |--------------------------------------------------------------------------
-    | IDLE LOGOUT (5 minutes)
+    | IDLE LOGOUT — 5 MINUTES
     |--------------------------------------------------------------------------
     |
-    | If the admin does nothing (no mouse, no click, no type, no scroll)
-    | for 5 minutes, they will be automatically logged out.
+    | Admin will be logged out after 5 minutes of inactivity.
     |
-    | 1 minute before logout, a warning modal will appear.
+    | Warning appears during the last 1 minute.
     |
-    | NOTE: This is SEPARATE from the staff session.
-    | Admin and staff have independent sessions.
+    | 4:00  → Warning appears
+    | 4:00–5:00 → 60 second countdown
+    | 5:00 → Automatic logout
     |
     */
 
-const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
-    timeout: 5 * 60 * 1000,         // 5 minutes
-    warningDuration: 1 * 60 * 1000, // 1 minute warning
-});
+    const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
+        timeout: 5 * 60 * 1000,
+        warningDuration: 1 * 60 * 1000,
+        logoutUrl: "/admin/logout",
+        redirectUrl: "/admin/login",
+    });
+
     return (
         <>
             <Head title={title} />
 
-            <div className="min-h-screen bg-[#050505] text-white">
+            <div className="min-h-screen bg-gray-50 text-gray-900 transition-colors duration-300 dark:bg-[#050505] dark:text-white">
                 <AdminSidebar
                     collapsed={sidebarCollapsed}
                     onToggle={() =>
-                        setSidebarCollapsed(
-                            (previous) => !previous,
-                        )
+                        setSidebarCollapsed((previous) => !previous)
                     }
                 />
 
@@ -56,13 +58,40 @@ const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout({
                         transition-all
                         duration-300
                         lg:pt-0
-                        ${
-                            sidebarCollapsed
-                                ? "lg:pl-20"
-                                : "lg:pl-72"
-                        }
+                        ${sidebarCollapsed ? "lg:pl-20" : "lg:pl-72"}
                     `}
                 >
+                    {/* GLOBAL ADMIN NOTIFICATION BAR */}
+                    <div
+                        className="
+                            sticky
+                            top-16
+                            z-[55]
+                            flex
+                            h-12
+                            items-center
+                            justify-end
+                            gap-3
+                            border-b
+                            border-gray-200/60
+                            bg-white/70
+                            px-4
+                            backdrop-blur-md
+                            dark:border-white/[0.06]
+                            dark:bg-[#0a0a0a]/70
+                            lg:top-0
+                            lg:px-8
+                        "
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="hidden text-[10px] font-black uppercase tracking-[0.18em] text-gray-400 dark:text-white/25 sm:inline">
+                                Notifications
+                            </span>
+
+                            <AdminNotificationBell />
+                        </div>
+                    </div>
+
                     <div className="min-h-screen">
                         {children}
                     </div>

@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { Head, router } from "@inertiajs/react";
 import AdminLayout from "../../Layouts/AdminLayout";
 
@@ -22,6 +29,8 @@ import {
     Send,
     ShieldCheck,
     Trash2,
+    User,
+    Users,
     X,
     XCircle,
 } from "lucide-react";
@@ -623,21 +632,21 @@ function StatusBadge({
         string
     > = {
         Active:
-            "border-green-400/20 bg-green-400/10 text-green-300",
+            "border-green-400/20 bg-green-400/10 text-green-700 dark:text-green-300",
         Pending:
-            "border-yellow-400/20 bg-yellow-400/10 text-yellow-300",
+            "border-yellow-400/20 bg-yellow-400/10 text-yellow-700 dark:text-yellow-300",
         "Needs Correction":
-            "border-red-400/20 bg-red-400/10 text-red-300",
+            "border-red-400/20 bg-red-400/10 text-red-700 dark:text-red-300",
         "Submitted for Review":
-            "border-blue-400/20 bg-blue-400/10 text-blue-300",
+            "border-blue-400/20 bg-blue-400/10 text-blue-700 dark:text-blue-300",
         "Expiring Soon":
-            "border-orange-400/20 bg-orange-400/10 text-orange-300",
+            "border-orange-400/20 bg-orange-400/10 text-orange-700 dark:text-orange-300",
         Expired:
-            "border-red-400/20 bg-red-400/10 text-red-300",
+            "border-red-400/20 bg-red-400/10 text-red-700 dark:text-red-300",
         Renewed:
-            "border-purple-400/20 bg-purple-400/10 text-purple-300",
+            "border-purple-400/20 bg-purple-400/10 text-purple-700 dark:text-purple-300",
         Archived:
-            "border-zinc-400/20 bg-zinc-400/10 text-zinc-300",
+            "border-zinc-400/20 bg-zinc-400/10 text-gray-700 dark:text-zinc-300",
     };
 
     return (
@@ -664,21 +673,21 @@ function FileRow({
               : "#";
 
     return (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 px-3 py-3">
             <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-yellow-400/20 bg-yellow-400/10 text-yellow-300">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-yellow-400/20 bg-yellow-400/10 text-yellow-700 dark:text-yellow-300">
                     <FileText
                         size={17}
                     />
                 </div>
 
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-white">
+                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
                         {file.file_name ||
                             "Document"}
                     </p>
 
-                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                    <p className="mt-0.5 text-[11px] text-gray-500 dark:text-zinc-500">
                         {file.mime_type ||
                             "File"}
 
@@ -695,7 +704,7 @@ function FileRow({
                 href={downloadUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-300"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs font-semibold text-gray-800 dark:text-zinc-200 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-700 dark:hover:text-yellow-300"
             >
                 <Download
                     size={14}
@@ -726,21 +735,21 @@ function StatCard({
             className={`w-full rounded-2xl border p-4 text-left transition ${
                 active
                     ? "border-yellow-400/30 bg-yellow-400/[0.08]"
-                    : "border-white/10 bg-white/[0.025] hover:border-white/20 hover:bg-white/[0.04]"
+                    : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025] hover:border-gray-300 dark:hover:border-white/20 hover:bg-white dark:hover:bg-white/[0.04]"
             }`}
         >
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <p className="text-xs font-medium text-zinc-500">
+                    <p className="text-xs font-medium text-gray-500 dark:text-zinc-500">
                         {label}
                     </p>
 
-                    <p className="mt-2 text-2xl font-bold text-white">
+                    <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
                         {value}
                     </p>
                 </div>
 
-                <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-2 text-yellow-300">
+                <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/10 p-2 text-yellow-700 dark:text-yellow-300">
                     {icon}
                 </div>
             </div>
@@ -770,8 +779,8 @@ function MenuItem({
                 disabled
                     ? "cursor-not-allowed opacity-40"
                     : danger
-                      ? "text-red-300 hover:bg-red-400/10"
-                      : "text-zinc-200 hover:bg-white/5 hover:text-yellow-300"
+                      ? "text-red-700 dark:text-red-300 hover:bg-red-400/10"
+                      : "text-gray-800 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-yellow-700 dark:hover:text-yellow-300"
             }`}
         >
             {icon}
@@ -788,12 +797,12 @@ function DetailBox({
     value?: React.ReactNode;
 }) {
     return (
-        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/25 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                 {label}
             </p>
 
-            <div className="mt-1 text-sm text-white">
+            <div className="mt-1 text-sm text-gray-900 dark:text-white">
                 {value || "—"}
             </div>
         </div>
@@ -854,6 +863,16 @@ export default function ContractPermitManagement(
     const [menuOpen, setMenuOpen] =
         useState<number | null>(null);
 
+    const [menuCoords, setMenuCoords] =
+        useState<{
+            top: number;
+            left: number;
+        } | null>(null);
+
+    const menuTriggerRefs = useRef<
+        Record<number, HTMLButtonElement | null>
+    >({});
+
     const [confirmDialog, setConfirmDialog] =
         useState<{
             title: string;
@@ -895,51 +914,164 @@ export default function ContractPermitManagement(
     const menuRef =
         useRef<HTMLDivElement | null>(null);
 
+    const menuAnchorRef =
+        useRef<DOMRect | null>(null);
+
     /* =====================================================
-       CLOSE MENU
+       POSITION MENU — malapit sa button, gumagalaw
+       ayon sa tunay na sukat ng menu (hindi na
+       hard-coded na 300px sa taas).
+    ===================================================== */
+
+    useLayoutEffect(() => {
+        if (
+            menuOpen === null ||
+            !menuAnchorRef.current ||
+            !menuRef.current
+        ) {
+            return;
+        }
+
+        const triggerRect = menuAnchorRef.current;
+
+        const menuEl = menuRef.current;
+
+        const menuWidth = menuEl.offsetWidth;
+        const menuHeight = menuEl.offsetHeight;
+
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        const gap = 6;
+        const padding = 12;
+
+        // Kung hindi kasya sa ibaba, try sa itaas.
+        const spaceBelow =
+            viewportHeight - triggerRect.bottom - gap - padding;
+        const spaceAbove = triggerRect.top - gap - padding;
+
+        const openUpward =
+            spaceBelow < menuHeight && spaceAbove > spaceBelow;
+
+        let top = openUpward
+            ? triggerRect.top - gap - menuHeight
+            : triggerRect.bottom + gap;
+
+        // Huwag lumabas sa viewport.
+        if (top < padding) top = padding;
+        if (top + menuHeight > viewportHeight - padding) {
+            top = Math.max(
+                padding,
+                viewportHeight - menuHeight - padding,
+            );
+        }
+
+        // Ikonekta sa gilid ng button.
+        let left = triggerRect.right - menuWidth;
+
+        if (left < padding) left = padding;
+        if (left + menuWidth > viewportWidth - padding) {
+            left = viewportWidth - menuWidth - padding;
+        }
+
+        setMenuCoords({ top, left });
+    }, [menuOpen]);
+
+
+       /* =====================================================
+       CLOSE MENU (outside click + scroll + resize)
     ===================================================== */
 
     useEffect(() => {
-        const handler = (
-            event: MouseEvent,
-        ) => {
+        const handleOutside = (event: MouseEvent) => {
+            const target = event.target as Element;
             if (
-                menuRef.current &&
-                !menuRef.current.contains(
-                    event.target as Node,
-                )
+                !target.closest("[data-admin-action-menu]") &&
+                !target.closest("[data-admin-menu-trigger]")
             ) {
                 setMenuOpen(null);
+                setMenuCoords(null);
             }
         };
 
-        document.addEventListener(
-            "mousedown",
-            handler,
-        );
+        const handleScrollOrResize = (
+            event?: Event,
+        ) => {
+            // Huwag isara kapag ang scroll ay
+            // galing mismo sa loob ng menu.
+            const target = event?.target as
+                | Element
+                | undefined;
+
+            if (
+                target &&
+                target.closest?.(
+                    "[data-admin-action-menu]",
+                )
+            ) {
+                return;
+            }
+
+            setMenuOpen(null);
+            setMenuCoords(null);
+        };
+
+        document.addEventListener("mousedown", handleOutside);
+        window.addEventListener("scroll", handleScrollOrResize, true);
+        window.addEventListener("resize", handleScrollOrResize);
 
         return () => {
-            document.removeEventListener(
-                "mousedown",
-                handler,
+            document.removeEventListener("mousedown", handleOutside);
+            window.removeEventListener(
+                "scroll",
+                handleScrollOrResize,
+                true,
+            );
+            window.removeEventListener(
+                "resize",
+                handleScrollOrResize,
             );
         };
     }, []);
 
-  {/* =====================================================
-    LIVE REFRESH
+           const openMenu = (
+        event: React.MouseEvent<HTMLButtonElement>,
+        recordId: number,
+    ) => {
+        event.stopPropagation();
+
+        if (menuOpen === recordId) {
+            setMenuOpen(null);
+            setMenuCoords(null);
+            return;
+        }
+
+        const button = menuTriggerRefs.current[recordId];
+        if (!button) return;
+
+        // Itinala ang tunay na posisyon ng button.
+        // Ang mismong positioning ay gagawin ng
+        // useLayoutEffect base sa sukat ng menu.
+        menuAnchorRef.current =
+            button.getBoundingClientRect();
+
+        setMenuCoords(null);
+        setMenuOpen(recordId);
+    };
+{/* =====================================================
+    LIVE REFRESH — DISABLED (manual refresh na lang)
 ===================================================== */}
 
-useEffect(() => {
-    const interval = window.setInterval(() => {
-        router.reload();
-        setLastRefresh(new Date());
-    }, 30000);
-
-    return () => {
-        window.clearInterval(interval);
-    };
-}, []);
+// useEffect(() => {
+//     const interval = window.setInterval(() => {
+//         router.reload();
+//         setLastRefresh(new Date());
+//     }, 30000);
+//
+//     return () => {
+//         window.clearInterval(interval);
+//     };
+// }, []);
 
 const reloadContracts = () => {
     router.reload();
@@ -1857,7 +1989,7 @@ const reloadContracts = () => {
         <AdminLayout>
             <Head title="Contract & Permit Management" />
 
-            <div className="min-h-screen bg-black text-white">
+            <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white">
                 <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
                     {/* =====================================
                         HEADER
@@ -1866,20 +1998,20 @@ const reloadContracts = () => {
                     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-300">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-700 dark:text-yellow-300">
                                     <FileCheck2
                                         size={22}
                                     />
                                 </div>
 
                                 <div>
-                                    <h1 className="text-2xl font-bold tracking-tight text-white">
+                                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                                         Contract &
                                         Permit
                                         Management
                                     </h1>
 
-                                    <p className="mt-1 text-sm text-zinc-500">
+                                    <p className="mt-1 text-sm text-gray-500 dark:text-zinc-500">
                                         Review, approve,
                                         monitor, and manage
                                         contracts and
@@ -1895,7 +2027,7 @@ const reloadContracts = () => {
                                 onClick={
                                     reloadContracts
                                 }
-                                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-200 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-300"
+                                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs font-semibold text-gray-800 dark:text-zinc-200 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-700 dark:hover:text-yellow-300"
                             >
                                 <RefreshCw
                                     size={14}
@@ -1910,15 +2042,15 @@ const reloadContracts = () => {
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
                                 </span>
 
-                                <span className="text-[11px] font-medium text-green-300">
+                                <span className="text-[11px] font-medium text-green-700 dark:text-green-300">
                                     Live
                                 </span>
 
-                                <span className="text-[11px] text-zinc-500">
+                                <span className="text-[11px] text-gray-500 dark:text-zinc-500">
                                     •
                                 </span>
 
-                                <span className="text-[11px] text-zinc-500">
+                                <span className="text-[11px] text-gray-500 dark:text-zinc-500">
                                     {lastRefresh.toLocaleTimeString(
                                         "en-PH",
                                     )}
@@ -2091,12 +2223,12 @@ const reloadContracts = () => {
                         FILTER BAR
                     ===================================== */}
 
-                    <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.025] p-3">
+                    <div className="mb-5 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025] p-3">
                         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
                             <div className="relative min-w-0 flex-1">
                                 <Search
                                     size={17}
-                                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600"
+                                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-zinc-600"
                                 />
 
                                 <input
@@ -2111,7 +2243,7 @@ const reloadContracts = () => {
                                         )
                                     }
                                     placeholder="Search client, project, reference, type..."
-                                    className="w-full rounded-xl border border-white/10 bg-black/40 py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-yellow-400/40"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-zinc-600 focus:border-yellow-400/40"
                                 />
                             </div>
 
@@ -2131,7 +2263,7 @@ const reloadContracts = () => {
                                                 | ContractStatus,
                                         )
                                     }
-                                    className="rounded-xl border border-white/10 bg-black px-3 py-2.5 text-xs font-medium text-zinc-200 outline-none focus:border-yellow-400/40"
+                                    className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-3 py-2.5 text-xs font-medium text-gray-800 dark:text-zinc-200 outline-none focus:border-yellow-400/40"
                                 >
                                     <option value="All">
                                         All Status
@@ -2175,7 +2307,7 @@ const reloadContracts = () => {
                                                 | "Permit",
                                         )
                                     }
-                                    className="rounded-xl border border-white/10 bg-black px-3 py-2.5 text-xs font-medium text-zinc-200 outline-none focus:border-yellow-400/40"
+                                    className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black px-3 py-2.5 text-xs font-medium text-gray-800 dark:text-zinc-200 outline-none focus:border-yellow-400/40"
                                 >
                                     <option value="All">
                                         All Types
@@ -2205,17 +2337,17 @@ const reloadContracts = () => {
                                             "All",
                                         );
                                     }}
-                                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                                    className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                                 >
                                     Clear
                                 </button>
                             </div>
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
-                            <p className="text-xs text-zinc-500">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 dark:border-white/5 pt-3">
+                            <p className="text-xs text-gray-500 dark:text-zinc-500">
                                 Showing{" "}
-                                <span className="font-semibold text-zinc-300">
+                                <span className="font-semibold text-gray-700 dark:text-zinc-300">
                                     {
                                         filteredRecords.length
                                     }
@@ -2240,8 +2372,8 @@ const reloadContracts = () => {
                                 }}
                                 className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                                     showArchived
-                                        ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-300"
-                                        : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+                                        ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-700 dark:text-yellow-300"
+                                        : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-white/10"
                                 }`}
                             >
                                 <Archive
@@ -2259,42 +2391,42 @@ const reloadContracts = () => {
                         TABLE
                     ===================================== */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.02]">
                         <div className="overflow-x-auto">
                             <table className="min-w-[1100px] w-full">
                                 <thead>
-                                    <tr className="border-b border-white/10 bg-white/[0.025]">
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                    <tr className="border-b border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.025]">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                             Contract / Permit
                                         </th>
 
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                             Client
                                         </th>
 
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                             Project
                                         </th>
 
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                             Documents
                                         </th>
 
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                             Validity
                                         </th>
 
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                        <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                             Status
                                         </th>
 
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                             Action
                                         </th>
                                     </tr>
                                 </thead>
 
-                                <tbody className="divide-y divide-white/5">
+                                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                     {filteredRecords.length ===
                                     0 ? (
                                         <tr>
@@ -2305,7 +2437,7 @@ const reloadContracts = () => {
                                                 className="px-6 py-16 text-center"
                                             >
                                                 <div className="mx-auto flex max-w-md flex-col items-center">
-                                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-600">
+                                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-zinc-600">
                                                         <FileText
                                                             size={
                                                                 25
@@ -2313,12 +2445,12 @@ const reloadContracts = () => {
                                                         />
                                                     </div>
 
-                                                    <p className="mt-4 text-sm font-semibold text-zinc-300">
+                                                    <p className="mt-4 text-sm font-semibold text-gray-700 dark:text-zinc-300">
                                                         No records
                                                         found
                                                     </p>
 
-                                                    <p className="mt-1 text-xs text-zinc-600">
+                                                    <p className="mt-1 text-xs text-gray-600 dark:text-zinc-600">
                                                         Try changing
                                                         your search
                                                         or filters.
@@ -2367,11 +2499,16 @@ const reloadContracts = () => {
                                                         key={
                                                             record.id
                                                         }
-                                                        className="transition hover:bg-white/[0.025]"
+                                                        className={`transition ${
+                                                            menuOpen ===
+                                                            record.id
+                                                                ? "bg-yellow-400/[0.07] ring-1 ring-inset ring-yellow-400/25"
+                                                                : "hover:bg-gray-100 dark:hover:bg-white/[0.025]"
+                                                        }`}
                                                     >
                                                         <td className="px-4 py-4">
                                                             <div className="flex items-start gap-3">
-                                                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-yellow-400/15 bg-yellow-400/[0.06] text-yellow-300">
+                                                                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-yellow-400/15 bg-yellow-400/[0.06] text-yellow-700 dark:text-yellow-300">
                                                                     {isPermit ? (
                                                                         <ShieldCheck
                                                                             size={
@@ -2388,20 +2525,20 @@ const reloadContracts = () => {
                                                                 </div>
 
                                                                 <div className="min-w-0">
-                                                                    <p className="max-w-[220px] truncate text-sm font-semibold text-white">
+                                                                    <p className="max-w-[220px] truncate text-sm font-semibold text-gray-900 dark:text-white">
                                                                         {getTitle(
                                                                             record,
                                                                         )}
                                                                     </p>
 
-                                                                    <p className="mt-1 text-[11px] text-zinc-500">
+                                                                    <p className="mt-1 text-[11px] text-gray-500 dark:text-zinc-500">
                                                                         {getReference(
                                                                             record,
                                                                         )}
                                                                     </p>
 
                                                                     <div className="mt-2">
-                                                                        <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-zinc-400">
+                                                                        <span className="rounded-md border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-[10px] text-gray-600 dark:text-zinc-400">
                                                                             {getType(
                                                                                 record,
                                                                             )}
@@ -2412,13 +2549,13 @@ const reloadContracts = () => {
                                                         </td>
 
                                                         <td className="px-4 py-4">
-                                                            <p className="text-sm font-medium text-zinc-200">
+                                                            <p className="text-sm font-medium text-gray-800 dark:text-zinc-200">
                                                                 {getClient(
                                                                     record,
                                                                 )}
                                                             </p>
 
-                                                            <p className="mt-1 text-[11px] text-zinc-600">
+                                                            <p className="mt-1 text-[11px] text-gray-600 dark:text-zinc-600">
                                                                 {getClientEmail(
                                                                     record,
                                                                 ) ||
@@ -2427,14 +2564,14 @@ const reloadContracts = () => {
                                                         </td>
 
                                                         <td className="px-4 py-4">
-                                                            <p className="max-w-[190px] truncate text-sm text-zinc-300">
+                                                            <p className="max-w-[190px] truncate text-sm text-gray-700 dark:text-zinc-300">
                                                                 {getProject(
                                                                     record,
                                                                 )}
                                                             </p>
 
                                                             {record.location && (
-                                                                <p className="mt-1 flex max-w-[190px] items-center gap-1 truncate text-[11px] text-zinc-600">
+                                                                <p className="mt-1 flex max-w-[190px] items-center gap-1 truncate text-[11px] text-gray-600 dark:text-zinc-600">
                                                                     <MapPin
                                                                         size={
                                                                             11
@@ -2450,8 +2587,8 @@ const reloadContracts = () => {
 
                                                         <td className="px-4 py-4">
                                                             <div className="space-y-1">
-                                                                <p className="text-xs text-zinc-300">
-                                                                    <span className="font-semibold text-white">
+                                                                <p className="text-xs text-gray-700 dark:text-zinc-300">
+                                                                    <span className="font-semibold text-gray-900 dark:text-white">
                                                                         {
                                                                             getContractFileCount(
                                                                                 record,
@@ -2468,9 +2605,9 @@ const reloadContracts = () => {
                                                                 </p>
 
                                                                 {!isPermit && (
-                                                                    <p className="text-[11px] text-zinc-600">
+                                                                    <p className="text-[11px] text-gray-600 dark:text-zinc-600">
                                                                         Signed:{" "}
-                                                                        <span className="text-zinc-400">
+                                                                        <span className="text-gray-600 dark:text-zinc-400">
                                                                             {
                                                                                 getSignedFileCount(
                                                                                     record,
@@ -2490,7 +2627,7 @@ const reloadContracts = () => {
                                                             status ===
                                                                 "Expired" ? (
                                                                 <div>
-                                                                    <p className="text-xs text-zinc-300">
+                                                                    <p className="text-xs text-gray-700 dark:text-zinc-300">
                                                                         {formatDate(
                                                                             getStartDate(
                                                                                 record,
@@ -2498,7 +2635,7 @@ const reloadContracts = () => {
                                                                         )}
                                                                     </p>
 
-                                                                    <p className="mt-1 text-[11px] text-zinc-600">
+                                                                    <p className="mt-1 text-[11px] text-gray-600 dark:text-zinc-600">
                                                                         to{" "}
                                                                         {formatDate(
                                                                             expiry,
@@ -2511,11 +2648,11 @@ const reloadContracts = () => {
                                                                             className={`mt-1 text-[10px] font-semibold ${
                                                                                 remaining <
                                                                                 0
-                                                                                    ? "text-red-300"
+                                                                                    ? "text-red-700 dark:text-red-300"
                                                                                     : remaining <=
                                                                                         30
-                                                                                      ? "text-orange-300"
-                                                                                      : "text-green-300"
+                                                                                      ? "text-orange-700 dark:text-orange-300"
+                                                                                      : "text-green-700 dark:text-green-300"
                                                                             }`}
                                                                         >
                                                                             {remaining <
@@ -2528,7 +2665,7 @@ const reloadContracts = () => {
                                                                     )}
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-xs text-zinc-600">
+                                                                <span className="text-xs text-gray-600 dark:text-zinc-600">
                                                                     Not active
                                                                 </span>
                                                             )}
@@ -2547,7 +2684,7 @@ const reloadContracts = () => {
                                                                 getCorrectionReason(
                                                                     record,
                                                                 ) && (
-                                                                    <p className="mt-2 max-w-[180px] truncate text-[10px] text-red-300/70">
+                                                                    <p className="mt-2 max-w-[180px] truncate text-[10px] text-red-700/70 dark:text-red-300/70">
                                                                         {getCorrectionReason(
                                                                             record,
                                                                         )}
@@ -2556,29 +2693,36 @@ const reloadContracts = () => {
                                                         </td>
 
                                                         <td className="px-4 py-4">
-                                                            <div
-                                                                ref={
-                                                                    menuOpen ===
-                                                                    record.id
-                                                                        ? menuRef
-                                                                        : null
-                                                                }
-                                                                className="relative flex justify-end"
-                                                            >
+                                                            <div className="relative flex justify-end">
                                                                 <button
+                                                                    ref={(el) => {
+                                                                        menuTriggerRefs.current[
+                                                                            record.id
+                                                                        ] =
+                                                                            el;
+                                                                    }}
+                                                                    data-admin-menu-trigger
                                                                     type="button"
                                                                     disabled={
                                                                         processing
                                                                     }
-                                                                    onClick={() =>
-                                                                        setMenuOpen(
-                                                                            menuOpen ===
-                                                                                record.id
-                                                                                ? null
-                                                                                : record.id,
+                                                                    onClick={(e) =>
+                                                                        openMenu(
+                                                                            e,
+                                                                            record.id,
                                                                         )
                                                                     }
-                                                                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-300 disabled:opacity-40"
+                                                                    title={`Actions — ${getTitle(
+                                                                        record,
+                                                                    )} (${getClient(
+                                                                        record,
+                                                                    )})`}
+                                                                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition disabled:opacity-40 ${
+                                                                        menuOpen ===
+                                                                        record.id
+                                                                            ? "border-yellow-400/50 bg-yellow-400/20 text-yellow-700 dark:text-yellow-300"
+                                                                            : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-zinc-400 hover:border-yellow-400/30 hover:bg-yellow-400/10 hover:text-yellow-700 dark:hover:text-yellow-300"
+                                                                    }`}
                                                                 >
                                                                     {processing ? (
                                                                         <RefreshCw
@@ -2595,284 +2739,6 @@ const reloadContracts = () => {
                                                                         />
                                                                     )}
                                                                 </button>
-
-                                                                {menuOpen ===
-                                                                    record.id && (
-                                                                    <div className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#101010] py-1 shadow-2xl shadow-black/70">
-                                                                        <MenuItem
-                                                                            icon={
-                                                                                <Eye
-                                                                                    size={
-                                                                                        14
-                                                                                    }
-                                                                                />
-                                                                            }
-                                                                            onClick={() => {
-                                                                                setMenuOpen(
-                                                                                    null,
-                                                                                );
-
-                                                                                setSelectedContract(
-                                                                                    record,
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            View
-                                                                            Details
-                                                                        </MenuItem>
-
-                                                                        <MenuItem
-                                                                            icon={
-                                                                                <Download
-                                                                                    size={
-                                                                                        14
-                                                                                    }
-                                                                                />
-                                                                            }
-                                                                            onClick={() => {
-                                                                                setMenuOpen(
-                                                                                    null,
-                                                                                );
-
-                                                                                if (
-                                                                                    getContractFiles(
-                                                                                        record,
-                                                                                    ).length >
-                                                                                    0
-                                                                                ) {
-                                                                                    const file =
-                                                                                        getContractFiles(
-                                                                                            record,
-                                                                                        )[0];
-
-                                                                                    const url =
-                                                                                        file.id >
-                                                                                        0
-                                                                                            ? `/admin/contracts/files/${file.id}/download`
-                                                                                            : record.contract_file_url ||
-                                                                                              `/storage/${String(
-                                                                                                  file.file_path ||
-                                                                                                      "",
-                                                                                              ).replace(
-                                                                                                  /^\/+/,
-                                                                                                  "",
-                                                                                              )}`;
-
-                                                                                    window.open(
-                                                                                        url,
-                                                                                        "_blank",
-                                                                                    );
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            Download
-                                                                            Document
-                                                                        </MenuItem>
-
-                                                                        {!isPermit &&
-                                                                            getSignedFileCount(
-                                                                                record,
-                                                                            ) >
-                                                                                0 && (
-                                                                                <MenuItem
-                                                                                    icon={
-                                                                                        <FileCheck2
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                        />
-                                                                                    }
-                                                                                    onClick={() => {
-                                                                                        setMenuOpen(
-                                                                                            null,
-                                                                                        );
-
-                                                                                        const file =
-                                                                                            getSignedFiles(
-                                                                                                record,
-                                                                                            )[0];
-
-                                                                                        const url =
-                                                                                            file.id >
-                                                                                            0
-                                                                                                ? `/admin/contracts/files/${file.id}/download`
-                                                                                                : record.signed_contract_url ||
-                                                                                                  `/storage/${String(
-                                                                                                      file.file_path ||
-                                                                                                          "",
-                                                                                                  ).replace(
-                                                                                                      /^\/+/,
-                                                                                                      "",
-                                                                                                  )}`;
-
-                                                                                        window.open(
-                                                                                            url,
-                                                                                            "_blank",
-                                                                                        );
-                                                                                    }}
-                                                                                >
-                                                                                    Download
-                                                                                    Signed
-                                                                                    Contract
-                                                                                </MenuItem>
-                                                                            )}
-
-                                                                        <MenuItem
-                                                                            icon={
-                                                                                <Send
-                                                                                    size={
-                                                                                        14
-                                                                                    }
-                                                                                />
-                                                                            }
-                                                                            onClick={() =>
-                                                                                openEmailModal(
-                                                                                    record,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            Email
-                                                                            Client
-                                                                        </MenuItem>
-
-                                                                        <MenuItem
-                                                                            icon={
-                                                                                <FileText
-                                                                                    size={
-                                                                                        14
-                                                                                    }
-                                                                                />
-                                                                            }
-                                                                            onClick={() =>
-                                                                                printRecord(
-                                                                                    record,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            Print
-                                                                        </MenuItem>
-
-                                                                        {!isArchivedRecord(
-                                                                            record,
-                                                                        ) &&
-                                                                            status ===
-                                                                                "Submitted for Review" && (
-                                                                                <>
-                                                                                    <div className="my-1 border-t border-white/10" />
-
-                                                                                    <MenuItem
-                                                                                        icon={
-                                                                                            <CheckCircle2
-                                                                                                size={
-                                                                                                    14
-                                                                                                }
-                                                                                            />
-                                                                                        }
-                                                                                        disabled={
-                                                                                            !canApprove
-                                                                                        }
-                                                                                        onClick={() =>
-                                                                                            approveContract(
-                                                                                                record,
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        {isPermit
-                                                                                            ? "Verify & Approve Permit"
-                                                                                            : "Approve & Activate"}
-                                                                                    </MenuItem>
-
-                                                                                    <MenuItem
-                                                                                        icon={
-                                                                                            <XCircle
-                                                                                                size={
-                                                                                                    14
-                                                                                                }
-                                                                                            />
-                                                                                        }
-                                                                                        onClick={() =>
-                                                                                            openCorrection(
-                                                                                                record,
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        Return
-                                                                                        for
-                                                                                        Correction
-                                                                                    </MenuItem>
-                                                                                </>
-                                                                            )}
-
-                                                                        {!isArchivedRecord(
-                                                                            record,
-                                                                        ) && (
-                                                                            <>
-                                                                                <div className="my-1 border-t border-white/10" />
-
-                                                                                <MenuItem
-                                                                                    icon={
-                                                                                        <Archive
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                        />
-                                                                                    }
-                                                                                    onClick={() =>
-                                                                                        archiveContract(
-                                                                                            record,
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    Archive
-                                                                                </MenuItem>
-                                                                            </>
-                                                                        )}
-
-                                                                        {isArchivedRecord(
-                                                                            record,
-                                                                        ) && (
-                                                                            <>
-                                                                                <div className="my-1 border-t border-white/10" />
-
-                                                                                <MenuItem
-                                                                                    icon={
-                                                                                        <Archive
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                        />
-                                                                                    }
-                                                                                    onClick={() =>
-                                                                                        restoreContract(
-                                                                                            record,
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    Restore
-                                                                                </MenuItem>
-
-                                                                                <MenuItem
-                                                                                    icon={
-                                                                                        <Trash2
-                                                                                            size={
-                                                                                                14
-                                                                                            }
-                                                                                        />
-                                                                                    }
-                                                                                    danger
-                                                                                    onClick={() =>
-                                                                                        deleteContract(
-                                                                                            record,
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    Delete
-                                                                                    Permanently
-                                                                                </MenuItem>
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -2889,7 +2755,7 @@ const reloadContracts = () => {
                         FOOTER INFO
                     ===================================== */}
 
-                    <div className="mt-4 flex flex-col gap-2 rounded-xl border border-white/5 bg-white/[0.015] px-4 py-3 text-[11px] text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mt-4 flex flex-col gap-2 rounded-xl border border-gray-100 dark:border-white/5 bg-white/[0.015] px-4 py-3 text-[11px] text-gray-600 dark:text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
                         <p>
                             Contract approval requires
                             the actual contract and
@@ -2913,10 +2779,10 @@ const reloadContracts = () => {
 
             {selectedContract && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="my-8 w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
-                        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5">
+                    <div className="my-8 w-full max-w-5xl overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#101010] shadow-2xl shadow-black/80">
+                        <div className="flex items-start justify-between gap-4 border-b border-gray-200 dark:border-white/10 px-5 py-5">
                             <div className="flex items-start gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-300">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/20 bg-yellow-400/10 text-yellow-700 dark:text-yellow-300">
                                     {isPermitRecord(
                                         selectedContract,
                                     ) ? (
@@ -2935,13 +2801,13 @@ const reloadContracts = () => {
                                 </div>
 
                                 <div>
-                                    <h2 className="text-lg font-bold text-white">
+                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                                         {getTitle(
                                             selectedContract,
                                         )}
                                     </h2>
 
-                                    <p className="mt-1 text-xs text-zinc-500">
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-zinc-500">
                                         {getReference(
                                             selectedContract,
                                         )}{" "}
@@ -2960,7 +2826,7 @@ const reloadContracts = () => {
                                         null,
                                     )
                                 }
-                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-zinc-400 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                             >
                                 <X
                                     size={18}
@@ -3115,16 +2981,16 @@ const reloadContracts = () => {
                                             size={
                                                 18
                                             }
-                                            className="mt-0.5 shrink-0 text-red-300"
+                                            className="mt-0.5 shrink-0 text-red-700 dark:text-red-300"
                                         />
 
                                         <div>
-                                            <p className="text-sm font-semibold text-red-200">
+                                            <p className="text-sm font-semibold text-red-700 dark:text-red-200">
                                                 Correction
                                                 Required
                                             </p>
 
-                                            <p className="mt-1 text-sm leading-6 text-red-200/70">
+                                            <p className="mt-1 text-sm leading-6 text-red-700/70 dark:text-red-200/70">
                                                 {getCorrectionReason(
                                                     selectedContract,
                                                 )}
@@ -3139,7 +3005,7 @@ const reloadContracts = () => {
                                     <DetailBox
                                         label="Description"
                                         value={
-                                            <p className="whitespace-pre-wrap leading-6 text-zinc-300">
+                                            <p className="whitespace-pre-wrap leading-6 text-gray-700 dark:text-zinc-300">
                                                 {
                                                     selectedContract.description
                                                 }
@@ -3154,7 +3020,7 @@ const reloadContracts = () => {
                                     <DetailBox
                                         label="Notes"
                                         value={
-                                            <p className="whitespace-pre-wrap leading-6 text-zinc-300">
+                                            <p className="whitespace-pre-wrap leading-6 text-gray-700 dark:text-zinc-300">
                                                 {
                                                     selectedContract.notes
                                                 }
@@ -3169,7 +3035,7 @@ const reloadContracts = () => {
                             <div className="mt-6">
                                 <div className="mb-3 flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-sm font-bold text-white">
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                                             {isPermitRecord(
                                                 selectedContract,
                                             )
@@ -3177,7 +3043,7 @@ const reloadContracts = () => {
                                                 : "Contract Documents"}
                                         </h3>
 
-                                        <p className="mt-1 text-xs text-zinc-600">
+                                        <p className="mt-1 text-xs text-gray-600 dark:text-zinc-600">
                                             {isPermitRecord(
                                                 selectedContract,
                                             )
@@ -3186,7 +3052,7 @@ const reloadContracts = () => {
                                         </p>
                                     </div>
 
-                                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-zinc-400">
+                                    <span className="rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-gray-600 dark:text-zinc-400">
                                         {
                                             getContractFileCount(
                                                 selectedContract,
@@ -3223,7 +3089,7 @@ const reloadContracts = () => {
                                             ),
                                         )
                                     ) : (
-                                        <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4 text-sm text-red-300">
+                                        <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4 text-sm text-red-700 dark:text-red-300">
                                             No document
                                             attached.
                                         </div>
@@ -3239,17 +3105,17 @@ const reloadContracts = () => {
                                 <div className="mt-6">
                                     <div className="mb-3 flex items-center justify-between">
                                         <div>
-                                            <h3 className="text-sm font-bold text-white">
+                                            <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                                                 Signed Contract
                                             </h3>
 
-                                            <p className="mt-1 text-xs text-zinc-600">
+                                            <p className="mt-1 text-xs text-gray-600 dark:text-zinc-600">
                                                 Required before
                                                 contract approval.
                                             </p>
                                         </div>
 
-                                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-zinc-400">
+                                        <span className="rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-gray-600 dark:text-zinc-400">
                                             {
                                                 getSignedFileCount(
                                                     selectedContract,
@@ -3286,7 +3152,7 @@ const reloadContracts = () => {
                                                 ),
                                             )
                                         ) : (
-                                            <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4 text-sm text-red-300">
+                                            <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4 text-sm text-red-700 dark:text-red-300">
                                                 No signed
                                                 contract
                                                 attached.
@@ -3299,7 +3165,7 @@ const reloadContracts = () => {
 
                         {/* MODAL ACTIONS */}
 
-                        <div className="flex flex-col-reverse gap-2 border-t border-white/10 bg-black/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-col-reverse gap-2 border-t border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <button
                                 type="button"
                                 onClick={() =>
@@ -3307,7 +3173,7 @@ const reloadContracts = () => {
                                         null,
                                     )
                                 }
-                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                                className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 transition hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                             >
                                 Close
                             </button>
@@ -3324,7 +3190,7 @@ const reloadContracts = () => {
                                                 selectedContract,
                                             )
                                         }
-                                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2.5 text-xs font-semibold text-red-300 transition hover:bg-red-400/15"
+                                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2.5 text-xs font-semibold text-red-700 dark:text-red-300 transition hover:bg-red-400/15"
                                     >
                                         <XCircle
                                             size={
@@ -3383,15 +3249,15 @@ const reloadContracts = () => {
 
             {correctionRecord && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
-                        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                    <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#101010] shadow-2xl shadow-black/80">
+                        <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-5 py-4">
                             <div>
-                                <h2 className="text-base font-bold text-white">
+                                <h2 className="text-base font-bold text-gray-900 dark:text-white">
                                     Return for
                                     Correction
                                 </h2>
 
-                                <p className="mt-1 text-xs text-zinc-600">
+                                <p className="mt-1 text-xs text-gray-600 dark:text-zinc-600">
                                     {getReference(
                                         correctionRecord,
                                     )}
@@ -3405,7 +3271,7 @@ const reloadContracts = () => {
                                         null,
                                     )
                                 }
-                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400"
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-zinc-400"
                             >
                                 <X
                                     size={17}
@@ -3414,7 +3280,7 @@ const reloadContracts = () => {
                         </div>
 
                         <div className="p-5">
-                            <label className="text-xs font-semibold text-zinc-300">
+                            <label className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
                                 Correction Reason
                             </label>
 
@@ -3433,11 +3299,11 @@ const reloadContracts = () => {
                                 }
                                 rows={6}
                                 placeholder="Explain what needs to be corrected..."
-                                className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white outline-none placeholder:text-zinc-700 focus:border-yellow-400/40"
+                                className="mt-2 w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 p-3 text-sm text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-zinc-700 focus:border-yellow-400/40"
                             />
                         </div>
 
-                        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+                        <div className="flex justify-end gap-2 border-t border-gray-200 dark:border-white/10 px-5 py-4">
                             <button
                                 type="button"
                                 onClick={() =>
@@ -3445,7 +3311,7 @@ const reloadContracts = () => {
                                         null,
                                     )
                                 }
-                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300"
+                                className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-300"
                             >
                                 Cancel
                             </button>
@@ -3491,14 +3357,14 @@ const reloadContracts = () => {
 
             {emailRecord && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
-                        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                    <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#101010] shadow-2xl shadow-black/80">
+                        <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 px-5 py-4">
                             <div>
-                                <h2 className="text-base font-bold text-white">
+                                <h2 className="text-base font-bold text-gray-900 dark:text-white">
                                     Email Client
                                 </h2>
 
-                                <p className="mt-1 text-xs text-zinc-600">
+                                <p className="mt-1 text-xs text-gray-600 dark:text-zinc-600">
                                     {getClient(
                                         emailRecord,
                                     )}{" "}
@@ -3516,7 +3382,7 @@ const reloadContracts = () => {
                                         null,
                                     )
                                 }
-                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400"
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-zinc-400"
                             >
                                 <X
                                     size={17}
@@ -3525,7 +3391,7 @@ const reloadContracts = () => {
                         </div>
 
                         <div className="p-5">
-                            <label className="text-xs font-semibold text-zinc-300">
+                            <label className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
                                 Message
                             </label>
 
@@ -3543,11 +3409,11 @@ const reloadContracts = () => {
                                     )
                                 }
                                 rows={10}
-                                className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-black/40 p-3 text-sm leading-6 text-white outline-none placeholder:text-zinc-700 focus:border-yellow-400/40"
+                                className="mt-2 w-full resize-none rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 p-3 text-sm leading-6 text-gray-900 dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-zinc-700 focus:border-yellow-400/40"
                             />
                         </div>
 
-                        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+                        <div className="flex justify-end gap-2 border-t border-gray-200 dark:border-white/10 px-5 py-4">
                             <button
                                 type="button"
                                 onClick={() =>
@@ -3555,7 +3421,7 @@ const reloadContracts = () => {
                                         null,
                                     )
                                 }
-                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300"
+                                className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-300"
                             >
                                 Cancel
                             </button>
@@ -3600,17 +3466,17 @@ const reloadContracts = () => {
 
             {confirmDialog && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#101010] shadow-2xl shadow-black/80">
+                    <div className="w-full max-w-md overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#101010] shadow-2xl shadow-black/80">
                         <div className="p-5">
                             <div
                                 className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${
                                     confirmDialog.variant ===
                                     "danger"
-                                        ? "border-red-400/20 bg-red-400/10 text-red-300"
+                                        ? "border-red-400/20 bg-red-400/10 text-red-700 dark:text-red-300"
                                         : confirmDialog.variant ===
                                             "warning"
-                                          ? "border-orange-400/20 bg-orange-400/10 text-orange-300"
-                                          : "border-green-400/20 bg-green-400/10 text-green-300"
+                                          ? "border-orange-400/20 bg-orange-400/10 text-orange-700 dark:text-orange-300"
+                                          : "border-green-400/20 bg-green-400/10 text-green-700 dark:text-green-300"
                                 }`}
                             >
                                 {confirmDialog.variant ===
@@ -3636,20 +3502,20 @@ const reloadContracts = () => {
                                 )}
                             </div>
 
-                            <h2 className="mt-4 text-lg font-bold text-white">
+                            <h2 className="mt-4 text-lg font-bold text-gray-900 dark:text-white">
                                 {
                                     confirmDialog.title
                                 }
                             </h2>
 
-                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-zinc-400">
+                            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-600 dark:text-zinc-400">
                                 {
                                     confirmDialog.message
                                 }
                             </p>
                         </div>
 
-                        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+                        <div className="flex justify-end gap-2 border-t border-gray-200 dark:border-white/10 px-5 py-4">
                             <button
                                 type="button"
                                 onClick={() =>
@@ -3657,7 +3523,7 @@ const reloadContracts = () => {
                                         null,
                                     )
                                 }
-                                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10"
+                                className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 transition hover:bg-gray-200 dark:hover:bg-white/10"
                             >
                                 {
                                     confirmDialog.cancelLabel
@@ -3687,6 +3553,357 @@ const reloadContracts = () => {
                     </div>
                 </div>
             )}
+
+            {/* =================================================
+                ACTION MENU (Portal)
+            ================================================= */}
+            {menuOpen !== null &&
+                (() => {
+                    const record = records.find(
+                        (r) => r.id === menuOpen,
+                    );
+                    if (!record) return null;
+
+                    const isPermit = isPermitRecord(record);
+                    const status = calculateStatus(record);
+                    const canApprove = canApproveDirectly(record);
+
+                    const assignedStaff =
+                        getAssignedStaff(record);
+
+                    const clientName = getClient(record);
+                    const clientEmail =
+                        getClientEmail(record);
+
+                    const closeAndReset = () => {
+                        setMenuOpen(null);
+                        setMenuCoords(null);
+                    };
+
+                    return createPortal(
+                        <>
+                            <div
+                                className="fixed inset-0 z-[998]"
+                                onClick={closeAndReset}
+                                aria-hidden="true"
+                            />
+                            <div
+                                ref={menuRef}
+                                data-admin-action-menu
+                                className="fixed z-[999] w-64 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#101010] py-1 shadow-2xl shadow-black/70"
+                                style={{
+                                    top: `${menuCoords?.top ?? 0}px`,
+                                    left: `${menuCoords?.left ?? 0}px`,
+                                    maxHeight: `calc(100vh - 24px)`,
+                                    // Itinatago hanggang
+                                    // maisaayos ang posisyon.
+                                    visibility: menuCoords
+                                        ? "visible"
+                                        : "hidden",
+                                }}
+                            >
+                                {/* =================================
+                                    RECORD HEADER — para alam
+                                    kung kanino ang pinindot
+                                ================================= */}
+                                <div className="border-b border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.02] px-3 py-3">
+                                    <div className="flex items-start gap-2.5">
+                                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-yellow-400/20 bg-yellow-400/10 text-yellow-700 dark:text-yellow-300">
+                                            {isPermit ? (
+                                                <ShieldCheck
+                                                    size={
+                                                        15
+                                                    }
+                                                />
+                                            ) : (
+                                                <FileText
+                                                    size={
+                                                        15
+                                                    }
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <p
+                                                className="truncate text-[13px] font-semibold text-gray-900 dark:text-white"
+                                                title={
+                                                    getTitle(
+                                                        record,
+                                                    )
+                                                }
+                                            >
+                                                {getTitle(
+                                                    record,
+                                                )}
+                                            </p>
+
+                                            <p className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-zinc-500">
+                                                {getType(
+                                                    record,
+                                                )}{" "}
+                                                •{" "}
+                                                {
+                                                    getReference(
+                                                        record,
+                                                    )
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* KANINO — client */}
+                                    <div className="mt-2.5 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 px-2.5 py-2">
+                                        <div className="flex items-center gap-1.5">
+                                            <User
+                                                size={
+                                                    11
+                                                }
+                                                className="shrink-0 text-yellow-700/70 dark:text-yellow-300/70"
+                                            />
+
+                                            <p className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800 dark:text-zinc-100">
+                                                {
+                                                    clientName
+                                                }
+                                            </p>
+                                        </div>
+
+                                        {clientEmail ? (
+                                            <p
+                                                className="mt-1 truncate pl-[18px] text-[10px] text-gray-500 dark:text-zinc-500"
+                                                title={
+                                                    clientEmail
+                                                }
+                                            >
+                                                {
+                                                    clientEmail
+                                                }
+                                            </p>
+                                        ) : null}
+
+                                        {assignedStaff ? (
+                                            <div className="mt-1.5 flex items-center gap-1.5 border-t border-gray-100 dark:border-white/5 pt-1.5">
+                                                <Users
+                                                    size={
+                                                        11
+                                                    }
+                                                    className="shrink-0 text-gray-500 dark:text-zinc-500"
+                                                />
+
+                                                <p className="min-w-0 flex-1 truncate text-[10px] text-gray-500 dark:text-zinc-500">
+                                                    Assigned:{" "}
+                                                    <span className="text-gray-600 dark:text-zinc-400">
+                                                        {
+                                                            assignedStaff.name
+                                                        }
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+
+                                <MenuItem
+                                    icon={<Eye size={14} />}
+                                    onClick={() => {
+                                        closeAndReset();
+                                        setSelectedContract(record);
+                                    }}
+                                >
+                                    View Details
+                                </MenuItem>
+
+                                <MenuItem
+                                    icon={<Download size={14} />}
+                                    onClick={() => {
+                                        closeAndReset();
+                                        if (
+                                            getContractFiles(record)
+                                                .length > 0
+                                        ) {
+                                            const file =
+                                                getContractFiles(
+                                                    record,
+                                                )[0];
+                                            const url =
+                                                file.id > 0
+                                                    ? `/admin/contracts/files/${file.id}/download`
+                                                    : record.contract_file_url ||
+                                                      `/storage/${String(
+                                                          file.file_path ||
+                                                              "",
+                                                      ).replace(
+                                                          /^\/+/,
+                                                          "",
+                                                      )}`;
+                                            window.open(
+                                                url,
+                                                "_blank",
+                                            );
+                                        }
+                                    }}
+                                >
+                                    Download Document
+                                </MenuItem>
+
+                                {!isPermit &&
+                                    getSignedFileCount(record) > 0 && (
+                                        <MenuItem
+                                            icon={
+                                                <FileCheck2
+                                                    size={14}
+                                                />
+                                            }
+                                            onClick={() => {
+                                                closeAndReset();
+                                                const file =
+                                                    getSignedFiles(
+                                                        record,
+                                                    )[0];
+                                                const url =
+                                                    file.id > 0
+                                                        ? `/admin/contracts/files/${file.id}/download`
+                                                        : record.signed_contract_url ||
+                                                          `/storage/${String(
+                                                              file.file_path ||
+                                                                  "",
+                                                          ).replace(
+                                                              /^\/+/,
+                                                              "",
+                                                          )}`;
+                                                window.open(
+                                                    url,
+                                                    "_blank",
+                                                );
+                                            }}
+                                        >
+                                            Download Signed Contract
+                                        </MenuItem>
+                                    )}
+
+                                <MenuItem
+                                    icon={<Send size={14} />}
+                                    onClick={() => {
+                                        closeAndReset();
+                                        openEmailModal(record);
+                                    }}
+                                >
+                                    Email Client
+                                </MenuItem>
+
+                                <MenuItem
+                                    icon={<FileText size={14} />}
+                                    onClick={() => {
+                                        closeAndReset();
+                                        printRecord(record);
+                                    }}
+                                >
+                                    Print
+                                </MenuItem>
+
+                                {!isArchivedRecord(record) &&
+                                    status ===
+                                        "Submitted for Review" && (
+                                        <>
+                                            <div className="my-1 border-t border-gray-200 dark:border-white/10" />
+
+                                            <MenuItem
+                                                icon={
+                                                    <CheckCircle2
+                                                        size={14}
+                                                    />
+                                                }
+                                                disabled={!canApprove}
+                                                onClick={() => {
+                                                    closeAndReset();
+                                                    approveContract(
+                                                        record,
+                                                    );
+                                                }}
+                                            >
+                                                {isPermit
+                                                    ? "Verify & Approve Permit"
+                                                    : "Approve & Activate"}
+                                            </MenuItem>
+
+                                            <MenuItem
+                                                icon={
+                                                    <XCircle
+                                                        size={14}
+                                                    />
+                                                }
+                                                onClick={() => {
+                                                    closeAndReset();
+                                                    openCorrection(
+                                                        record,
+                                                    );
+                                                }}
+                                            >
+                                                Return for Correction
+                                            </MenuItem>
+                                        </>
+                                    )}
+
+                                {!isArchivedRecord(record) && (
+                                    <>
+                                        <div className="my-1 border-t border-gray-200 dark:border-white/10" />
+
+                                        <MenuItem
+                                            icon={
+                                                <Archive size={14} />
+                                            }
+                                            onClick={() => {
+                                                closeAndReset();
+                                                archiveContract(
+                                                    record,
+                                                );
+                                            }}
+                                        >
+                                            Archive
+                                        </MenuItem>
+                                    </>
+                                )}
+
+                                {isArchivedRecord(record) && (
+                                    <>
+                                        <div className="my-1 border-t border-gray-200 dark:border-white/10" />
+
+                                        <MenuItem
+                                            icon={
+                                                <Archive size={14} />
+                                            }
+                                            onClick={() => {
+                                                closeAndReset();
+                                                restoreContract(
+                                                    record,
+                                                );
+                                            }}
+                                        >
+                                            Restore
+                                        </MenuItem>
+
+                                        <MenuItem
+                                            icon={
+                                                <Trash2 size={14} />
+                                            }
+                                            danger
+                                            onClick={() => {
+                                                closeAndReset();
+                                                deleteContract(
+                                                    record,
+                                                );
+                                            }}
+                                        >
+                                            Delete Permanently
+                                        </MenuItem>
+                                    </>
+                                )}
+                            </div>
+                        </>,
+                        document.body,
+                    );
+                })()}
         </AdminLayout>
     );
 }

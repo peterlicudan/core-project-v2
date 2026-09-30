@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Head, router, useForm } from "@inertiajs/react";
+
+import { Head, router, useForm, usePage } from "@inertiajs/react";
 import UserLayout from "../../Layouts/UserLayout";
 
 import {
@@ -163,7 +164,7 @@ const getReference = (record: ContractPermit): string =>
     record.contract_number ||
     record.reference_number ||
     record.permit_number ||
-    `CTR-${record.id}`;
+    "—";
 
 const getStartDate = (record: ContractPermit): string | null =>
     record.start_date || record.issue_date || null;
@@ -272,21 +273,21 @@ const calculateStatus = (record: ContractPermit): ContractStatus => {
 const statusClasses = (status: ContractStatus): string => {
     switch (status) {
         case "Active":
-            return "border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-400";
+            return "border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-600 dark:text-emerald-400";
         case "Needs Correction":
-            return "border-red-400/20 bg-red-400/[0.06] text-red-400";
+            return "border-red-400/20 bg-red-400/[0.06] text-red-600 dark:text-red-400";
         case "Submitted for Review":
-            return "border-blue-400/20 bg-blue-400/[0.06] text-blue-400";
+            return "border-blue-400/20 bg-blue-400/[0.06] text-blue-600 dark:text-blue-400";
         case "Expiring Soon":
-            return "border-orange-400/20 bg-orange-400/[0.06] text-orange-400";
+            return "border-orange-400/20 bg-orange-400/[0.06] text-orange-600 dark:text-orange-400";
         case "Expired":
-            return "border-red-400/20 bg-red-400/[0.06] text-red-400";
+            return "border-red-400/20 bg-red-400/[0.06] text-red-600 dark:text-red-400";
         case "Renewed":
-            return "border-violet-400/20 bg-violet-400/[0.06] text-violet-400";
+            return "border-violet-400/20 bg-violet-400/[0.06] text-violet-600 dark:text-violet-400";
         case "Archived":
-            return "border-slate-700 bg-slate-800/50 text-zinc-500";
+            return "border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800/50 text-gray-500 dark:text-zinc-500";
         default:
-            return "border-yellow-400/20 bg-yellow-400/[0.06] text-yellow-400";
+            return "border-yellow-400/20 bg-yellow-400/[0.06] text-yellow-600 dark:text-yellow-400";
     }
 };
 
@@ -305,8 +306,8 @@ const statusShortLabel = (status: ContractStatus): string => {
 
 const invoiceBadgeClasses = (approved: boolean): string =>
     approved
-        ? "border-emerald-400/20 bg-emerald-400/[0.05] text-emerald-400"
-        : "border-yellow-400/20 bg-yellow-400/[0.05] text-yellow-400";
+        ? "border-emerald-400/20 bg-emerald-400/[0.05] text-emerald-600 dark:text-emerald-400"
+        : "border-yellow-400/20 bg-yellow-400/[0.05] text-yellow-600 dark:text-yellow-400";
 
 const statusIcon = (status: ContractStatus): React.ReactNode => {
     switch (status) {
@@ -359,10 +360,10 @@ const getSignedFileCount = (record: ContractPermit): number => {
 // =========================================================
 // SCROLL SETTINGS
 // =========================================================
-
 const SCROLL_THRESHOLD = 4;
 const ROW_HEIGHT = 76;
 const HEADER_HEIGHT = 48;
+const TABLE_PADDING = 4;
 
 // =========================================================
 // COMPONENT
@@ -372,6 +373,9 @@ export default function ContractPermit({
     contracts = [],
     approvedInvoices = [],
 }: Props) {
+    const page = usePage();
+    const url = page.url;
+
     const [search, setSearch] = useState("");
     const [selectedContract, setSelectedContract] =
         useState<ContractPermit | null>(null);
@@ -434,6 +438,28 @@ export default function ContractPermit({
         permit_number: "",
         contract_files: [] as File[],
     });
+
+    // =====================================================
+    // ✅ AUTO-OPEN CONTRACT FROM NOTIFICATION (?contract_id=X)
+    // =====================================================
+
+    useEffect(() => {
+        const params = new URLSearchParams(url.split("?")[1] || "");
+        const contractIdFromUrl = params.get("contract_id");
+
+        if (!contractIdFromUrl) return;
+
+        const target = contracts.find(
+            (c) => Number(c.id) === Number(contractIdFromUrl),
+        );
+
+        if (target) {
+            // Auto-open yung contract details modal
+            setSelectedContract(target);
+            // Clear URL param (para hindi mag-loop)
+            window.history.replaceState({}, "", "/contract-permit");
+        }
+    }, [url, contracts]);
 
     // =====================================================
     // CLOSE DROPDOWN
@@ -572,10 +598,10 @@ export default function ContractPermit({
         });
     }, [approvedInvoices, normalizedRecords]);
 
-    const shouldScroll = filteredRecords.length >= SCROLL_THRESHOLD;
-    const tableMaxHeight = shouldScroll
-        ? HEADER_HEIGHT + SCROLL_THRESHOLD * ROW_HEIGHT
-        : undefined;
+ const shouldScroll = filteredRecords.length >= SCROLL_THRESHOLD;
+const tableMaxHeight = shouldScroll
+    ? HEADER_HEIGHT + SCROLL_THRESHOLD * ROW_HEIGHT + TABLE_PADDING
+    : undefined;
 
     const reloadContracts = () => {
         router.reload({ only: ["contracts", "approvedInvoices"] });
@@ -586,48 +612,77 @@ export default function ContractPermit({
         window.setTimeout(() => setSuccessMessage(null), 3500);
     };
 
-    const openActionMenu = (
-        event: React.MouseEvent<HTMLButtonElement>,
-        contractId: number,
-    ) => {
-        event.stopPropagation();
+   const openActionMenu = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    contractId: number,
+) => {
+    event.stopPropagation();
 
-        if (openMenuId === contractId) {
-            setOpenMenuId(null);
-            setMenuPosition(null);
-            return;
+    if (openMenuId === contractId) {
+        setOpenMenuId(null);
+        setMenuPosition(null);
+        return;
+    }
+
+    const button = menuButtonRefs.current[contractId];
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const menuWidth = 256;
+    const gap = 8;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const padding = 12;
+
+    const contract = contracts.find((c) => c.id === contractId);
+    let estimatedItems = 0;
+    if (contract) {
+        estimatedItems += 1;
+        estimatedItems += 1;
+        estimatedItems += 1;
+        estimatedItems += contract.contract_files?.length ?? 0;
+        estimatedItems += contract.signed_files?.length ?? 0;
+        estimatedItems += 1;
+        estimatedItems += 1;
+    }
+    const baseHeight = 70;
+    const itemHeight = 40;
+    const dividerHeight = 9;
+    const sectionLabelHeight = 24;
+    const estimatedMenuHeight = Math.min(
+        480,
+        baseHeight +
+            estimatedItems * itemHeight +
+            (contract ? 4 : 2) * dividerHeight +
+            (contract ? 2 : 0) * sectionLabelHeight,
+    );
+
+    const spaceBelow = viewportHeight - rect.bottom - gap - padding;
+    const spaceAbove = rect.top - gap - padding;
+    const openUpward =
+        spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow;
+
+    let top: number;
+    if (openUpward) {
+        top = rect.top - gap - estimatedMenuHeight;
+        if (top < padding) top = padding;
+    } else {
+        top = rect.bottom + gap;
+        if (top + estimatedMenuHeight > viewportHeight - padding) {
+            top = viewportHeight - estimatedMenuHeight - padding;
         }
+        if (top < padding) top = padding;
+    }
 
-        const button = menuButtonRefs.current[contractId];
-        if (!button) return;
+    let left = rect.right - menuWidth;
+    if (left < padding) left = padding;
+    if (left + menuWidth > viewportWidth - padding) {
+        left = viewportWidth - menuWidth - padding;
+    }
 
-        const rect = button.getBoundingClientRect();
-        const menuWidth = 240;
-        const menuHeight = 420;
-        const gap = 6;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        const spaceBelow = viewportHeight - rect.bottom;
-        const openUpward = spaceBelow < menuHeight + gap;
-
-        let left = rect.right - menuWidth;
-        if (left < 12) left = 12;
-        if (left + menuWidth > viewportWidth - 12) {
-            left = viewportWidth - menuWidth - 12;
-        }
-
-        let top = openUpward ? rect.top - menuHeight - gap : rect.bottom + gap;
-
-        if (top < 12) top = 12;
-        if (top + menuHeight > viewportHeight - 12) {
-            top = viewportHeight - menuHeight - 12;
-        }
-
-        setMenuPosition({ top, left, openUpward });
-        setOpenMenuId(contractId);
-    };
-
+    setMenuPosition({ top, left, openUpward });
+    setOpenMenuId(contractId);
+};
     /* =====================================================
        CREATE CONTRACT
     ===================================================== */
@@ -1003,48 +1058,14 @@ export default function ContractPermit({
                 ? files
                       .map(
                           (f) =>
-                              `<li>${escapeHtml(f.file_name)}${
-                                  f.file_size
-                                      ? ` (${formatFileSize(f.file_size)})`
-                                      : ""
-                              }</li>`,
+                              `<li>${escapeHtml(f.file_name)}${f.file_size ? ` (${formatFileSize(f.file_size)})` : ""}</li>`,
                       )
                       .join("")
                 : "<li>No files uploaded</li>";
 
-        printWindow.document
-            .write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Contract Record - ${escapeHtml(reference)}</title>
-<style>@page{size:Letter;margin:0.45in}*{box-sizing:border-box}body{margin:0;background:#fff;color:#161616;font-family:Arial,sans-serif;font-size:12px}.page{width:100%;max-width:8in;margin:0 auto}.header{border-bottom:3px solid #facc15;padding-bottom:14px;margin-bottom:18px}.brand{font-size:26px;font-weight:900}.subbrand{margin-top:3px;color:#555;font-size:11px;font-weight:700}.address{margin-top:3px;color:#777;font-size:10px}.title{margin-top:18px;font-size:20px;font-weight:900}.reference{margin-top:4px;color:#777;font-size:11px}.status-row{margin-top:12px}.badge{display:inline-block;padding:5px 9px;margin-right:5px;border:1px solid #ccc;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase}.section{margin-top:18px}.section-title{margin:0 0 8px;padding-bottom:5px;border-bottom:1px solid #ddd;font-size:11px;font-weight:900;text-transform:uppercase}.details{display:grid;grid-template-columns:1fr 1fr;gap:10px}.detail{border:1px solid #e3e3e3;border-radius:7px;padding:9px}.detail-label{margin-bottom:3px;color:#777;font-size:8px;font-weight:900;text-transform:uppercase}.detail-value{font-size:11px;font-weight:700;word-break:break-word}.text-box{border:1px solid #e3e3e3;border-radius:7px;padding:10px;line-height:1.6;color:#333}.files{display:grid;grid-template-columns:1fr 1fr;gap:10px}.file-box{border:1px solid #e3e3e3;border-radius:7px;padding:10px}.file-box ul{margin:5px 0 0 0;padding-left:16px}.file-box li{font-size:10px;line-height:1.6}.correction-box{border:1px solid #fca5a5;background:#fef2f2;border-radius:7px;padding:11px}.correction-title{color:#b91c1c;font-size:9px;font-weight:900;text-transform:uppercase;margin-bottom:4px}.confidential{margin-top:22px;padding:10px;border:1px solid #ddd;background:#fafafa;color:#777;font-size:8px}.footer{display:flex;justify-content:space-between;margin-top:16px;padding-top:8px;border-top:1px solid #ddd;color:#777;font-size:8px}</style></head><body><div class="page">
-<div class="header"><div class="brand">ALIBATON</div><div class="subbrand">Heavy Equipment &amp; Logistics</div><div class="address">Quezon City</div><div class="title">Contract &amp; Permit Record</div><div class="reference">Reference: ${escapeHtml(reference)}</div><div class="status-row"><span class="badge">${escapeHtml(status)}</span><span class="badge">${escapeHtml(workflow)}</span><span class="badge">${isInvoiceApproved(contract) ? "Invoice Approved" : "Invoice Pending"}</span></div></div>
-${correctionReason ? `<div class="section"><h2 class="section-title">Admin Correction Required</h2><div class="correction-box"><div class="correction-title">Correction Reason</div>${escapeHtml(correctionReason)}</div></div>` : ""}
-<div class="section"><h2 class="section-title">Contract Information</h2><div class="details">
-<div class="detail"><div class="detail-label">Title</div><div class="detail-value">${escapeHtml(title)}</div></div>
-<div class="detail"><div class="detail-label">Type</div><div class="detail-value">${escapeHtml(type)}</div></div>
-<div class="detail"><div class="detail-label">Reference</div><div class="detail-value">${escapeHtml(reference)}</div></div>
-<div class="detail"><div class="detail-label">Client</div><div class="detail-value">${escapeHtml(client)}</div></div>
-<div class="detail"><div class="detail-label">Project</div><div class="detail-value">${escapeHtml(project)}</div></div>
-<div class="detail"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(location)}</div></div>
-<div class="detail"><div class="detail-label">Client Email</div><div class="detail-value">${escapeHtml(contract.client_email || contract.email || "—")}</div></div>
-</div></div>
-<div class="section"><h2 class="section-title">Validity</h2><div class="details">
-<div class="detail"><div class="detail-label">Start / Issue Date</div><div class="detail-value">${startDate ? escapeHtml(formatDate(startDate)) : "Starts after Admin approval"}</div></div>
-<div class="detail"><div class="detail-label">Expiry Date</div><div class="detail-value">${expiryDate ? escapeHtml(formatDate(expiryDate)) : "Starts after Admin approval"}</div></div>
-<div class="detail"><div class="detail-label">Admin Approved At</div><div class="detail-value">${escapeHtml(approvedText)}</div></div>
-<div class="detail"><div class="detail-label">Days Remaining</div><div class="detail-value">${expiryDate && daysUntil(expiryDate) !== null ? `${daysUntil(expiryDate)} days` : "—"}</div></div>
-</div></div>
-<div class="section"><h2 class="section-title">Description</h2><div class="text-box">${escapeHtml(description)}</div></div>
-<div class="section"><h2 class="section-title">Notes</h2><div class="text-box">${escapeHtml(notes)}</div></div>
-<div class="section"><h2 class="section-title">Documents</h2><div class="files">
-<div class="file-box"><div class="detail-label">${isPermit ? "Permit Documents" : "Contract Documents"} (${contractFilesList.length})</div><ul>${renderFileList(contractFilesList)}</ul></div>
-${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents (${signedFilesList.length})</div><ul>${renderFileList(signedFilesList)}</ul></div>` : ""}
-</div></div>
-<div class="section"><h2 class="section-title">Record Information</h2><div class="details">
-<div class="detail"><div class="detail-label">Created</div><div class="detail-value">${escapeHtml(createdText)}</div></div>
-<div class="detail"><div class="detail-label">Last Updated</div><div class="detail-value">${escapeHtml(updatedText)}</div></div>
-</div></div>
-<div class="confidential">This document is generated from the ALIBATON Contract &amp; Permit Management System.</div>
-<div class="footer"><span>ALIBATON • Heavy Equipment &amp; Logistics</span><span>Quezon City</span><span>Ref: ${escapeHtml(reference)}</span></div>
-</div></body></html>`);
+        printWindow.document.write(
+            `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Contract Record - ${escapeHtml(reference)}</title><style>@page{size:Letter;margin:0.45in}*{box-sizing:border-box}body{margin:0;background:#fff;color:#161616;font-family:Arial,sans-serif;font-size:12px}.page{width:100%;max-width:8in;margin:0 auto}.header{border-bottom:3px solid #facc15;padding-bottom:14px;margin-bottom:18px}.brand{font-size:26px;font-weight:900}.subbrand{margin-top:3px;color:#555;font-size:11px;font-weight:700}.address{margin-top:3px;color:#777;font-size:10px}.title{margin-top:18px;font-size:20px;font-weight:900}.reference{margin-top:4px;color:#777;font-size:11px}.status-row{margin-top:12px}.badge{display:inline-block;padding:5px 9px;margin-right:5px;border:1px solid #ccc;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase}.section{margin-top:18px}.section-title{margin:0 0 8px;padding-bottom:5px;border-bottom:1px solid #ddd;font-size:11px;font-weight:900;text-transform:uppercase}.details{display:grid;grid-template-columns:1fr 1fr;gap:10px}.detail{border:1px solid #e3e3e3;border-radius:7px;padding:9px}.detail-label{margin-bottom:3px;color:#777;font-size:8px;font-weight:900;text-transform:uppercase}.detail-value{font-size:11px;font-weight:700;word-break:break-word}.text-box{border:1px solid #e3e3e3;border-radius:7px;padding:10px;line-height:1.6;color:#333}.files{display:grid;grid-template-columns:1fr 1fr;gap:10px}.file-box{border:1px solid #e3e3e3;border-radius:7px;padding:10px}.file-box ul{margin:5px 0 0 0;padding-left:16px}.file-box li{font-size:10px;line-height:1.6}.correction-box{border:1px solid #fca5a5;background:#fef2f2;border-radius:7px;padding:11px}.correction-title{color:#b91c1c;font-size:9px;font-weight:900;text-transform:uppercase;margin-bottom:4px}.confidential{margin-top:22px;padding:10px;border:1px solid #ddd;background:#fafafa;color:#777;font-size:8px}.footer{display:flex;justify-content:space-between;margin-top:16px;padding-top:8px;border-top:1px solid #ddd;color:#777;font-size:8px}</style></head><body><div class="page"><div class="header"><div class="brand">ALIBATON</div><div class="subbrand">Heavy Equipment &amp; Logistics</div><div class="address">Quezon City</div><div class="title">Contract &amp; Permit Record</div><div class="reference">Reference: ${escapeHtml(reference)}</div><div class="status-row"><span class="badge">${escapeHtml(status)}</span><span class="badge">${escapeHtml(workflow)}</span><span class="badge">${isInvoiceApproved(contract) ? "Invoice Approved" : "Invoice Pending"}</span></div></div>${correctionReason ? `<div class="section"><h2 class="section-title">Admin Correction Required</h2><div class="correction-box"><div class="correction-title">Correction Reason</div>${escapeHtml(correctionReason)}</div></div>` : ""}<div class="section"><h2 class="section-title">Contract Information</h2><div class="details"><div class="detail"><div class="detail-label">Title</div><div class="detail-value">${escapeHtml(title)}</div></div><div class="detail"><div class="detail-label">Type</div><div class="detail-value">${escapeHtml(type)}</div></div><div class="detail"><div class="detail-label">Reference</div><div class="detail-value">${escapeHtml(reference)}</div></div><div class="detail"><div class="detail-label">Client</div><div class="detail-value">${escapeHtml(client)}</div></div><div class="detail"><div class="detail-label">Project</div><div class="detail-value">${escapeHtml(project)}</div></div><div class="detail"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(location)}</div></div><div class="detail"><div class="detail-label">Client Email</div><div class="detail-value">${escapeHtml(contract.client_email || contract.email || "—")}</div></div></div></div><div class="section"><h2 class="section-title">Validity</h2><div class="details"><div class="detail"><div class="detail-label">Start / Issue Date</div><div class="detail-value">${startDate ? escapeHtml(formatDate(startDate)) : "Starts after Admin approval"}</div></div><div class="detail"><div class="detail-label">Expiry Date</div><div class="detail-value">${expiryDate ? escapeHtml(formatDate(expiryDate)) : "Starts after Admin approval"}</div></div><div class="detail"><div class="detail-label">Admin Approved At</div><div class="detail-value">${escapeHtml(approvedText)}</div></div><div class="detail"><div class="detail-label">Days Remaining</div><div class="detail-value">${expiryDate && daysUntil(expiryDate) !== null ? `${daysUntil(expiryDate)} days` : "—"}</div></div></div></div><div class="section"><h2 class="section-title">Description</h2><div class="text-box">${escapeHtml(description)}</div></div><div class="section"><h2 class="section-title">Notes</h2><div class="text-box">${escapeHtml(notes)}</div></div><div class="section"><h2 class="section-title">Documents</h2><div class="files"><div class="file-box"><div class="detail-label">${isPermit ? "Permit Documents" : "Contract Documents"} (${contractFilesList.length})</div><ul>${renderFileList(contractFilesList)}</ul></div>${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents (${signedFilesList.length})</div><ul>${renderFileList(signedFilesList)}</ul></div>` : ""}</div></div><div class="section"><h2 class="section-title">Record Information</h2><div class="details"><div class="detail"><div class="detail-label">Created</div><div class="detail-value">${escapeHtml(createdText)}</div></div><div class="detail"><div class="detail-label">Last Updated</div><div class="detail-value">${escapeHtml(updatedText)}</div></div></div></div><div class="confidential">This document is generated from the ALIBATON Contract &amp; Permit Management System.</div><div class="footer"><span>ALIBATON • Heavy Equipment &amp; Logistics</span><span>Quezon City</span><span>Ref: ${escapeHtml(reference)}</span></div></div></body></html>`,
+        );
 
         printWindow.document.close();
         printWindow.onload = () => {
@@ -1123,46 +1144,53 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                 }
             `}</style>
 
-            <div className="min-w-0 flex-1 px-4 pb-8 pt-20 text-white sm:px-6 lg:px-8 lg:pt-8">
+            <div className="min-w-0 flex-1 px-4 pb-8 pt-20 text-gray-900 dark:text-white sm:px-6 lg:px-8 lg:pt-8">
                 <div className="mx-auto w-full max-w-[1600px]">
                     {/* HEADER */}
-                    <div className="mb-6 flex min-w-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                        <div className="min-w-0">
-                            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-yellow-400">
-                                <ShieldCheck size={15} />
-                                Staff Module
-                            </div>
-                            <h1 className="break-words text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
-                                Contract & Permit Management
-                            </h1>
-                            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-                                Manage your assigned Contract and Permit
-                                records. Attach unlimited documents during
-                                creation, upload signed contracts, submit for
-                                Admin review, download files, and email clients.
-                            </p>
-                        </div>
-                        {mainTab === "contract" && (
-                            <button
-                                type="button"
-                                onClick={openCreateModal}
-                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-black text-black transition hover:bg-yellow-300"
-                            >
-                                <PlusCircle size={17} />
-                                Create Contract
-                            </button>
-                        )}
-                        {mainTab === "permit" && (
-                            <button
-                                type="button"
-                                onClick={openCreatePermitModal}
-                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-300"
-                            >
-                                <PlusCircle size={17} />
-                                Create Permit
-                            </button>
-                        )}
-                    </div>
+                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="min-w-0">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1.5 text-xs font-semibold text-yellow-600 dark:text-yellow-300">
+            <ShieldCheck size={15} />
+            Staff Module
+        </div>
+
+        <h1 className="break-words text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
+            Contract & Permit Management
+        </h1>
+
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-zinc-500">
+            Manage your assigned Contract and Permit records. Attach unlimited
+            documents during creation, upload signed contracts, submit for
+            Admin review, download files, and email clients.
+        </p>
+    </div>
+
+    <div className="flex shrink-0 items-center gap-3">
+
+
+        {mainTab === "contract" && (
+            <button
+                type="button"
+                onClick={openCreateModal}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-black text-black transition hover:bg-yellow-300"
+            >
+                <PlusCircle size={17} />
+                Create Contract
+            </button>
+        )}
+
+        {mainTab === "permit" && (
+            <button
+                type="button"
+                onClick={openCreatePermitModal}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-300"
+            >
+                <PlusCircle size={17} />
+               Upload Permit
+            </button>
+        )}
+    </div>
+</div>
 
                     {/* MAIN TABS */}
                     <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1191,7 +1219,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                     </div>
 
                     {/* SUB TABS */}
-                    <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-2">
+                    <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-2">
                         <SubTabButton
                             active={subTab === "all"}
                             label="All"
@@ -1237,18 +1265,18 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                     </div>
 
                     {/* SEARCH */}
-                    <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
+                    <div className="mb-6 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 shadow-xl">
                         <div className="flex min-w-0 flex-col gap-3 lg:flex-row">
                             <div className="relative min-w-0 flex-1">
                                 <Search
                                     size={17}
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-zinc-600"
                                 />
                                 <input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder={`Search ${mainTab}...`}
-                                    className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-yellow-400/50"
+                                    className="w-full rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/80 py-3 pl-11 pr-4 text-sm text-gray-900 dark:text-white outline-none transition placeholder:text-gray-500 dark:placeholder:text-zinc-600 focus:border-yellow-400/50"
                                 />
                             </div>
                         </div>
@@ -1256,17 +1284,17 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
 
                     {/* TABLE */}
                     {filteredRecords.length === 0 ? (
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-6 py-20 text-center shadow-xl">
-                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/70">
+                        <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-6 py-20 text-center shadow-xl">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70">
                                 <FileCheck2
                                     size={28}
-                                    className="text-zinc-600"
+                                    className="text-gray-500 dark:text-zinc-600"
                                 />
                             </div>
-                            <h3 className="text-lg font-black text-zinc-300">
+                            <h3 className="text-lg font-black text-gray-700 dark:text-zinc-300">
                                 No records found
                             </h3>
-                            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-600">
+                            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500 dark:text-zinc-600">
                                 There are no {mainTab} records matching your
                                 current filters.
                             </p>
@@ -1274,50 +1302,52 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 <button
                                     type="button"
                                     onClick={clearFilters}
-                                    className="mt-5 rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-2.5 text-sm font-bold text-zinc-300 transition hover:border-yellow-400/20 hover:bg-slate-800 hover:text-white"
+                                    className="mt-5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-zinc-300 transition hover:border-yellow-400/20 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                                 >
                                     Clear Search
                                 </button>
                             )}
                         </div>
                     ) : (
-                        <section className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-slate-900/80 shadow-2xl shadow-black/30">
+                        <section className="overflow-hidden rounded-3xl border border-yellow-400/10 bg-white dark:bg-slate-900/80 shadow-2xl shadow-black/30">
                             <div
-                                className="alibaton-scroll"
-                                style={{
-                                    maxHeight:
-                                        shouldScroll && tableMaxHeight
-                                            ? `${tableMaxHeight}px`
-                                            : undefined,
-                                    overflowY: shouldScroll
-                                        ? "auto"
-                                        : "visible",
-                                }}
-                            >
+    className="alibaton-scroll"
+    style={
+        shouldScroll
+            ? {
+                  maxHeight: `${tableMaxHeight}px`,
+                  overflowY: "auto",
+                  overflowX: "hidden",
+              }
+            : {
+                  overflowY: "visible",
+              }
+    }
+>
                                 <table className="w-full table-fixed">
-                                    <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm">
-                                        <tr className="border-b border-slate-800 bg-slate-950/70">
-                                            <th className="w-[13%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                    <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-950/95 backdrop-blur-sm">
+                                        <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/70">
+                                            <th className="w-[13%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 {mainTab === "contract"
                                                     ? "Contract"
                                                     : "Permit"}
                                             </th>
-                                            <th className="w-[10%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            <th className="w-[10%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Type
                                             </th>
-                                            <th className="w-[22%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            <th className="w-[22%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Project
                                             </th>
-                                            <th className="w-[15%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            <th className="w-[15%] px-3 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Validity
                                             </th>
-                                            <th className="w-[13%] px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            <th className="w-[13%] px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Status
                                             </th>
-                                            <th className="w-[11%] px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            <th className="w-[11%] px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Files
                                             </th>
-                                            <th className="w-[16%] px-3 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            <th className="w-[16%] px-3 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Action
                                             </th>
                                         </tr>
@@ -1348,34 +1378,25 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                         className={`border-b transition hover:bg-yellow-400/[0.025] ${
                                                             needsCorrection
                                                                 ? "border-red-400/20 bg-red-500/[0.04]"
-                                                                : "border-slate-800/70"
+                                                                : "border-gray-200 dark:border-slate-800/70"
                                                         }`}
                                                     >
                                                         <td className="px-3 py-4 align-top">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    setSelectedContract(
-                                                                        contract,
-                                                                    )
-                                                                }
-                                                                className="text-left"
-                                                            >
-                                                                <p className="truncate text-xs font-black text-white hover:text-yellow-400">
-                                                                    {getReference(
-                                                                        contract,
-                                                                    )}
-                                                                </p>
-                                                                <p className="mt-0.5 truncate text-[10px] text-zinc-500">
-                                                                    {getTitle(
-                                                                        contract,
-                                                                    )}
-                                                                </p>
-                                                            </button>
-                                                        </td>
-
+    <button
+        type="button"
+        onClick={() => setSelectedContract(contract)}
+        className="text-left"
+    >
+        <p className="truncate text-xs font-black text-gray-900 dark:text-white hover:text-yellow-600 dark:hover:text-yellow-400">
+            {getTitle(contract)}
+        </p>
+        <p className="mt-0.5 truncate text-[10px] text-gray-500 dark:text-zinc-500">
+            {getProject(contract)}
+        </p>
+    </button>
+</td>
                                                         <td className="px-3 py-4 align-top">
-                                                            <span className="inline-flex items-center gap-1 rounded-md border border-yellow-400/20 bg-yellow-400/5 px-1.5 py-0.5 text-[10px] font-bold text-yellow-400">
+                                                            <span className="inline-flex items-center gap-1 rounded-md border border-yellow-400/20 bg-yellow-400/5 px-1.5 py-0.5 text-[10px] font-bold text-yellow-600 dark:text-yellow-400">
                                                                 {String(
                                                                     getType(
                                                                         contract,
@@ -1407,7 +1428,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
 
                                                         <td className="px-3 py-4 align-top">
                                                             <p
-                                                                className="truncate text-[11px] text-slate-300"
+                                                                className="truncate text-[11px] text-gray-700 dark:text-slate-300"
                                                                 title={getProject(
                                                                     contract,
                                                                 )}
@@ -1449,7 +1470,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                     className="mt-0.5 shrink-0 text-slate-600"
                                                                 />
                                                                 <div className="min-w-0">
-                                                                    <p className="truncate text-[11px] text-slate-300">
+                                                                    <p className="truncate text-[11px] text-gray-700 dark:text-slate-300">
                                                                         {getStartDate(
                                                                             contract,
                                                                         )
@@ -1466,13 +1487,13 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                                 null &&
                                                                             remaining <
                                                                                 0
-                                                                                ? "text-red-400"
+                                                                                ? "text-red-600 dark:text-red-400"
                                                                                 : remaining !==
                                                                                         null &&
                                                                                     remaining <=
                                                                                         30
-                                                                                  ? "text-orange-400"
-                                                                                  : "text-zinc-600"
+                                                                                  ? "text-orange-600 dark:text-orange-400"
+                                                                                  : "text-gray-500 dark:text-zinc-600"
                                                                         }`}
                                                                     >
                                                                         to{" "}
@@ -1528,7 +1549,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                     className={`inline-flex items-center gap-1 text-[9px] font-bold ${
                                                                         contractFileCount >
                                                                         0
-                                                                            ? "text-emerald-400"
+                                                                            ? "text-emerald-600 dark:text-emerald-400"
                                                                             : "text-slate-700"
                                                                     }`}
                                                                 >
@@ -1539,12 +1560,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                     />
                                                                     {contractFileCount >
                                                                     0
-                                                                        ? `${contractFileCount} file${
-                                                                              contractFileCount >
-                                                                              1
-                                                                                  ? "s"
-                                                                                  : ""
-                                                                          }`
+                                                                        ? `${contractFileCount} file${contractFileCount > 1 ? "s" : ""}`
                                                                         : "Missing"}
                                                                 </span>
 
@@ -1555,7 +1571,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                         className={`inline-flex items-center gap-1 text-[9px] font-bold ${
                                                                             signedFileCount >
                                                                             0
-                                                                                ? "text-emerald-400"
+                                                                                ? "text-emerald-600 dark:text-emerald-400"
                                                                                 : "text-slate-700"
                                                                         }`}
                                                                     >
@@ -1582,7 +1598,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                             contract,
                                                                         )
                                                                     }
-                                                                    className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-700 px-2 text-[10px] font-bold text-slate-300 transition hover:border-yellow-400/40 hover:bg-slate-800 hover:text-yellow-400"
+                                                                    className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-gray-300 dark:border-slate-700 px-2 text-[10px] font-bold text-gray-700 dark:text-slate-300 transition hover:border-yellow-400/40 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-yellow-600 dark:hover:text-yellow-400"
                                                                 >
                                                                     <Eye
                                                                         size={
@@ -1609,8 +1625,8 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                     className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition ${
                                                                         openMenuId ===
                                                                         contract.id
-                                                                            ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
-                                                                            : "border-slate-700 text-slate-400 hover:border-yellow-400/40 hover:text-yellow-400"
+                                                                            ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400"
+                                                                            : "border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-yellow-400/40 hover:text-yellow-600 dark:hover:text-yellow-400"
                                                                     }`}
                                                                 >
                                                                     <MoreVertical
@@ -1635,16 +1651,16 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                             size={
                                                                                 16
                                                                             }
-                                                                            className="mt-0.5 shrink-0 text-red-400"
+                                                                            className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
                                                                         />
                                                                         <div className="min-w-0 flex-1">
-                                                                            <p className="text-[10px] font-black uppercase tracking-wider text-red-300">
+                                                                            <p className="text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-300">
                                                                                 ⚠️
                                                                                 Admin
                                                                                 Correction
                                                                                 Required
                                                                             </p>
-                                                                            <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-white">
+                                                                            <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-gray-900 dark:text-white">
                                                                                 {
                                                                                     correction
                                                                                 }
@@ -1657,7 +1673,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                                                     contract,
                                                                                 )
                                                                             }
-                                                                            className="shrink-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-red-300 transition hover:bg-red-500/20"
+                                                                            className="shrink-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-300 transition hover:bg-red-500/20"
                                                                         >
                                                                             Fix
                                                                             Now
@@ -1676,19 +1692,19 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                     )}
 
                     {/* FOOTER */}
-                    <div className="mt-6 flex min-w-0 flex-col gap-2 border-t border-slate-800 pt-5 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mt-6 flex min-w-0 flex-col gap-2 border-t border-gray-200 dark:border-slate-800 pt-5 text-xs text-gray-500 dark:text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
                         <span>
                             Showing{" "}
-                            <strong className="text-zinc-400">
+                            <strong className="text-gray-600 dark:text-zinc-400">
                                 {filteredRecords.length}
                             </strong>{" "}
                             of{" "}
-                            <strong className="text-zinc-400">
+                            <strong className="text-gray-600 dark:text-zinc-400">
                                 {activeRecords.length}
                             </strong>{" "}
                             {mainTab} records
                             {shouldScroll && (
-                                <span className="ml-2 text-yellow-400/60">
+                                <span className="ml-2 text-yellow-600/60 dark:text-yellow-400/60">
                                     (scroll to view more)
                                 </span>
                             )}
@@ -1747,20 +1763,20 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             />
                             <div
                                 data-contract-action-menu
-                                className="alibaton-scroll fixed z-[9999] w-64 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 shadow-[0_25px_80px_rgba(0,0,0,0.9)]"
-                                style={{
-                                    top: `${menuPosition.top}px`,
-                                    left: `${menuPosition.left}px`,
-                                    maxHeight: "480px",
-                                }}
+                                className="alibaton-scroll fixed z-[9999] w-64 overflow-y-auto rounded-2xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950 shadow-[0_25px_80px_rgba(0,0,0,0.9)]"
+                               style={{
+    top: `${menuPosition.top}px`,
+    left: `${menuPosition.left}px`,
+    maxHeight: `calc(100vh - 24px)`,
+}}
                             >
-                                <div className="border-b border-slate-800 px-3 py-2.5">
-                                    <p className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
+                                <div className="border-b border-gray-200 dark:border-slate-800 px-3 py-2.5">
+                                    <p className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 dark:text-slate-500">
                                         {mainTab === "contract"
                                             ? "Contract Actions"
                                             : "Permit Actions"}
                                     </p>
-                                    <p className="mt-0.5 truncate text-xs font-bold text-white">
+                                    <p className="mt-0.5 truncate text-xs font-bold text-gray-900 dark:text-white">
                                         {getReference(contract)}
                                     </p>
                                 </div>
@@ -1779,7 +1795,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     {/* ✅ EMAIL CLIENT — pwede kahit walang signed file */}
                                     {canEmailClient && (
                                         <>
-                                            <div className="my-1 border-t border-slate-800" />
+                                            <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
                                             <MenuItem
                                                 icon={<Mail size={14} />}
                                                 label={
@@ -1800,8 +1816,8 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     {/* ✅ UPLOAD SIGNED CONTRACT — for Contract records */}
                                     {canUploadSigned && (
                                         <>
-                                            <div className="my-1 border-t border-slate-800" />
-                                            <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                            <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
+                                            <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 Signed Contract
                                             </p>
                                             <MenuItem
@@ -1824,8 +1840,8 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     {/* DOWNLOAD FILES — contract */}
                                     {allContractFiles.length > 0 && (
                                         <>
-                                            <div className="my-1 border-t border-slate-800" />
-                                            <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                            <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
+                                            <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                 {isContract
                                                     ? "Contract Documents"
                                                     : "Permit Documents"}
@@ -1854,8 +1870,8 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     {isContract &&
                                         allSignedFiles.length > 0 && (
                                             <>
-                                                <div className="my-1 border-t border-slate-800" />
-                                                <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                                <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
+                                                <p className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                                     Signed Documents
                                                 </p>
                                                 {allSignedFiles.map((file) => (
@@ -1889,7 +1905,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     {/* SUBMIT FOR REVIEW */}
                                     {canSubmitReview && (
                                         <>
-                                            <div className="my-1 border-t border-slate-800" />
+                                            <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
                                             <MenuItem
                                                 icon={<Send size={14} />}
                                                 label="Submit for Review"
@@ -1904,7 +1920,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     )}
 
                                     {/* ARCHIVE / RESTORE */}
-                                    <div className="my-1 border-t border-slate-800" />
+                                    <div className="my-1 border-t border-gray-200 dark:border-slate-800" />
                                     {!isArchived ? (
                                         <MenuItem
                                             icon={<Archive size={14} />}
@@ -1948,9 +1964,9 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                 >
                     <form onSubmit={submitCreate} className="space-y-5">
                         <div>
-                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                                Select Approved Invoice{" "}
-                                <span className="ml-1 text-yellow-400">*</span>
+                            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
+                                Select Approved Quotation{" "}
+                                <span className="ml-1 text-yellow-600 dark:text-yellow-400">*</span>
                             </label>
                             <div className="relative">
                                 <select
@@ -1961,17 +1977,17 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                             e.target.value,
                                         )
                                     }
-                                    className="w-full appearance-none rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 pr-10 text-sm text-white outline-none focus:border-yellow-400/60"
+                                    className="w-full appearance-none rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/80 px-4 py-3 pr-10 text-sm text-gray-900 dark:text-white outline-none focus:border-yellow-400/60"
                                     required
                                 >
                                     <option value="">
-                                        Select an approved invoice...
+                                        Select an approved Quotation...
                                     </option>
                                     {availableInvoices.map((invoice) => (
                                         <option
                                             key={invoice.id}
                                             value={String(invoice.id)}
-                                            className="bg-slate-950"
+                                            className="bg-gray-50 dark:bg-slate-950"
                                         >
                                             {invoice.number} — {invoice.client}{" "}
                                             — ₱
@@ -1983,11 +1999,11 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 </select>
                                 <ChevronDown
                                     size={16}
-                                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600"
+                                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-zinc-600"
                                 />
                             </div>
                             {availableInvoices.length === 0 && (
-                                <p className="mt-2 text-sm text-amber-400">
+                                <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
                                     ⚠️{" "}
                                     {approvedInvoices.length === 0
                                         ? "No approved invoices available. Please wait for Admin to approve an invoice first."
@@ -2006,31 +2022,31 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 if (!selected) return null;
                                 return (
                                     <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.05] p-4">
-                                        <h3 className="mb-3 text-sm font-bold text-emerald-400">
+                                        <h3 className="mb-3 text-sm font-bold text-emerald-600 dark:text-emerald-400">
                                             📄 Invoice Details
                                         </h3>
                                         <div className="grid grid-cols-2 gap-3 text-sm">
                                             <div>
-                                                <p className="text-zinc-500">
+                                                <p className="text-gray-500 dark:text-zinc-500">
                                                     Invoice Number
                                                 </p>
-                                                <p className="font-bold text-white">
+                                                <p className="font-bold text-gray-900 dark:text-white">
                                                     {selected.number}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-zinc-500">
+                                                <p className="text-gray-500 dark:text-zinc-500">
                                                     Client
                                                 </p>
-                                                <p className="font-bold text-white">
+                                                <p className="font-bold text-gray-900 dark:text-white">
                                                     {selected.client}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-zinc-500">
+                                                <p className="text-gray-500 dark:text-zinc-500">
                                                     Amount
                                                 </p>
-                                                <p className="font-bold text-white">
+                                                <p className="font-bold text-gray-900 dark:text-white">
                                                     ₱
                                                     {Number(
                                                         selected.amount,
@@ -2038,20 +2054,20 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-zinc-500">
+                                                <p className="text-gray-500 dark:text-zinc-500">
                                                     Status
                                                 </p>
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-400">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                                     <CheckCircle2 size={12} />
                                                     Approved
                                                 </span>
                                             </div>
                                             {selected.project && (
                                                 <div className="col-span-2">
-                                                    <p className="text-zinc-500">
+                                                    <p className="text-gray-500 dark:text-zinc-500">
                                                         Project
                                                     </p>
-                                                    <p className="font-bold text-white">
+                                                    <p className="font-bold text-gray-900 dark:text-white">
                                                         {selected.project}
                                                     </p>
                                                 </div>
@@ -2071,32 +2087,9 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 placeholder="Contract title"
                                 required
                             />
-                            <FormInput
-                                label="Project"
-                                value={createForm.data.project}
-                                onChange={(value) =>
-                                    createForm.setData("project", value)
-                                }
-                                placeholder="Project name"
-                            />
-                            <FormInput
-                                label="Location"
-                                value={createForm.data.location}
-                                onChange={(value) =>
-                                    createForm.setData("location", value)
-                                }
-                                placeholder="Project location"
-                            />
-                            <TextArea
-                                label="Description"
-                                value={createForm.data.description}
-                                onChange={(value) =>
-                                    createForm.setData("description", value)
-                                }
-                                placeholder="Contract description"
-                                rows={4}
-                                full
-                            />
+
+
+
                         </div>
 
                         <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/[0.05] p-4">
@@ -2113,13 +2106,13 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                         </div>
 
                         <div className="rounded-2xl border border-blue-400/10 bg-blue-400/[0.025] p-4">
-                            <p className="text-xs leading-5 text-zinc-500">
+                            <p className="text-xs leading-5 text-gray-500 dark:text-zinc-500">
                                 The new record starts as{" "}
-                                <strong className="text-blue-400">
+                                <strong className="text-blue-600 dark:text-blue-400">
                                     Pending
                                 </strong>
                                 . After creation, use the 3-dot menu to{" "}
-                                <strong className="text-yellow-400">
+                                <strong className="text-yellow-600 dark:text-yellow-400">
                                     Email the Template to Client
                                 </strong>
                                 , then upload the signed contract and submit
@@ -2128,14 +2121,14 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             </p>
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-slate-800 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setShowCreateModal(false);
                                     createForm.reset();
                                 }}
-                                className="rounded-xl border border-slate-800 bg-slate-900/80 px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+                                className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-5 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 transition hover:border-gray-300 dark:hover:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                             >
                                 Cancel
                             </button>
@@ -2186,13 +2179,13 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             <div className="flex items-start gap-3">
                                 <FileCheck2
                                     size={18}
-                                    className="mt-0.5 shrink-0 text-emerald-400"
+                                    className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                                 />
                                 <div>
-                                    <p className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                                    <p className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
                                         Permit Record
                                     </p>
-                                    <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                                    <p className="mt-1 text-[11px] leading-5 text-gray-600 dark:text-zinc-400">
                                         Attach the actual permit paper/document
                                         during creation. Admin will verify the
                                         attached file before approving.
@@ -2240,45 +2233,8 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 placeholder="client@example.com"
                                 type="email"
                             />
-                            <FormInput
-                                label="Project"
-                                value={createPermitForm.data.project}
-                                onChange={(value) =>
-                                    createPermitForm.setData("project", value)
-                                }
-                                placeholder="Project name"
-                            />
-                            <FormInput
-                                label="Location"
-                                value={createPermitForm.data.location}
-                                onChange={(value) =>
-                                    createPermitForm.setData("location", value)
-                                }
-                                placeholder="Project location"
-                            />
-                            <TextArea
-                                label="Description"
-                                value={createPermitForm.data.description}
-                                onChange={(value) =>
-                                    createPermitForm.setData(
-                                        "description",
-                                        value,
-                                    )
-                                }
-                                placeholder="Permit description"
-                                rows={4}
-                                full
-                            />
-                            <TextArea
-                                label="Notes"
-                                value={createPermitForm.data.notes}
-                                onChange={(value) =>
-                                    createPermitForm.setData("notes", value)
-                                }
-                                placeholder="Additional notes"
-                                rows={3}
-                                full
-                            />
+
+
                         </div>
 
                         <div className="rounded-2xl border-2 border-emerald-400/30 bg-emerald-400/[0.06] p-4">
@@ -2298,9 +2254,9 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                         </div>
 
                         <div className="rounded-2xl border border-blue-400/10 bg-blue-400/[0.025] p-4">
-                            <p className="text-xs leading-5 text-zinc-500">
+                            <p className="text-xs leading-5 text-gray-500 dark:text-zinc-500">
                                 The new Permit starts as{" "}
-                                <strong className="text-blue-400">
+                                <strong className="text-blue-600 dark:text-blue-400">
                                     Pending
                                 </strong>
                                 . The attached permit document(s) will be sent
@@ -2309,14 +2265,14 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             </p>
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-slate-800 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setShowCreatePermitModal(false);
                                     createPermitForm.reset();
                                 }}
-                                className="rounded-xl border border-slate-800 bg-slate-900/80 px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+                                className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-5 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 transition hover:border-gray-300 dark:hover:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                             >
                                 Cancel
                             </button>
@@ -2370,13 +2326,13 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             <div className="flex items-start gap-3">
                                 <FileCheck2
                                     size={18}
-                                    className="mt-0.5 shrink-0 text-emerald-400"
+                                    className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
                                 />
                                 <div>
-                                    <p className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                                    <p className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
                                         Client-Signed Contract
                                     </p>
-                                    <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                                    <p className="mt-1 text-[11px] leading-5 text-gray-600 dark:text-zinc-400">
                                         Attach the contract that has been signed
                                         and returned by the client. This will
                                         be reviewed by Admin.
@@ -2385,40 +2341,40 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
-                            <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        <div className="rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/80 p-4">
+                            <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                 Contract Info
                             </p>
                             <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                                 <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-zinc-600">
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-zinc-600">
                                         Reference
                                     </p>
-                                    <p className="font-bold text-white">
+                                    <p className="font-bold text-gray-900 dark:text-white">
                                         {getReference(uploadSignedContract)}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-zinc-600">
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-zinc-600">
                                         Client
                                     </p>
-                                    <p className="font-bold text-white">
+                                    <p className="font-bold text-gray-900 dark:text-white">
                                         {getClient(uploadSignedContract)}
                                     </p>
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <p className="text-[10px] uppercase tracking-wider text-zinc-600">
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-zinc-600">
                                         Project
                                     </p>
-                                    <p className="font-bold text-white">
+                                    <p className="font-bold text-gray-900 dark:text-white">
                                         {getProject(uploadSignedContract)}
                                     </p>
                                 </div>
                                 <div className="sm:col-span-2">
-                                    <p className="text-[10px] uppercase tracking-wider text-zinc-600">
+                                    <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-zinc-600">
                                         Current Signed Files
                                     </p>
-                                    <p className="font-bold text-white">
+                                    <p className="font-bold text-gray-900 dark:text-white">
                                         {getSignedFileCount(
                                             uploadSignedContract,
                                         )}{" "}
@@ -2443,27 +2399,27 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 accentColor="emerald"
                             />
                             {uploadSignedForm.errors.signed_files && (
-                                <p className="mt-2 text-xs font-semibold text-red-400">
+                                <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">
                                     {uploadSignedForm.errors.signed_files}
                                 </p>
                             )}
                         </div>
 
                         <div className="rounded-2xl border border-blue-400/10 bg-blue-400/[0.025] p-4">
-                            <p className="text-xs leading-5 text-zinc-500">
+                            <p className="text-xs leading-5 text-gray-500 dark:text-zinc-500">
                                 After upload, you can{" "}
-                                <strong className="text-yellow-400">
+                                <strong className="text-yellow-600 dark:text-yellow-400">
                                     Email Signed Contract
                                 </strong>{" "}
                                 to the client, or{" "}
-                                <strong className="text-blue-400">
+                                <strong className="text-blue-600 dark:text-blue-400">
                                     Submit for Review
                                 </strong>{" "}
                                 so Admin can approve the record.
                             </p>
                         </div>
 
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-slate-800 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 disabled={uploadSignedForm.processing}
@@ -2472,7 +2428,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     uploadSignedForm.reset();
                                     uploadSignedForm.clearErrors();
                                 }}
-                                className="rounded-xl border border-slate-800 bg-slate-900/80 px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-5 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 transition hover:border-gray-300 dark:hover:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -2521,7 +2477,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 {statusIcon(calculateStatus(selectedContract))}
                                 {calculateStatus(selectedContract)}
                             </span>
-                            <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs font-bold text-zinc-400">
+                            <span className="rounded-full border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-3 py-1.5 text-xs font-bold text-gray-600 dark:text-zinc-400">
                                 {getType(selectedContract)}
                             </span>
                             <span
@@ -2546,20 +2502,20 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 "Needs Correction" && (
                                 <div className="rounded-2xl border-2 border-red-400/40 bg-red-500/[0.08] p-5 shadow-lg shadow-red-500/10">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-400/15 text-red-400">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-400/15 text-red-600 dark:text-red-400">
                                             <AlertTriangle size={20} />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-black uppercase tracking-wider text-red-300">
+                                            <p className="text-sm font-black uppercase tracking-wider text-red-600 dark:text-red-300">
                                                 ⚠️ Admin Correction Required
                                             </p>
-                                            <p className="mt-1 text-[11px] font-semibold text-red-200/70">
+                                            <p className="mt-1 text-[11px] font-semibold text-red-700/70 dark:text-red-200/70">
                                                 You need to correct the
                                                 following items before
                                                 resubmitting to Admin:
                                             </p>
-                                            <div className="mt-3 rounded-xl border border-red-400/20 bg-black/30 p-3">
-                                                <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-white">
+                                            <div className="mt-3 rounded-xl border border-red-400/20 bg-white/60 p-3 dark:bg-black/30">
+                                                <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-gray-900 dark:text-white">
                                                     {getCorrectionReason(
                                                         selectedContract,
                                                     )}
@@ -2568,9 +2524,9 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                             <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2.5">
                                                 <RefreshCw
                                                     size={14}
-                                                    className="mt-0.5 shrink-0 text-amber-400"
+                                                    className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
                                                 />
-                                                <p className="text-[11px] leading-4 text-amber-200/80">
+                                                <p className="text-[11px] leading-4 text-amber-700/80 dark:text-amber-200/80">
                                                     <strong>
                                                         Next Steps:
                                                     </strong>{" "}
@@ -2592,13 +2548,13 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 <div className="flex items-start gap-3">
                                     <Send
                                         size={19}
-                                        className="mt-0.5 shrink-0 text-blue-400"
+                                        className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400"
                                     />
                                     <div>
-                                        <p className="text-xs font-black uppercase tracking-wider text-blue-300">
+                                        <p className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-300">
                                             Awaiting Admin Review
                                         </p>
-                                        <p className="mt-1 text-xs leading-6 text-zinc-500">
+                                        <p className="mt-1 text-xs leading-6 text-gray-500 dark:text-zinc-500">
                                             This record has been submitted for
                                             final Admin approval.
                                         </p>
@@ -2723,7 +2679,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                 <div className="space-y-4">
                                     {contractFiles.length > 0 && (
                                         <div>
-                                            <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">
+                                            <p className="mb-2 text-xs font-black uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                                 {isPermit ? "📁 Permit" : "📁 Contract"}{" "}
                                                 Documents ({contractFiles.length})
                                             </p>
@@ -2731,16 +2687,16 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                 {contractFiles.map((f) => (
                                                     <div
                                                         key={f.id}
-                                                        className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3"
+                                                        className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 p-3"
                                                     >
-                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-400">
+                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-400/10 text-yellow-600 dark:text-yellow-400">
                                                             <FileText size={18} />
                                                         </div>
                                                         <div className="min-w-0 flex-1">
-                                                            <p className="truncate text-xs font-bold text-white">
+                                                            <p className="truncate text-xs font-bold text-gray-900 dark:text-white">
                                                                 {f.file_name}
                                                             </p>
-                                                            <p className="mt-0.5 text-[10px] text-zinc-500">
+                                                            <p className="mt-0.5 text-[10px] text-gray-500 dark:text-zinc-500">
                                                                 {f.file_size
                                                                     ? formatFileSize(
                                                                           f.file_size,
@@ -2750,7 +2706,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                         </div>
                                                         <a
                                                             href={`/contract-permit/files/${f.id}/download`}
-                                                            className="inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[10px] font-bold text-zinc-300 transition hover:border-zinc-700 hover:text-white"
+                                                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-[10px] font-bold text-gray-700 dark:text-zinc-300 transition hover:border-gray-300 dark:hover:border-zinc-700 hover:text-gray-900 dark:hover:text-white"
                                                         >
                                                             <Download size={12} />
                                                             Download
@@ -2764,7 +2720,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     {isContractRecord(selectedContract) &&
                                         signedFiles.length > 0 && (
                                             <div>
-                                                <p className="mb-2 text-xs font-black uppercase tracking-wider text-zinc-500">
+                                                <p className="mb-2 text-xs font-black uppercase tracking-wider text-gray-500 dark:text-zinc-500">
                                                     ✍️ Signed Documents (
                                                     {signedFiles.length})
                                                 </p>
@@ -2772,16 +2728,16 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                     {signedFiles.map((f) => (
                                                         <div
                                                             key={f.id}
-                                                            className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3"
+                                                            className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 p-3"
                                                         >
-                                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-400">
+                                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-600 dark:text-emerald-400">
                                                                 <FileCheck2 size={18} />
                                                             </div>
                                                             <div className="min-w-0 flex-1">
-                                                                <p className="truncate text-xs font-bold text-white">
+                                                                <p className="truncate text-xs font-bold text-gray-900 dark:text-white">
                                                                     {f.file_name}
                                                                 </p>
-                                                                <p className="mt-0.5 text-[10px] text-zinc-500">
+                                                                <p className="mt-0.5 text-[10px] text-gray-500 dark:text-zinc-500">
                                                                     {f.file_size
                                                                         ? formatFileSize(
                                                                               f.file_size,
@@ -2791,7 +2747,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                                             </div>
                                                             <a
                                                                 href={`/contract-permit/files/${f.id}/download`}
-                                                                className="inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[10px] font-bold text-zinc-300 transition hover:border-zinc-700 hover:text-white"
+                                                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-1.5 text-[10px] font-bold text-gray-700 dark:text-zinc-300 transition hover:border-gray-300 dark:hover:border-zinc-700 hover:text-gray-900 dark:hover:text-white"
                                                             >
                                                                 <Download size={12} />
                                                                 Download
@@ -2805,11 +2761,11 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             );
                         })()}
 
-                        <div className="flex flex-wrap gap-2 border-t border-slate-800 pt-5">
+                        <div className="flex flex-wrap gap-2 border-t border-gray-200 dark:border-slate-800 pt-5">
                             <button
                                 type="button"
                                 onClick={() => printContract(selectedContract)}
-                                className="inline-flex items-center gap-2 rounded-xl border border-yellow-400/20 bg-yellow-400/[0.06] px-4 py-2.5 text-sm font-bold text-yellow-400 transition hover:border-yellow-400/40 hover:bg-yellow-400/10"
+                                className="inline-flex items-center gap-2 rounded-xl border border-yellow-400/20 bg-yellow-400/[0.06] px-4 py-2.5 text-sm font-bold text-yellow-600 dark:text-yellow-400 transition hover:border-yellow-400/40 hover:bg-yellow-400/10"
                             >
                                 <Printer size={16} />
                                 Print Record
@@ -2827,11 +2783,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             ? "Send Signed Contract Agreement"
                             : "Send Contract Template to Client"
                     }
-                    subtitle={`${
-                        getSignedFileCount(emailContract) > 0
-                            ? "Send signed Contract Agreement"
-                            : "Send Contract Template for review and signature"
-                    } for ${getReference(emailContract)}`}
+                    subtitle={`${getSignedFileCount(emailContract) > 0 ? "Send signed Contract Agreement" : "Send Contract Template for review and signature"} for ${getReference(emailContract)}`}
                     icon={<Mail size={20} />}
                     onClose={() => {
                         if (emailForm.processing) return;
@@ -2842,28 +2794,20 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                 >
                     <form onSubmit={submitEmail} className="space-y-5">
                         <div
-                            className={`rounded-2xl border p-4 ${
-                                getSignedFileCount(emailContract) > 0
-                                    ? "border-emerald-400/20 bg-emerald-400/[0.05]"
-                                    : "border-yellow-400/20 bg-yellow-400/[0.05]"
-                            }`}
+                            className={`rounded-2xl border p-4 ${getSignedFileCount(emailContract) > 0 ? "border-emerald-400/20 bg-emerald-400/[0.05]" : "border-yellow-400/20 bg-yellow-400/[0.05]"}`}
                         >
                             <div className="flex items-start gap-3">
                                 <Mail
                                     size={18}
-                                    className={`mt-0.5 shrink-0 ${
-                                        getSignedFileCount(emailContract) > 0
-                                            ? "text-emerald-400"
-                                            : "text-yellow-400"
-                                    }`}
+                                    className={`mt-0.5 shrink-0 ${getSignedFileCount(emailContract) > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-yellow-600 dark:text-yellow-400"}`}
                                 />
                                 <div>
                                     {getSignedFileCount(emailContract) > 0 ? (
                                         <>
-                                            <p className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                                            <p className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
                                                 Attached: Signed Contract
                                             </p>
-                                            <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                                            <p className="mt-1 text-[11px] leading-5 text-gray-600 dark:text-zinc-400">
                                                 The uploaded signed contract (
                                                 {getSignedFileCount(
                                                     emailContract,
@@ -2880,10 +2824,10 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                         </>
                                     ) : (
                                         <>
-                                            <p className="text-xs font-black uppercase tracking-wider text-yellow-300">
+                                            <p className="text-xs font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-300">
                                                 Attached: Contract Template
                                             </p>
-                                            <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                                            <p className="mt-1 text-[11px] leading-5 text-gray-600 dark:text-zinc-400">
                                                 The contract template (
                                                 {getContractFileCount(
                                                     emailContract,
@@ -2915,7 +2859,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             required
                         />
                         {emailForm.errors.recipient_email && (
-                            <p className="-mt-3 text-xs font-semibold text-red-400">
+                            <p className="-mt-3 text-xs font-semibold text-red-600 dark:text-red-400">
                                 {emailForm.errors.recipient_email}
                             </p>
                         )}
@@ -2938,7 +2882,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                             full
                             required
                         />
-                        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 dark:border-slate-800 pt-5 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 disabled={emailForm.processing}
@@ -2947,7 +2891,7 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
                                     emailForm.reset();
                                     emailForm.clearErrors();
                                 }}
-                                className="rounded-xl border border-slate-800 bg-slate-900/80 px-5 py-3 text-sm font-bold text-zinc-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 px-5 py-3 text-sm font-bold text-gray-700 dark:text-zinc-300 transition hover:border-gray-300 dark:hover:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -2984,28 +2928,28 @@ ${!isPermit ? `<div class="file-box"><div class="detail-label">Signed Documents 
             {/* SUCCESS NOTIFICATION */}
             {successMessage && (
                 <div className="pointer-events-none fixed inset-0 z-[200] flex items-center justify-center p-4">
-                    <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-emerald-400/30 bg-slate-900/98 px-5 py-5 shadow-2xl shadow-emerald-400/10 backdrop-blur-sm">
+                    <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-emerald-400/30 bg-white dark:bg-slate-900/98 px-5 py-5 shadow-2xl shadow-emerald-400/10 backdrop-blur-sm">
                         <div className="flex items-start gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-400">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 size={24} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-black text-white">
+                                <p className="text-sm font-black text-gray-900 dark:text-white">
                                     {successMessage.title}
                                 </p>
-                                <p className="mt-1 text-xs leading-5 text-zinc-400">
+                                <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-zinc-400">
                                     {successMessage.description}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSuccessMessage(null)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-slate-800 hover:text-white"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 dark:text-zinc-500 transition hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                             >
                                 <X size={15} />
                             </button>
                         </div>
-                        <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-slate-800">
+                        <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-800">
                             <div
                                 className="h-full bg-emerald-400"
                                 style={{
@@ -3050,45 +2994,33 @@ function MainTabCard({
         <button
             type="button"
             onClick={onClick}
-            className={`group relative overflow-hidden rounded-2xl border p-5 text-left shadow-xl transition-all duration-300 hover:-translate-y-1 ${
-                active
-                    ? "border-yellow-400/40 bg-yellow-400/[0.08] shadow-yellow-400/[0.05]"
-                    : "border-slate-800 bg-slate-900/80 hover:border-slate-700 hover:bg-slate-800"
-            }`}
+            className={`group relative overflow-hidden rounded-2xl border p-5 text-left shadow-xl transition-all duration-300 hover:-translate-y-1 ${active ? "border-yellow-400/40 bg-yellow-400/[0.08] shadow-yellow-400/[0.05]" : "border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-gray-300 dark:hover:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800"}`}
         >
             <div className="flex items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-4">
                     <div
-                        className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition ${
-                            active
-                                ? "bg-yellow-400 text-black"
-                                : "bg-slate-950 text-zinc-500 group-hover:text-zinc-300"
-                        }`}
+                        className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition ${active ? "bg-yellow-400 text-black" : "bg-gray-50 dark:bg-slate-950 text-gray-500 dark:text-zinc-500 group-hover:text-gray-700 dark:group-hover:text-zinc-300"}`}
                     >
                         {icon}
                     </div>
                     <div className="min-w-0">
                         <p
-                            className={`truncate text-lg font-black uppercase tracking-wider ${
-                                active ? "text-yellow-300" : "text-white"
-                            }`}
+                            className={`truncate text-lg font-black uppercase tracking-wider ${active ? "text-yellow-600 dark:text-yellow-300" : "text-gray-900 dark:text-white"}`}
                         >
                             {label}
                         </p>
-                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-600">
                             {subtitle}
                         </p>
                     </div>
                 </div>
                 <div className="shrink-0 text-right">
                     <p
-                        className={`text-3xl font-black ${
-                            active ? "text-yellow-300" : "text-white"
-                        }`}
+                        className={`text-3xl font-black ${active ? "text-yellow-600 dark:text-yellow-300" : "text-gray-900 dark:text-white"}`}
                     >
                         {count}
                     </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-zinc-600">
                         {count === 1 ? "record" : "records"}
                     </p>
                 </div>
@@ -3119,19 +3051,11 @@ function SubTabButton({
         <button
             type="button"
             onClick={onClick}
-            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
-                active
-                    ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/20"
-                    : "text-zinc-400 hover:bg-slate-800 hover:text-yellow-400"
-            }`}
+            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${active ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/20" : "text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-yellow-400"}`}
         >
             <span>{label}</span>
             <span
-                className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black ${
-                    active
-                        ? "bg-black/20 text-black"
-                        : "bg-slate-950 text-zinc-500"
-                }`}
+                className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black ${active ? "bg-black/20 text-black" : "bg-gray-50 dark:bg-slate-950 text-gray-500 dark:text-zinc-500"}`}
             >
                 {count}
             </span>
@@ -3160,13 +3084,7 @@ function MenuItem({
         <button
             type="button"
             onClick={onClick}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${
-                danger
-                    ? "text-red-400 hover:bg-red-400/10"
-                    : highlight
-                      ? "text-yellow-400 hover:bg-yellow-400/10"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-            }`}
+            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${danger ? "text-red-600 dark:text-red-400 hover:bg-red-400/10" : highlight ? "text-yellow-600 dark:text-yellow-400 hover:bg-yellow-400/10" : "text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-white"}`}
         >
             {icon}
             <span className="truncate">{label}</span>
@@ -3200,13 +3118,13 @@ function MultiFileUploadField({
         accentColor === "emerald"
             ? {
                   bg: "bg-emerald-400/10",
-                  text: "text-emerald-400",
+                  text: "text-emerald-600 dark:text-emerald-400",
                   border: "hover:border-emerald-400/50",
                   btn: "bg-emerald-400 hover:bg-emerald-300",
               }
             : {
                   bg: "bg-yellow-400/10",
-                  text: "text-yellow-400",
+                  text: "text-yellow-600 dark:text-yellow-400",
                   border: "hover:border-yellow-400/50",
                   btn: "bg-yellow-400 hover:bg-yellow-300",
               };
@@ -3245,9 +3163,9 @@ function MultiFileUploadField({
 
     return (
         <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
                 {label}
-                <span className="ml-1 text-yellow-400">*</span>
+                <span className="ml-1 text-yellow-600 dark:text-yellow-400">*</span>
             </label>
 
             <input
@@ -3269,11 +3187,7 @@ function MultiFileUploadField({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onClick={() => inputRef.current?.click()}
-                className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-all duration-200 ${accent.border} ${
-                    isDragging
-                        ? `${accent.bg} scale-[1.01]`
-                        : "border-slate-700 bg-slate-950/80 hover:bg-slate-900"
-                }`}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-all duration-200 ${accent.border} ${isDragging ? `${accent.bg} scale-[1.01]` : "border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-950/80 hover:bg-white dark:hover:bg-slate-900"}`}
             >
                 <div
                     className={`flex h-14 w-14 items-center justify-center rounded-2xl ${accent.bg} ${accent.text}`}
@@ -3281,10 +3195,10 @@ function MultiFileUploadField({
                     <Cloud size={26} />
                 </div>
                 <div>
-                    <p className="text-sm font-black text-white">
+                    <p className="text-sm font-black text-gray-900 dark:text-white">
                         Click to browse or drag & drop
                     </p>
-                    <p className="mt-1 text-[11px] text-zinc-500">
+                    <p className="mt-1 text-[11px] text-gray-500 dark:text-zinc-500">
                         You can select multiple files at once.
                     </p>
                 </div>
@@ -3301,7 +3215,7 @@ function MultiFileUploadField({
                     {files.map((file, index) => (
                         <div
                             key={`${file.name}-${index}-${file.size}`}
-                            className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/80 p-3"
+                            className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/80 p-3"
                         >
                             <div
                                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${accent.bg} ${accent.text}`}
@@ -3309,30 +3223,30 @@ function MultiFileUploadField({
                                 <FileText size={18} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="truncate text-xs font-bold text-white">
+                                <p className="truncate text-xs font-bold text-gray-900 dark:text-white">
                                     {file.name}
                                 </p>
-                                <p className="mt-0.5 text-[10px] text-zinc-500">
+                                <p className="mt-0.5 text-[10px] text-gray-500 dark:text-zinc-500">
                                     {formatFileSize(file.size)}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => removeFile(index)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-400/20 bg-red-400/5 text-red-400 transition hover:bg-red-400/10"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-400/20 bg-red-400/5 text-red-600 dark:text-red-400 transition hover:bg-red-400/10"
                             >
                                 <X size={14} />
                             </button>
                         </div>
                     ))}
-                    <p className="text-[10px] text-zinc-600">
+                    <p className="text-[10px] text-gray-500 dark:text-zinc-600">
                         {files.length} file{files.length > 1 ? "s" : ""}{" "}
                         selected
                     </p>
                 </div>
             )}
 
-            {hint && <p className="mt-2 text-[10px] text-zinc-600">{hint}</p>}
+            {hint && <p className="mt-2 text-[10px] text-gray-500 dark:text-zinc-600">{hint}</p>}
         </div>
     );
 }
@@ -3358,9 +3272,9 @@ function FormInput({
 }) {
     return (
         <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
                 {label}
-                {required && <span className="ml-1 text-yellow-400">*</span>}
+                {required && <span className="ml-1 text-yellow-600 dark:text-yellow-400">*</span>}
             </label>
             <input
                 type={type}
@@ -3368,7 +3282,7 @@ function FormInput({
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
                 required={required}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-yellow-400/60 focus:bg-slate-900"
+                className="w-full rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/80 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition placeholder:text-gray-500 dark:placeholder:text-zinc-600 focus:border-yellow-400/60 focus:bg-white dark:focus:bg-slate-900"
             />
         </div>
     );
@@ -3397,9 +3311,9 @@ function TextArea({
 }) {
     return (
         <div className={full ? "md:col-span-2" : ""}>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-zinc-400">
                 {label}
-                {required && <span className="ml-1 text-yellow-400">*</span>}
+                {required && <span className="ml-1 text-yellow-600 dark:text-yellow-400">*</span>}
             </label>
             <textarea
                 rows={rows}
@@ -3407,7 +3321,7 @@ function TextArea({
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
                 required={required}
-                className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-600 focus:border-yellow-400/60 focus:bg-slate-900"
+                className="w-full resize-none rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/80 px-4 py-3 text-sm leading-6 text-gray-900 dark:text-white outline-none transition placeholder:text-gray-500 dark:placeholder:text-zinc-600 focus:border-yellow-400/60 focus:bg-white dark:focus:bg-slate-900"
             />
         </div>
     );
@@ -3428,14 +3342,12 @@ function DetailBox({
 }) {
     return (
         <div
-            className={`min-w-0 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl ${
-                full ? "sm:col-span-2" : ""
-            }`}
+            className={`min-w-0 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 shadow-xl ${full ? "sm:col-span-2" : ""}`}
         >
-            <p className="mb-1 text-[9px] font-black uppercase tracking-[0.15em] text-zinc-600">
+            <p className="mb-1 text-[9px] font-black uppercase tracking-[0.15em] text-gray-500 dark:text-zinc-600">
                 {label}
             </p>
-            <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-zinc-300">
+            <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-gray-700 dark:text-zinc-300">
                 {value}
             </p>
         </div>
@@ -3464,21 +3376,19 @@ function Modal({
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-md sm:p-6">
             <div
-                className={`my-auto w-full ${
-                    wide ? "max-w-4xl" : "max-w-xl"
-                } overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 shadow-xl`}
+                className={`my-auto w-full ${wide ? "max-w-4xl" : "max-w-xl"} overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/95 shadow-xl`}
             >
-                <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-5 py-5 sm:px-6">
+                <div className="flex items-start justify-between gap-4 border-b border-gray-200 dark:border-slate-800 px-5 py-5 sm:px-6">
                     <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-black">
                             {icon}
                         </div>
                         <div className="min-w-0">
-                            <h2 className="break-words text-lg font-black text-white">
+                            <h2 className="break-words text-lg font-black text-gray-900 dark:text-white">
                                 {title}
                             </h2>
                             {subtitle && (
-                                <p className="mt-1 break-words text-xs leading-5 text-zinc-600">
+                                <p className="mt-1 break-words text-xs leading-5 text-gray-500 dark:text-zinc-600">
                                     {subtitle}
                                 </p>
                             )}
@@ -3487,7 +3397,7 @@ function Modal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/80 text-zinc-500 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950/80 text-gray-500 dark:text-zinc-500 transition hover:border-gray-300 dark:hover:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
                     >
                         <X size={17} />
                     </button>

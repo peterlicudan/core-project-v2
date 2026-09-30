@@ -978,33 +978,244 @@ class ForecastingController extends Controller
 
     private function buildInsights(string $type, array $trainingSeries, array $forecastValues, array $forecastResult, float $growth, string $trend, array $dataQuality): array
     {
-        $metricLabel = $this->metricLabel($type);
+        $metricLabel = ucfirst($this->metricLabel($type));
+        $isCurrency = in_array($type, ['revenue', 'payments'], true);
+        $horizon = count($forecastValues);
         $insights = [];
 
-        $insights[] = "{$metricLabel} forecasting is based on live ALIBATON database records and finalized business events.";
-        $insights[] = 'The system evaluates multiple forecasting models using rolling historical backtesting instead of relying on a fixed formula.';
+        $formatValue = function (float $value) use ($isCurrency): string {
+            return $isCurrency
+                ? '₱' . number_format($value, 2)
+                : number_format($value, 0);
+        };
 
-        if ($trend === 'up') {
-            $insights[] = "The selected model indicates an upward {$metricLabel} direction over the forecast horizon.";
-        } elseif ($trend === 'down') {
-            $insights[] = "The selected model indicates a downward {$metricLabel} direction over the forecast horizon.";
-        } else {
-            $insights[] = "The selected model indicates a relatively stable {$metricLabel} direction over the forecast horizon.";
+        /*
+        |--------------------------------------------------------------------------
+        | FORECAST MONTH LABELS (para sa descriptive/predictive insights)
+        |--------------------------------------------------------------------------
+        */
+
+        $forecastLabels = [];
+        $lastTrainingDate = null;
+
+        foreach ($trainingSeries as $point) {
+            $date = $point['date'] ?? null;
+            if ($date) $lastTrainingDate = $date;
         }
 
+        $baseMonth = $lastTrainingDate
+            ? Carbon::parse($lastTrainingDate)->addMonth()->startOfMonth()
+            : now()->addMonth()->startOfMonth();
+
+        for ($i = 0; $i < $horizon; $i++) {
+            $forecastLabels[] = $baseMonth->copy()->addMonths($i)->format('M Y');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 1. DATA SOURCE (ano ang pinagmulan ng forecast)
+        |--------------------------------------------------------------------------
+        */
+
+        $insights[] = [
+            'title' => 'Data source',
+            'message' => "{$metricLabel} forecasting is based on live ALIBATON database records. "
+                . 'Multiple models are evaluated with rolling backtests, and the best one produces the projection.',
+            'type' => 'info',
+            'value' => null,
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | 2. TREND DIRECTION + GROWTH (predictive — tataas o bababa ba?)
+        |--------------------------------------------------------------------------
+        */
+
+        $trendType = $trend === 'up' ? 'positive' : ($trend === 'down' ? 'warning' : 'neutral');
+
+        $directionText = match ($trend) {
+            'up' => 'pataas — may inaasahang PAGTAAS (increase)',
+            'down' => 'pababa — may inaasahang PAGBABA (decrease)',
+            default => 'humigit-kumulang stable (hindi gaanong magbabago)',
+        };
+
+        $growthText = '';
         if ($growth > 5) {
-            $insights[] = 'Projected average activity is above the latest comparable historical period.';
+            $growthText = 'Ang projected average ay ' . number_format($growth, 1)
+                . '% na MAS MATAAS kaysa sa pinakahuling historical average.';
         } elseif ($growth < -5) {
-            $insights[] = 'Projected average activity is below the latest comparable historical period.';
+            $growthText = 'Ang projected average ay ' . number_format(abs($growth), 1)
+                . '% na MAS MABABA kaysa sa pinakahuling historical average.';
         } else {
-            $insights[] = 'Projected average activity remains close to the latest comparable historical period.';
+            $growthText = 'Ang projected average ay malapit lamang sa pinakahuling historical average (hindi gaanong nagbabago).';
         }
 
-        if (($dataQuality['confidence'] ?? 'low') === 'high') {
-            $insights[] = 'Historical coverage and backtesting provide relatively strong support for the selected model.';
-        } else {
-            $insights[] = 'Additional completed historical records will improve forecast stability.';
+        $insights[] = [
+            'title' => $trend === 'up'
+                ? 'Inaasahang pagtaas (increase)'
+                : ($trend === 'down' ? 'Inaasahang pagbaba (decrease)' : 'Stable/patas na trend'),
+            'message' => 'Sa susunod na ' . $horizon . ' buwan, ang direksyon ng ' . $metricLabel
+                . ' ay ' . $directionText . '. ' . $growthText
+                . ' Sa graph: ang mga bar ay ang aktwal na history, at ang projection line ay ang inaasahang susunod.',
+            'type' => $trendType,
+            'value' => round($growth, 2),
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. GRAPH DESCRIPTION (ano ang ipinapakita ng graphs?)
+        |--------------------------------------------------------------------------
+        */
+
+        $historyValues = [];
+
+        foreach ($trainingSeries as $point) {
+            $historyValues[] = [
+                'label' => $point['label']
+                    ?? Carbon::parse($point['date'] ?? now())->format('M Y'),
+                'value' => max(0, (float) ($point['value'] ?? 0)),
+            ];
         }
+
+        if (count($historyValues) > 0) {
+            $minPoint = $maxPoint = $historyValues[0];
+            $lastValue = $historyValues[count($historyValues) - 1]['value'];
+
+            foreach ($historyValues as $point) {
+                if ($point['value'] > $maxPoint['value']) $maxPoint = $point;
+                if ($point['value'] < $minPoint['value']) $minPoint = $point;
+            }
+
+            $insights[] = [
+                'title' => 'Ano ang ipinapakita ng graph',
+                'message' => 'Ang graph ay nagpapakita ng ' . count($historyValues)
+                    . ' buwan ng historical data (bars) at ' . $horizon
+                    . ' buwan na projection (line). Pinakamataas na historical: '
+                    . $formatValue($maxPoint['value']) . ' (' . $maxPoint['label'] . '); pinakamababa: '
+                    . $formatValue($minPoint['value']) . ' (' . $minPoint['label'] . '). '
+                    . 'Mula sa huling actual (' . $formatValue($lastValue) . '), naka-project ang susunod na galaw.',
+                'type' => 'neutral',
+                'value' => null,
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 4. PROJECTED PEAK (kailan ang pinakamataas na inaasahan?)
+        |--------------------------------------------------------------------------
+        */
+
+        $peakValue = 0;
+        $peakIndex = 0;
+
+        foreach ($forecastValues as $i => $value) {
+            $value = max(0, (float) $value);
+            if ($value > $peakValue) {
+                $peakValue = $value;
+                $peakIndex = $i;
+            }
+        }
+
+        if ($horizon > 0 && $peakValue > 0 && isset($forecastLabels[$peakIndex])) {
+            $forecastAverage = array_sum($forecastValues) / count($forecastValues);
+            $deltaVsAverage = $forecastAverage > 0
+                ? (($peakValue - $forecastAverage) / $forecastAverage) * 100
+                : 0;
+
+            $insights[] = [
+                'title' => 'Inaasahang peak',
+                'message' => 'Ang pinakamataas na inaasahang ' . $metricLabel . ' ay '
+                    . $formatValue($peakValue) . ' sa ' . $forecastLabels[$peakIndex] . ' — '
+                    . ($deltaVsAverage >= 0 ? '+' : '') . number_format($deltaVsAverage, 1)
+                    . '% kumpara sa average ng buong forecast horizon. Posible ang pag-usbong ng activity sa buwang iyon.',
+                'type' => 'positive',
+                'value' => round($peakValue, 2),
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 5. FORECAST MOMENTUM (pinakamalaking pagtaas/pagbaba buwan-buwan)
+        |--------------------------------------------------------------------------
+        */
+
+        $biggestRise = null;
+        $biggestDrop = null;
+
+        for ($i = 1; $i < $horizon; $i++) {
+            $previous = max(0, (float) ($forecastValues[$i - 1] ?? 0));
+            $current = max(0, (float) ($forecastValues[$i] ?? 0));
+
+            if ($previous == 0 && $current == 0) continue;
+
+            $percent = $previous == 0
+                ? ($current > 0 ? 100 : 0)
+                : (($current - $previous) / abs($previous)) * 100;
+
+            if ($percent > 0 && ($biggestRise === null || $percent > $biggestRise['percent'])) {
+                $biggestRise = ['from' => $i - 1, 'to' => $i, 'percent' => $percent];
+            }
+
+            if ($percent < 0 && ($biggestDrop === null || $percent < $biggestDrop['percent'])) {
+                $biggestDrop = ['from' => $i - 1, 'to' => $i, 'percent' => $percent];
+            }
+        }
+
+        $momentumParts = [];
+
+        if ($biggestRise !== null) {
+            $momentumParts[] = 'sa pagitan ng ' . ($forecastLabels[$biggestRise['from']] ?? '')
+                . ' at ' . ($forecastLabels[$biggestRise['to']] ?? '')
+                . ' ay inaasahang tataas ng +' . number_format($biggestRise['percent'], 1) . '%';
+        }
+
+        if ($biggestDrop !== null) {
+            $momentumParts[] = 'sa pagitan ng ' . ($forecastLabels[$biggestDrop['from']] ?? '')
+                . ' at ' . ($forecastLabels[$biggestDrop['to']] ?? '')
+                . ' naman ay inaasahang bababa ng ' . number_format($biggestDrop['percent'], 1) . '%';
+        }
+
+        if (!empty($momentumParts)) {
+            $netPositive = $biggestRise !== null
+                && ($biggestDrop === null || $biggestRise['percent'] > abs($biggestDrop['percent']));
+
+            $momentumType = $netPositive ? 'positive' : ($biggestDrop !== null ? 'warning' : 'neutral');
+
+            $insights[] = [
+                'title' => 'Forecast momentum (buwan-buwan)',
+                'message' => 'Sa forecast horizon, ' . implode('; ', $momentumParts)
+                    . '. Ito ang mga buwan na dapat bantayan dahil inaasahang may malaking pagbabago sa ' . $metricLabel . '.',
+                'type' => $momentumType,
+                'value' => null,
+            ];
+        } else {
+            $insights[] = [
+                'title' => 'Forecast momentum (buwan-buwan)',
+                'message' => 'Walang kapansin-pansing pagbabago sa loob ng forecast horizon — ang projected '
+                    . $metricLabel . ' ay humigit-kumulang patas o paulit-ulit kada buwan. '
+                    . 'Ibig sabihin, hindi inaasahan ang malaking pag-usbong o pagbagsak.',
+                'type' => 'neutral',
+                'value' => null,
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 6. CONFIDENCE / RELIABILITY
+        |--------------------------------------------------------------------------
+        */
+
+        $confidence = $dataQuality['confidence'] ?? 'low';
+        $confidenceType = $confidence === 'high'
+            ? 'positive'
+            : ($confidence === 'medium' ? 'neutral' : 'warning');
+
+        $insights[] = [
+            'title' => 'Confidence ng forecast',
+            'message' => $dataQuality['message'] ?? 'Limited historical data — ituring na early estimate ang forecast.',
+            'type' => $confidenceType,
+            'value' => (float) ($dataQuality['score'] ?? 0),
+        ];
 
         return $insights;
     }

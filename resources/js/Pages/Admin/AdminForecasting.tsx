@@ -3,8 +3,10 @@ import { Head, usePage } from "@inertiajs/react";
 import {
     AlertTriangle,
     ArrowUpRight,
+    ArrowDownRight,
     BarChart3,
     CheckCircle2,
+    Info,
     RefreshCw,
     Shield,
     Sparkles,
@@ -209,9 +211,33 @@ type BackendForecastResponse = {
         backtest_mae?: number;
         message?: string;
     };
-    insights?: string[];
-    forecast_insights?: string[];
-    forecastInsights?: string[];
+    insights?: Array<
+        | string
+        | {
+              title?: string;
+              message?: string;
+              type?: string;
+              value?: number | null;
+          }
+    >;
+    forecast_insights?: Array<
+        | string
+        | {
+              title?: string;
+              message?: string;
+              type?: string;
+              value?: number | null;
+          }
+    >;
+    forecastInsights?: Array<
+        | string
+        | {
+              title?: string;
+              message?: string;
+              type?: string;
+              value?: number | null;
+          }
+    >;
     risks?: string[];
     forecast_risks?: string[];
     forecastRisks?: string[];
@@ -258,9 +284,7 @@ const formatCompactValue = (value: number): string => {
 const clamp = (value: number, min: number, max: number): number =>
     Math.min(max, Math.max(min, value));
 
-const createEmptyMetric = (
-    format: "currency" | "number",
-): ForecastMetric => ({
+const createEmptyMetric = (format: "currency" | "number"): ForecastMetric => ({
     historical: [],
     forecast: [],
     data: [],
@@ -275,8 +299,7 @@ const createEmptyMetric = (
         score: 0,
         label: "Insufficient data",
         level: "low",
-        message:
-            "No completed historical activity is currently available.",
+        message: "No completed historical activity is currently available.",
     },
     format,
     historical_count: 0,
@@ -360,28 +383,18 @@ const normalizeRow = (
 const normalizeBackendForecast = (
     raw: BackendForecastResponse,
 ): ForecastResponse => {
-    const historicalSource =
-        raw.historical ?? raw.history ?? raw.actuals ?? [];
+    const historicalSource = raw.historical ?? raw.history ?? raw.actuals ?? [];
 
     const forecastSource =
-        raw.forecast ??
-        raw.forecasted_period ??
-        raw.forecastedPeriod ??
-        [];
+        raw.forecast ?? raw.forecasted_period ?? raw.forecastedPeriod ?? [];
 
-    const historical = historicalSource.map((row) =>
-        normalizeRow(row, false),
-    );
+    const historical = historicalSource.map((row) => normalizeRow(row, false));
 
-    const forecast = forecastSource.map((row) =>
-        normalizeRow(row, true),
-    );
+    const forecast = forecastSource.map((row) => normalizeRow(row, true));
 
-    const combinedSource =
-        raw.data ??
+    const combinedSource = raw.data ??
         raw.chart_data ??
-        raw.chartData ??
-        [...historical, ...forecast];
+        raw.chartData ?? [...historical, ...forecast];
 
     const combined = combinedSource.map((row) => {
         const isForecast =
@@ -398,10 +411,7 @@ const normalizeBackendForecast = (
 
     const score = clamp(
         Number(
-            raw.confidence_score ??
-                raw.confidenceScore ??
-                quality.score ??
-                0,
+            raw.confidence_score ?? raw.confidenceScore ?? quality.score ?? 0,
         ),
         0,
         100,
@@ -428,13 +438,10 @@ const normalizeBackendForecast = (
 
     const activeCount = Number(
         quality.active_months ??
-            historical.filter(
-                (row) => Number(row.actual ?? 0) > 0,
-            ).length,
+            historical.filter((row) => Number(row.actual ?? 0) > 0).length,
     );
 
-    const historyStart =
-        historical[0]?.date ?? historical[0]?.month ?? null;
+    const historyStart = historical[0]?.date ?? historical[0]?.month ?? null;
 
     const historyEnd =
         historical[historical.length - 1]?.date ??
@@ -444,13 +451,9 @@ const normalizeBackendForecast = (
     const type = raw.type ?? "revenue";
 
     const backtestSource: Partial<BacktestData> =
-        raw.backtest ??
-        raw.backtest_results ??
-        raw.backtestResults ??
-        {};
+        raw.backtest ?? raw.backtest_results ?? raw.backtestResults ?? {};
 
-    const latestActual =
-        raw.latest_actual ?? raw.latestActual ?? null;
+    const latestActual = raw.latest_actual ?? raw.latestActual ?? null;
 
     const metric: ForecastMetric = {
         historical,
@@ -462,8 +465,7 @@ const normalizeBackendForecast = (
                 historical
                     .filter(
                         (row) =>
-                            row.actual !== null &&
-                            row.actual !== undefined,
+                            row.actual !== null && row.actual !== undefined,
                     )
                     .slice(-1)[0]?.actual ??
                 0,
@@ -478,26 +480,17 @@ const normalizeBackendForecast = (
         ),
 
         average_forecast: Number(
-            raw.average_forecast ??
-                raw.averageForecast ??
-                0,
+            raw.average_forecast ?? raw.averageForecast ?? 0,
         ),
 
         growth: Number(raw.growth ?? 0),
 
         trend:
-            raw.trend ??
-            raw.trend_direction ??
-            raw.trendDirection ??
-            "stable",
+            raw.trend ?? raw.trend_direction ?? raw.trendDirection ?? "stable",
 
         slope: 0,
 
-        r_squared: Number(
-            raw.r_squared ??
-                raw.rSquared ??
-                0,
-        ),
+        r_squared: Number(raw.r_squared ?? raw.rSquared ?? 0),
 
         confidence: {
             score,
@@ -517,18 +510,11 @@ const normalizeBackendForecast = (
         },
 
         format:
-            type === "invoices" ||
-            type === "contracts"
-                ? "number"
-                : "currency",
+            type === "invoices" || type === "contracts" ? "number" : "currency",
 
         historical_count: historicalCount,
 
-        model:
-            raw.model ??
-            raw.model_name ??
-            raw.modelName ??
-            "Forecast Model",
+        model: raw.model ?? raw.model_name ?? raw.modelName ?? "Forecast Model",
 
         model_description:
             raw.model_description ??
@@ -537,23 +523,13 @@ const normalizeBackendForecast = (
 
         backtest: {
             mae: Number(
-                backtestSource.mae ??
-                    raw.mae ??
-                    quality.backtest_mae ??
-                    0,
+                backtestSource.mae ?? raw.mae ?? quality.backtest_mae ?? 0,
             ),
 
-            rmse: Number(
-                backtestSource.rmse ??
-                    raw.rmse ??
-                    0,
-            ),
+            rmse: Number(backtestSource.rmse ?? raw.rmse ?? 0),
 
             wape: Number(
-                backtestSource.wape ??
-                    raw.wape ??
-                    quality.backtest_wape ??
-                    0,
+                backtestSource.wape ?? raw.wape ?? quality.backtest_wape ?? 0,
             ),
 
             smape: Number(
@@ -563,24 +539,15 @@ const normalizeBackendForecast = (
                     0,
             ),
 
-            folds: Number(
-                backtestSource.folds ??
-                    0,
-            ),
+            folds: Number(backtestSource.folds ?? 0),
         },
     };
 
     const insightMessages =
-        raw.insights ??
-        raw.forecast_insights ??
-        raw.forecastInsights ??
-        [];
+        raw.insights ?? raw.forecast_insights ?? raw.forecastInsights ?? [];
 
     const riskMessages =
-        raw.risks ??
-        raw.forecast_risks ??
-        raw.forecastRisks ??
-        [];
+        raw.risks ?? raw.forecast_risks ?? raw.forecastRisks ?? [];
 
     return {
         generated_at:
@@ -591,10 +558,7 @@ const normalizeBackendForecast = (
             new Date().toISOString(),
 
         period: Number(
-            raw.period ??
-                raw.forecast_period ??
-                raw.forecastMonths ??
-                6,
+            raw.period ?? raw.forecast_period ?? raw.forecastMonths ?? 6,
         ),
 
         history_months: historicalCount,
@@ -605,107 +569,104 @@ const normalizeBackendForecast = (
 
         requested_type: type,
 
-        revenue:
-            type === "revenue"
-                ? metric
-                : null,
+        revenue: type === "revenue" ? metric : null,
 
-        payments:
-            type === "payments"
-                ? metric
-                : null,
+        payments: type === "payments" ? metric : null,
 
-        invoices:
-            type === "invoices"
-                ? metric
-                : null,
+        invoices: type === "invoices" ? metric : null,
 
-        contracts:
-            type === "contracts"
-                ? metric
-                : null,
+        contracts: type === "contracts" ? metric : null,
 
         summary: {
-            projected_revenue:
-                type === "revenue"
-                    ? metric.projected_total
-                    : 0,
+            projected_revenue: type === "revenue" ? metric.projected_total : 0,
 
             projected_payments:
-                type === "payments"
-                    ? metric.projected_total
-                    : 0,
+                type === "payments" ? metric.projected_total : 0,
 
             projected_invoices:
-                type === "invoices"
-                    ? metric.projected_total
-                    : 0,
+                type === "invoices" ? metric.projected_total : 0,
 
             projected_contracts:
-                type === "contracts"
-                    ? metric.projected_total
-                    : 0,
+                type === "contracts" ? metric.projected_total : 0,
 
-            revenue_growth:
-                type === "revenue"
-                    ? metric.growth
-                    : 0,
+            revenue_growth: type === "revenue" ? metric.growth : 0,
 
-            payment_growth:
-                type === "payments"
-                    ? metric.growth
-                    : 0,
+            payment_growth: type === "payments" ? metric.growth : 0,
 
-            invoice_growth:
-                type === "invoices"
-                    ? metric.growth
-                    : 0,
+            invoice_growth: type === "invoices" ? metric.growth : 0,
 
-            contract_growth:
-                type === "contracts"
-                    ? metric.growth
-                    : 0,
+            contract_growth: type === "contracts" ? metric.growth : 0,
         },
 
-        insights: insightMessages.map(
-            (message, index) => ({
-                type: "info" as const,
+        insights: insightMessages.map((item, index) => {
+            // ✅ Backward-compatible: string O object ang pwedeng i-return
+            // ng backend (structured descriptive/predictive insights).
+            if (typeof item === "string") {
+                return {
+                    type: "info" as const,
+                    metric: type,
+                    title:
+                        index === 0
+                            ? "Forecast Insight"
+                            : "Historical Analysis",
+                    message: item,
+                    value: Number(metric.growth) || 0,
+                };
+            }
+
+            const raw = (item ?? {}) as {
+                title?: string;
+                message?: string;
+                type?: string;
+                value?: number | null;
+            };
+
+            const rawType = String(raw.type ?? "info").toLowerCase();
+
+            let normalizedType: ForecastInsight["type"] = "info";
+
+            if (
+                rawType === "positive" ||
+                rawType === "warning" ||
+                rawType === "neutral"
+            ) {
+                normalizedType = rawType;
+            } else if (rawType === "success") {
+                normalizedType = "positive";
+            } else if (rawType === "error") {
+                normalizedType = "warning";
+            }
+
+            return {
+                type: normalizedType,
                 metric: type,
                 title:
-                    index === 0
-                        ? "Forecast Insight"
-                        : "Historical Analysis",
-                message,
-                value: metric.growth,
-            }),
-        ),
+                    raw.title ??
+                    (index === 0 ? "Forecast Insight" : "Historical Analysis"),
+                message: raw.message ?? "",
+                value: Number(raw.value ?? metric.growth ?? 0),
+            };
+        }),
 
-        risks: riskMessages.map(
-            (message, index) => ({
-                severity:
-                    level === "low"
-                        ? "high"
-                        : level === "medium"
-                          ? "medium"
-                          : "low",
+        risks: riskMessages.map((message, index) => ({
+            severity:
+                level === "low"
+                    ? "high"
+                    : level === "medium"
+                      ? "medium"
+                      : "low",
 
-                type: "forecast",
+            type: "forecast",
 
-                title:
-                    index === 0
-                        ? "Forecast Risk"
-                        : "Data Consideration",
+            title: index === 0 ? "Forecast Risk" : "Data Consideration",
 
-                message,
-            }),
-        ),
+            message,
+        })),
 
         data_quality: {
-            historical_months_available:
-                historicalCount,
+            historical_months_available: historicalCount,
 
-            has_sufficient_history:
-                historicalCount >= 6,
+            has_sufficient_history: historicalCount >= 6,
 
             message:
                 quality.message ??
@@ -731,83 +692,60 @@ function ForecastTooltip(props: {
     label?: string;
     isCurrency?: boolean;
 }) {
-    const {
-        active,
-        payload,
-        label,
-        isCurrency,
-    } = props;
+    const { active, payload, label, isCurrency } = props;
 
-    if (
-        !active ||
-        !payload ||
-        payload.length === 0
-    ) {
+    if (!active || !payload || payload.length === 0) {
         return null;
     }
 
-    const actual = payload.find(
-        (item) => item.dataKey === "actual",
-    );
+    const actual = payload.find((item) => item.dataKey === "actual");
 
-    const forecast = payload.find(
-        (item) => item.dataKey === "forecast",
-    );
+    const forecast = payload.find((item) => item.dataKey === "forecast");
 
     const actualValue = actual?.value ?? null;
     const forecastValue = forecast?.value ?? null;
 
     return (
-        <div className="min-w-[200px] rounded-xl border border-slate-700 bg-slate-950 p-3 shadow-2xl">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="min-w-[200px] rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-3 shadow-2xl">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-slate-400">
                 {label}
             </p>
 
-            {actualValue !== null &&
-                actualValue !== undefined && (
-                    <div className="mb-2 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-sm bg-blue-500" />
+            {actualValue !== null && actualValue !== undefined && (
+                <div className="mb-2 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-sm bg-blue-500" />
 
-                            <span className="text-[11px] text-slate-400">
-                                Actual
-                            </span>
-                        </div>
-
-                        <span className="text-xs font-bold text-white">
-                            {isCurrency
-                                ? formatCurrency(
-                                      Number(actualValue),
-                                  )
-                                : formatNumber(
-                                      Number(actualValue),
-                                  )}
+                        <span className="text-[11px] text-gray-600 dark:text-slate-400">
+                            Actual
                         </span>
                     </div>
-                )}
 
-            {forecastValue !== null &&
-                forecastValue !== undefined && (
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-sm bg-emerald-400" />
+                    <span className="text-xs font-bold text-gray-900 dark:text-white">
+                        {isCurrency
+                            ? formatCurrency(Number(actualValue))
+                            : formatNumber(Number(actualValue))}
+                    </span>
+                </div>
+            )}
 
-                            <span className="text-[11px] text-slate-400">
-                                Forecast
-                            </span>
-                        </div>
+            {forecastValue !== null && forecastValue !== undefined && (
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-sm bg-emerald-400" />
 
-                        <span className="text-xs font-bold text-emerald-400">
-                            {isCurrency
-                                ? formatCurrency(
-                                      Number(forecastValue),
-                                  )
-                                : formatNumber(
-                                      Number(forecastValue),
-                                  )}
+                        <span className="text-[11px] text-gray-600 dark:text-slate-400">
+                            Forecast
                         </span>
                     </div>
-                )}
+
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {isCurrency
+                            ? formatCurrency(Number(forecastValue))
+                            : formatNumber(Number(forecastValue))}
+                    </span>
+                </div>
+            )}
         </div>
     );
 }
@@ -818,30 +756,21 @@ function SimpleValueTooltip(props: {
     label?: string;
     isCurrency?: boolean;
 }) {
-    const {
-        active,
-        payload,
-        label,
-        isCurrency,
-    } = props;
+    const { active, payload, label, isCurrency } = props;
 
-    if (
-        !active ||
-        !payload ||
-        payload.length === 0
-    ) {
+    if (!active || !payload || payload.length === 0) {
         return null;
     }
 
     const value = payload[0]?.value ?? 0;
 
     return (
-        <div className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 shadow-2xl">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 shadow-2xl">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-slate-400">
                 {label}
             </p>
 
-            <p className="text-xs font-bold text-emerald-400">
+            <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                 {isCurrency
                     ? formatCurrency(Number(value))
                     : formatNumber(Number(value))}
@@ -857,51 +786,35 @@ function SimpleValueTooltip(props: {
 function AdminForecasting() {
     const page = usePage<PageProps>();
 
-    const initialForecast =
-        page.props.forecasting;
+    const initialForecast = page.props.forecasting;
 
-    const [forecastType, setForecastType] =
-        useState<ForecastType>("revenue");
+    const [forecastType, setForecastType] = useState<ForecastType>("revenue");
 
-    const [forecastPeriod, setForecastPeriod] =
-        useState<ForecastPeriod>("6");
+    const [forecastPeriod, setForecastPeriod] = useState<ForecastPeriod>("6");
 
-    const [forecastData, setForecastData] =
-        useState<ForecastResponse>(() =>
-            initialForecast
-                ? normalizeBackendForecast(
-                      initialForecast,
-                  )
-                : emptyForecastResponse(),
-        );
+    const [forecastData, setForecastData] = useState<ForecastResponse>(() =>
+        initialForecast
+            ? normalizeBackendForecast(initialForecast)
+            : emptyForecastResponse(),
+    );
 
-    const [loading, setLoading] =
-        useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const [error, setError] =
-        useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const [lastRefreshed, setLastRefreshed] =
-        useState<Date>(new Date());
+    const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
     const loadForecast = useCallback(
-        async (
-            type: ForecastType,
-            period: ForecastPeriod,
-        ) => {
+        async (type: ForecastType, period: ForecastPeriod) => {
             setLoading(true);
             setError(null);
 
             try {
-                const params =
-                    new URLSearchParams();
+                const params = new URLSearchParams();
 
                 params.set("type", type);
                 params.set("period", period);
-                params.set(
-                    "_ts",
-                    Date.now().toString(),
-                );
+                params.set("_ts", Date.now().toString());
 
                 const response = await fetch(
                     `/admin/forecasting/data?${params.toString()}`,
@@ -909,18 +822,14 @@ function AdminForecasting() {
                         method: "GET",
 
                         headers: {
-                            Accept:
-                                "application/json",
+                            Accept: "application/json",
 
-                            "X-Requested-With":
-                                "XMLHttpRequest",
+                            "X-Requested-With": "XMLHttpRequest",
 
-                            "Cache-Control":
-                                "no-cache, no-store, max-age=0",
+                            "Cache-Control": "no-cache, no-store, max-age=0",
                         },
 
-                        credentials:
-                            "same-origin",
+                        credentials: "same-origin",
 
                         cache: "no-store",
                     },
@@ -930,11 +839,9 @@ function AdminForecasting() {
                     let serverMessage = "";
 
                     try {
-                        const body =
-                            await response.json();
+                        const body = await response.json();
 
-                        serverMessage =
-                            body?.message ?? "";
+                        serverMessage = body?.message ?? "";
                     } catch {}
 
                     throw new Error(
@@ -943,21 +850,15 @@ function AdminForecasting() {
                     );
                 }
 
-                const result =
-                    (await response.json()) as ForecastApiResponse;
+                const result = (await response.json()) as ForecastApiResponse;
 
-                if (
-                    !result ||
-                    typeof result !== "object"
-                ) {
+                if (!result || typeof result !== "object") {
                     throw new Error(
                         "The forecasting server returned an invalid response.",
                     );
                 }
 
-                if (
-                    result.success === false
-                ) {
+                if (result.success === false) {
                     throw new Error(
                         result.message ??
                             "The forecasting server could not generate the forecast.",
@@ -966,53 +867,32 @@ function AdminForecasting() {
 
                 const payload =
                     result.data &&
-                    typeof result.data ===
-                        "object" &&
-                    !Array.isArray(
-                        result.data,
-                    )
+                    typeof result.data === "object" &&
+                    !Array.isArray(result.data)
                         ? {
                               ...(result.data as BackendForecastResponse),
 
                               type:
-                                  (
-                                      result.data as BackendForecastResponse
-                                  ).type ??
-                                  result.type,
+                                  (result.data as BackendForecastResponse)
+                                      .type ?? result.type,
 
                               period:
-                                  (
-                                      result.data as BackendForecastResponse
-                                  ).period ??
-                                  result.period,
+                                  (result.data as BackendForecastResponse)
+                                      .period ?? result.period,
                           }
                         : result;
 
-                const normalized =
-                    normalizeBackendForecast(
-                        payload,
-                    );
+                const normalized = normalizeBackendForecast(payload);
 
-                if (
-                    normalized.requested_type !==
-                    type
-                ) {
-                    normalized.requested_type =
-                        type;
+                if (normalized.requested_type !== type) {
+                    normalized.requested_type = type;
                 }
 
-                setForecastData(
-                    normalized,
-                );
+                setForecastData(normalized);
 
-                setLastRefreshed(
-                    new Date(),
-                );
+                setLastRefreshed(new Date());
             } catch (err) {
-                console.error(
-                    "Admin forecasting error:",
-                    err,
-                );
+                console.error("Admin forecasting error:", err);
 
                 setError(
                     err instanceof Error
@@ -1027,69 +907,49 @@ function AdminForecasting() {
     );
 
     useEffect(() => {
-        loadForecast(
-            forecastType,
-            forecastPeriod,
+        loadForecast(forecastType, forecastPeriod);
+    }, [forecastType, forecastPeriod, loadForecast]);
+    // ✅ Auto-refresh disabled — manual "Run Forecast" button na lang
+    // useEffect(() => {
+    //     const interval =
+    //         window.setInterval(() => {
+    //             loadForecast(
+    //                 forecastType,
+    //                 forecastPeriod,
+    //             );
+    //         }, 30_000);
+    //
+    //     return () =>
+    //         window.clearInterval(
+    //             interval,
+    //         );
+    // }, [
+    //     forecastType,
+    //     forecastPeriod,
+    //     loadForecast,
+    // ]);
+
+    const handleGenerate = () => loadForecast(forecastType, forecastPeriod);
+
+    const activeMetric = useMemo<ForecastMetric>(() => {
+        const metric =
+            forecastType === "revenue"
+                ? forecastData.revenue
+                : forecastType === "payments"
+                  ? forecastData.payments
+                  : forecastType === "invoices"
+                    ? forecastData.invoices
+                    : forecastData.contracts;
+
+        return (
+            metric ??
+            createEmptyMetric(
+                forecastType === "revenue" || forecastType === "payments"
+                    ? "currency"
+                    : "number",
+            )
         );
-    }, [
-        forecastType,
-        forecastPeriod,
-        loadForecast,
-    ]);
-
-    useEffect(() => {
-        const interval =
-            window.setInterval(() => {
-                loadForecast(
-                    forecastType,
-                    forecastPeriod,
-                );
-            }, 30_000);
-
-        return () =>
-            window.clearInterval(
-                interval,
-            );
-    }, [
-        forecastType,
-        forecastPeriod,
-        loadForecast,
-    ]);
-
-    const handleGenerate = () =>
-        loadForecast(
-            forecastType,
-            forecastPeriod,
-        );
-
-    const activeMetric =
-        useMemo<ForecastMetric>(() => {
-            const metric =
-                forecastType === "revenue"
-                    ? forecastData.revenue
-                    : forecastType ===
-                        "payments"
-                      ? forecastData.payments
-                      : forecastType ===
-                          "invoices"
-                        ? forecastData.invoices
-                        : forecastData.contracts;
-
-            return (
-                metric ??
-                createEmptyMetric(
-                    forecastType ===
-                        "revenue" ||
-                        forecastType ===
-                            "payments"
-                        ? "currency"
-                        : "number",
-                )
-            );
-        }, [
-            forecastData,
-            forecastType,
-        ]);
+    }, [forecastData, forecastType]);
 
     const forecastLabel =
         forecastType === "revenue"
@@ -1101,12 +961,10 @@ function AdminForecasting() {
                 : "Contracts";
 
     const isCurrency =
-        forecastType === "revenue" ||
-        forecastType === "payments";
+        forecastType === "revenue" || forecastType === "payments";
 
     const chartData = useMemo(() => {
-        const rows =
-            activeMetric.data ?? [];
+        const rows = activeMetric.data ?? [];
 
         if (!rows.length) {
             return [];
@@ -1116,168 +974,108 @@ function AdminForecasting() {
             ...item,
 
             actual:
-                item.actual !== null &&
-                item.actual !== undefined
+                item.actual !== null && item.actual !== undefined
                     ? Number(item.actual)
                     : undefined,
 
             forecast:
-                item.forecast !== null &&
-                item.forecast !== undefined
+                item.forecast !== null && item.forecast !== undefined
                     ? Number(item.forecast)
                     : undefined,
         }));
     }, [activeMetric]);
 
-    const projectedValues =
-        useMemo(() => {
-            return (
-                activeMetric.forecast ?? []
+    const projectedValues = useMemo(() => {
+        return (activeMetric.forecast ?? [])
+            .filter(
+                (item) => item.forecast !== null && item.forecast !== undefined,
             )
-                .filter(
-                    (item) =>
-                        item.forecast !==
-                            null &&
-                        item.forecast !==
-                            undefined,
-                )
-                .slice(
-                    0,
-                    Number(
-                        forecastPeriod,
-                    ),
-                );
-        }, [
-            activeMetric,
-            forecastPeriod,
-        ]);
+            .slice(0, Number(forecastPeriod));
+    }, [activeMetric, forecastPeriod]);
 
-    const latestActual =
-        Number(
-            activeMetric.latest_actual,
-        ) || 0;
+    const latestActual = Number(activeMetric.latest_actual) || 0;
 
     const dataQuality =
-        forecastData.data_quality ??
-        emptyForecastResponse()
-            .data_quality;
+        forecastData.data_quality ?? emptyForecastResponse().data_quality;
 
-    const insights =
-        forecastData.insights ?? [];
+    const insights = forecastData.insights ?? [];
 
-    const formatYAxis = (
-        value: number,
-    ) =>
-        isCurrency
-            ? formatCompactValue(value)
-            : formatNumber(value);
+    const formatYAxis = (value: number) =>
+        isCurrency ? formatCompactValue(value) : formatNumber(value);
 
-    const actualCount =
-        activeMetric.historical.filter(
-            (item) =>
-                Number(
-                    item.actual ?? 0,
-                ) > 0,
-        ).length;
+    const actualCount = activeMetric.historical.filter(
+        (item) => Number(item.actual ?? 0) > 0,
+    ).length;
 
-    const mainChartData =
-        chartData;
+    const mainChartData = chartData;
 
-    const historicalBarData =
-        activeMetric.historical
-            .slice(-12)
-            .map((item) => ({
-                label: item.label,
-                actual:
-                    Number(
-                        item.actual,
-                    ) || 0,
-            }));
+    const historicalBarData = activeMetric.historical
+        .slice(-12)
+        .map((item) => ({
+            label: item.label,
+            actual: Number(item.actual) || 0,
+        }));
 
-    const monthOverMonthData =
-        projectedValues.map(
-            (item, index) => {
-                const prev =
-                    index === 0
-                        ? latestActual
-                        : Number(
-                              projectedValues[
-                                  index - 1
-                              ].forecast,
-                          ) || 0;
+    const monthOverMonthData = projectedValues.map((item, index) => {
+        const prev =
+            index === 0
+                ? latestActual
+                : Number(projectedValues[index - 1].forecast) || 0;
 
-                const current =
-                    Number(
-                        item.forecast,
-                    ) || 0;
+        const current = Number(item.forecast) || 0;
 
-                const change =
-                    prev > 0
-                        ? ((current - prev) /
-                              prev) *
-                          100
-                        : 0;
+        const change = prev > 0 ? ((current - prev) / prev) * 100 : 0;
 
-                return {
-                    label: item.label,
-                    change: Number(
-                        change.toFixed(2),
-                    ),
-                };
-            },
-        );
+        return {
+            label: item.label,
+            change: Number(change.toFixed(2)),
+        };
+    });
 
     return (
         <>
             <Head title="Admin — Forecast Analytics" />
 
             <AdminLayout>
-                <div className="min-h-screen bg-black p-4 font-sans text-white sm:p-6">
+                <div className="min-h-screen bg-gray-50 dark:bg-black p-4 font-sans text-gray-900 dark:text-white sm:p-6">
                     <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                         <div>
                             <div className="mb-2 flex items-center gap-2">
                                 <div className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)]" />
 
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-400">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-600 dark:text-yellow-400">
                                     ALIBATON ADMIN ANALYTICS
                                 </span>
                             </div>
 
-                            <h1 className="text-2xl font-black tracking-tight text-white">
+                            <h1 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">
                                 Forecast Analytics
                             </h1>
 
-                            <p className="mt-1 max-w-2xl text-sm text-slate-400">
-                                Company-wide predictive
-                                insights based on live
-                                financial, payment,
-                                invoice, and contract
-                                records across all
-                                users and clients.
+                            <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-slate-400">
+                                Company-wide predictive insights based on live
+                                financial, payment, invoice, and contract
+                                records across all users and clients.
                             </p>
 
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/20 bg-yellow-400/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-yellow-400">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/20 bg-yellow-400/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
                                     <Shield size={11} />
                                     Admin View
                                 </span>
 
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                    <BarChart3
-                                        size={11}
-                                    />
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-gray-600 dark:text-slate-400">
+                                    <BarChart3 size={11} />
                                     Overall Company
                                 </span>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <div className="hidden text-right text-[10px] text-slate-500 sm:block">
+                            <div className="hidden text-right text-[10px] text-gray-500 dark:text-slate-500 sm:block">
                                 <p>
                                     Last updated:{" "}
-                                    {lastRefreshed.toLocaleTimeString(
-                                        "en-PH",
-                                    )}
+                                    {lastRefreshed.toLocaleTimeString("en-PH")}
                                 </p>
 
                                 <p className="flex items-center justify-end gap-1">
@@ -1287,24 +1085,16 @@ function AdminForecasting() {
                             </div>
 
                             <button
-                                onClick={
-                                    handleGenerate
-                                }
+                                onClick={handleGenerate}
                                 disabled={loading}
                                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-yellow-400/30 bg-yellow-400 px-5 py-2.5 text-sm font-black text-black shadow-lg shadow-yellow-400/10 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 <RefreshCw
                                     size={16}
-                                    className={
-                                        loading
-                                            ? "animate-spin"
-                                            : ""
-                                    }
+                                    className={loading ? "animate-spin" : ""}
                                 />
 
-                                {loading
-                                    ? "Updating..."
-                                    : "Run Forecast"}
+                                {loading ? "Updating..." : "Run Forecast"}
                             </button>
                         </div>
                     </div>
@@ -1313,144 +1103,116 @@ function AdminForecasting() {
                         <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-900/70 bg-red-950/40 p-4">
                             <AlertTriangle
                                 size={18}
-                                className="mt-0.5 shrink-0 text-red-400"
+                                className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
                             />
 
                             <div className="min-w-0">
-                                <p className="text-sm font-bold text-red-300">
-                                    Forecasting data
-                                    could not be
-                                    loaded
+                                <p className="text-sm font-bold text-red-700 dark:text-red-300">
+                                    Forecasting data could not be loaded
                                 </p>
 
-                                <p className="mt-1 break-words text-xs text-red-400">
+                                <p className="mt-1 break-words text-xs text-red-600 dark:text-red-400">
                                     {error}
                                 </p>
                             </div>
                         </div>
                     )}
 
-                    <section className="mb-5 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-xl">
+                    <section className="mb-5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xl">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                             <div>
-                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                     Forecast Type
                                 </label>
 
                                 <select
-                                    value={
-                                        forecastType
-                                    }
+                                    value={forecastType}
                                     onChange={(e) =>
                                         setForecastType(
-                                            e.target
-                                                .value as ForecastType,
+                                            e.target.value as ForecastType,
                                         )
                                     }
-                                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-medium text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
+                                    className="w-full rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-xs font-medium text-gray-900 dark:text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
                                 >
                                     <option value="revenue">
-                                        Revenue
-                                        Forecast
+                                        Revenue Forecast
                                     </option>
 
                                     <option value="payments">
-                                        Payments
-                                        Forecast
+                                        Payments Forecast
                                     </option>
 
                                     <option value="invoices">
-                                        Invoices
-                                        Forecast
+                                        Invoices Forecast
                                     </option>
 
                                     <option value="contracts">
-                                        Contracts
-                                        Forecast
+                                        Contracts Forecast
                                     </option>
                                 </select>
                             </div>
 
                             <div>
-                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                     Period
                                 </label>
 
                                 <select
-                                    value={
-                                        forecastPeriod
-                                    }
+                                    value={forecastPeriod}
                                     onChange={(e) =>
                                         setForecastPeriod(
-                                            e.target
-                                                .value as ForecastPeriod,
+                                            e.target.value as ForecastPeriod,
                                         )
                                     }
-                                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-medium text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
+                                    className="w-full rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-xs font-medium text-gray-900 dark:text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
                                 >
-                                    <option value="3">
-                                        Next 3 Months
-                                    </option>
+                                    <option value="3">Next 3 Months</option>
 
-                                    <option value="6">
-                                        Next 6 Months
-                                    </option>
+                                    <option value="6">Next 6 Months</option>
 
-                                    <option value="12">
-                                        Next 12 Months
-                                    </option>
+                                    <option value="12">Next 12 Months</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                     Scope
                                 </label>
 
                                 <select
                                     disabled
-                                    className="w-full cursor-not-allowed rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-600"
+                                    className="w-full cursor-not-allowed rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2 text-xs text-gray-600 dark:text-slate-600"
                                 >
-                                    <option>
-                                        Overall Company
-                                    </option>
+                                    <option>Overall Company</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-500">
                                     Users
                                 </label>
 
                                 <select
                                     disabled
-                                    className="w-full cursor-not-allowed rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-600"
+                                    className="w-full cursor-not-allowed rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2 text-xs text-gray-600 dark:text-slate-600"
                                 >
-                                    <option>
-                                        All Users
-                                    </option>
+                                    <option>All Users</option>
                                 </select>
                             </div>
                         </div>
                     </section>
 
                     <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
-                        <div className="col-span-1 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl xl:col-span-2">
+                        <div className="col-span-1 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl xl:col-span-2">
                             <div className="mb-4 flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-sm font-black text-white">
-                                        Company-Wide{" "}
-                                        {
-                                            forecastLabel
-                                        }{" "}
-                                        Forecast
+                                    <h2 className="text-sm font-black text-gray-900 dark:text-white">
+                                        Company-Wide {forecastLabel} Forecast
                                     </h2>
 
-                                    <p className="mt-0.5 text-[10px] text-slate-500">
-                                        Historical actuals
-                                        vs model forecast
-                                        — aggregated
-                                        across all users
+                                    <p className="mt-0.5 text-[10px] text-gray-500 dark:text-slate-500">
+                                        Historical actuals vs model forecast —
+                                        aggregated across all users
                                     </p>
                                 </div>
 
@@ -1458,7 +1220,7 @@ function AdminForecasting() {
                                     <div className="flex items-center gap-1.5">
                                         <span className="h-2 w-2 rounded-sm bg-blue-500" />
 
-                                        <span className="text-slate-400">
+                                        <span className="text-gray-600 dark:text-slate-400">
                                             Actual
                                         </span>
                                     </div>
@@ -1466,7 +1228,7 @@ function AdminForecasting() {
                                     <div className="flex items-center gap-1.5">
                                         <span className="h-2 w-2 rounded-sm bg-emerald-400" />
 
-                                        <span className="text-slate-400">
+                                        <span className="text-gray-600 dark:text-slate-400">
                                             Forecast
                                         </span>
                                     </div>
@@ -1474,19 +1236,16 @@ function AdminForecasting() {
                             </div>
 
                             <div className="h-[280px] w-full">
-                                {mainChartData.length ===
-                                0 ? (
-                                    <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-800">
+                                {mainChartData.length === 0 ? (
+                                    <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 dark:border-slate-800">
                                         <div className="text-center">
                                             <AlertTriangle
                                                 size={22}
-                                                className="mx-auto mb-2 text-slate-600"
+                                                className="mx-auto mb-2 text-gray-600 dark:text-slate-600"
                                             />
 
-                                            <p className="text-xs font-semibold text-slate-500">
-                                                No historical
-                                                data
-                                                available.
+                                            <p className="text-xs font-semibold text-gray-500 dark:text-slate-500">
+                                                No historical data available.
                                             </p>
                                         </div>
                                     </div>
@@ -1496,9 +1255,7 @@ function AdminForecasting() {
                                         height="100%"
                                     >
                                         <ComposedChart
-                                            data={
-                                                mainChartData
-                                            }
+                                            data={mainChartData}
                                             margin={{
                                                 top: 10,
                                                 right: 10,
@@ -1508,19 +1265,13 @@ function AdminForecasting() {
                                         >
                                             <CartesianGrid
                                                 stroke="#1e293b"
-                                                vertical={
-                                                    false
-                                                }
+                                                vertical={false}
                                             />
 
                                             <XAxis
                                                 dataKey="label"
-                                                axisLine={
-                                                    false
-                                                }
-                                                tickLine={
-                                                    false
-                                                }
+                                                axisLine={false}
+                                                tickLine={false}
                                                 tick={{
                                                     fill: "#64748b",
                                                     fontSize: 10,
@@ -1529,28 +1280,20 @@ function AdminForecasting() {
                                             />
 
                                             <YAxis
-                                                axisLine={
-                                                    false
-                                                }
-                                                tickLine={
-                                                    false
-                                                }
+                                                axisLine={false}
+                                                tickLine={false}
                                                 tick={{
                                                     fill: "#64748b",
                                                     fontSize: 10,
                                                 }}
-                                                tickFormatter={
-                                                    formatYAxis
-                                                }
+                                                tickFormatter={formatYAxis}
                                                 width={70}
                                             />
 
                                             <Tooltip
                                                 content={
                                                     <ForecastTooltip
-                                                        isCurrency={
-                                                            isCurrency
-                                                        }
+                                                        isCurrency={isCurrency}
                                                     />
                                                 }
                                             />
@@ -1558,15 +1301,8 @@ function AdminForecasting() {
                                             <Bar
                                                 dataKey="actual"
                                                 fill="#3b82f6"
-                                                barSize={
-                                                    26
-                                                }
-                                                radius={[
-                                                    3,
-                                                    3,
-                                                    0,
-                                                    0,
-                                                ]}
+                                                barSize={26}
+                                                radius={[3, 3, 0, 0]}
                                                 name="Actual"
                                             />
 
@@ -1574,9 +1310,7 @@ function AdminForecasting() {
                                                 type="monotone"
                                                 dataKey="forecast"
                                                 stroke="#34d399"
-                                                strokeWidth={
-                                                    2
-                                                }
+                                                strokeWidth={2}
                                                 dot={{
                                                     r: 3,
                                                     fill: "#34d399",
@@ -1595,112 +1329,112 @@ function AdminForecasting() {
                             </div>
                         </div>
 
-                        <div className="col-span-1 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                            <h2 className="mb-4 flex items-center gap-1.5 text-sm font-black text-white">
+                        <div className="col-span-1 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                            <h2 className="mb-4 flex items-center gap-1.5 text-sm font-black text-gray-900 dark:text-white">
                                 <Sparkles
                                     size={14}
-                                    className="text-yellow-400"
+                                    className="text-yellow-600 dark:text-yellow-400"
                                 />
-                                Key Forecast
-                                Insights
+                                Key Forecast Insights
                             </h2>
 
                             <div className="space-y-3">
-                                {insights.length >
-                                0 ? (
-                                    insights
-                                        .slice(
-                                            0,
-                                            4,
-                                        )
-                                        .map(
-                                            (
-                                                insight,
-                                                idx,
-                                            ) => (
+                                {insights.length > 0 ? (
+                                    insights.slice(0, 8).map((insight, idx) => {
+                                        const iconWrap =
+                                            insight.type === "positive"
+                                                ? "bg-emerald-400/10 text-emerald-600 dark:text-emerald-400"
+                                                : insight.type === "warning"
+                                                  ? "bg-amber-400/10 text-amber-600 dark:text-amber-400"
+                                                  : insight.type === "neutral"
+                                                    ? "bg-slate-400/10 text-gray-500 dark:text-slate-400"
+                                                    : "bg-blue-400/10 text-blue-600 dark:text-blue-400";
+
+                                        const InsightIcon =
+                                            insight.type === "positive"
+                                                ? ArrowUpRight
+                                                : insight.type === "warning"
+                                                  ? ArrowDownRight
+                                                  : insight.type === "neutral"
+                                                    ? BarChart3
+                                                    : Info;
+
+                                        const showValue =
+                                            typeof insight.value === "number" &&
+                                            Number.isFinite(insight.value) &&
+                                            insight.value !== 0;
+
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className="flex gap-2"
+                                            >
                                                 <div
-                                                    key={
-                                                        idx
-                                                    }
-                                                    className="flex gap-2"
+                                                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${iconWrap}`}
                                                 >
-                                                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-400/10 text-yellow-400">
-                                                        <ArrowUpRight
-                                                            size={
-                                                                11
-                                                            }
-                                                        />
-                                                    </div>
-
-                                                    <div className="min-w-0">
-                                                        <p className="text-[11px] font-bold leading-tight text-white">
-                                                            {
-                                                                insight.title
-                                                            }
-                                                        </p>
-
-                                                        <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-                                                            {
-                                                                insight.message
-                                                            }
-                                                        </p>
-                                                    </div>
+                                                    <InsightIcon size={11} />
                                                 </div>
-                                            ),
-                                        )
+
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <p className="text-[11px] font-bold leading-tight text-gray-900 dark:text-white">
+                                                            {insight.title}
+                                                        </p>
+
+                                                        {showValue && (
+                                                            <span
+                                                                className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-black ${iconWrap}`}
+                                                            >
+                                                                {isCurrency
+                                                                    ? formatCurrency(
+                                                                          insight.value,
+                                                                      )
+                                                                    : formatNumber(
+                                                                          insight.value,
+                                                                      )}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                                        {insight.message}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
                                 ) : (
                                     <>
                                         <div className="flex gap-2">
-                                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-400">
-                                                <ArrowUpRight
-                                                    size={
-                                                        11
-                                                    }
-                                                />
+                                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-600 dark:text-emerald-400">
+                                                <ArrowUpRight size={11} />
                                             </div>
 
                                             <div>
-                                                <p className="text-[11px] font-bold leading-tight text-white">
-                                                    Company
-                                                    forecast
-                                                    generated
+                                                <p className="text-[11px] font-bold leading-tight text-gray-900 dark:text-white">
+                                                    Company forecast generated
                                                 </p>
 
-                                                <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-                                                    Based
-                                                    on all
-                                                    live
-                                                    database
-                                                    records
-                                                    across
-                                                    users.
+                                                <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                                    Based on all live database
+                                                    records across users.
                                                 </p>
                                             </div>
                                         </div>
 
                                         <div className="flex gap-2">
-                                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-400/10 text-blue-400">
-                                                <BarChart3
-                                                    size={
-                                                        11
-                                                    }
-                                                />
+                                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-400/10 text-blue-600 dark:text-blue-400">
+                                                <BarChart3 size={11} />
                                             </div>
 
                                             <div>
-                                                <p className="text-[11px] font-bold leading-tight text-white">
-                                                    Historical
-                                                    coverage
+                                                <p className="text-[11px] font-bold leading-tight text-gray-900 dark:text-white">
+                                                    Historical coverage
                                                 </p>
 
-                                                <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-                                                    {
-                                                        actualCount
-                                                    }{" "}
-                                                    active
-                                                    historical
-                                                    periods
-                                                    analyzed.
+                                                <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                                    {actualCount} active
+                                                    historical periods analyzed.
                                                 </p>
                                             </div>
                                         </div>
@@ -1711,19 +1445,16 @@ function AdminForecasting() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-                        <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                            <h3 className="mb-4 text-xs font-black text-white">
-                                Historical Activity
-                                (Last 12 Months)
+                        <div className="flex flex-col rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                            <h3 className="mb-4 text-xs font-black text-gray-900 dark:text-white">
+                                Historical Activity (Last 12 Months)
                             </h3>
 
                             <div className="h-[180px] w-full">
-                                {historicalBarData.length ===
-                                0 ? (
+                                {historicalBarData.length === 0 ? (
                                     <div className="flex h-full items-center justify-center">
-                                        <p className="text-xs text-slate-600">
-                                            No historical
-                                            data.
+                                        <p className="text-xs text-gray-600 dark:text-slate-600">
+                                            No historical data.
                                         </p>
                                     </div>
                                 ) : (
@@ -1732,9 +1463,7 @@ function AdminForecasting() {
                                         height="100%"
                                     >
                                         <BarChart
-                                            data={
-                                                historicalBarData
-                                            }
+                                            data={historicalBarData}
                                             margin={{
                                                 top: 5,
                                                 right: 5,
@@ -1744,19 +1473,13 @@ function AdminForecasting() {
                                         >
                                             <CartesianGrid
                                                 stroke="#1e293b"
-                                                vertical={
-                                                    false
-                                                }
+                                                vertical={false}
                                             />
 
                                             <XAxis
                                                 dataKey="label"
-                                                axisLine={
-                                                    false
-                                                }
-                                                tickLine={
-                                                    false
-                                                }
+                                                axisLine={false}
+                                                tickLine={false}
                                                 tick={{
                                                     fill: "#64748b",
                                                     fontSize: 9,
@@ -1764,27 +1487,19 @@ function AdminForecasting() {
                                             />
 
                                             <YAxis
-                                                axisLine={
-                                                    false
-                                                }
-                                                tickLine={
-                                                    false
-                                                }
+                                                axisLine={false}
+                                                tickLine={false}
                                                 tick={{
                                                     fill: "#64748b",
                                                     fontSize: 10,
                                                 }}
-                                                tickFormatter={
-                                                    formatYAxis
-                                                }
+                                                tickFormatter={formatYAxis}
                                             />
 
                                             <Tooltip
                                                 content={
                                                     <SimpleValueTooltip
-                                                        isCurrency={
-                                                            isCurrency
-                                                        }
+                                                        isCurrency={isCurrency}
                                                     />
                                                 }
                                             />
@@ -1792,12 +1507,7 @@ function AdminForecasting() {
                                             <Bar
                                                 dataKey="actual"
                                                 fill="#3b82f6"
-                                                radius={[
-                                                    4,
-                                                    4,
-                                                    0,
-                                                    0,
-                                                ]}
+                                                radius={[4, 4, 0, 0]}
                                                 name="Actual"
                                             />
                                         </BarChart>
@@ -1805,25 +1515,20 @@ function AdminForecasting() {
                                 )}
                             </div>
 
-                            <div className="mt-auto border-t border-slate-800 pt-3 text-center text-[10px] text-slate-600">
-                                {
-                                    historicalBarData.length
-                                }{" "}
-                                historical periods
+                            <div className="mt-auto border-t border-gray-200 dark:border-slate-800 pt-3 text-center text-[10px] text-gray-600 dark:text-slate-600">
+                                {historicalBarData.length} historical periods
                             </div>
                         </div>
 
-                        <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                            <h3 className="mb-4 text-xs font-black text-white">
-                                Month-over-Month
-                                Change (%)
+                        <div className="flex flex-col rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                            <h3 className="mb-4 text-xs font-black text-gray-900 dark:text-white">
+                                Month-over-Month Change (%)
                             </h3>
 
                             <div className="h-[180px] w-full">
-                                {monthOverMonthData.length ===
-                                0 ? (
+                                {monthOverMonthData.length === 0 ? (
                                     <div className="flex h-full items-center justify-center">
-                                        <p className="text-xs text-slate-600">
+                                        <p className="text-xs text-gray-600 dark:text-slate-600">
                                             No MoM data.
                                         </p>
                                     </div>
@@ -1833,9 +1538,7 @@ function AdminForecasting() {
                                         height="100%"
                                     >
                                         <LineChart
-                                            data={
-                                                monthOverMonthData
-                                            }
+                                            data={monthOverMonthData}
                                             margin={{
                                                 top: 5,
                                                 right: 5,
@@ -1845,19 +1548,13 @@ function AdminForecasting() {
                                         >
                                             <CartesianGrid
                                                 stroke="#1e293b"
-                                                vertical={
-                                                    false
-                                                }
+                                                vertical={false}
                                             />
 
                                             <XAxis
                                                 dataKey="label"
-                                                axisLine={
-                                                    false
-                                                }
-                                                tickLine={
-                                                    false
-                                                }
+                                                axisLine={false}
+                                                tickLine={false}
                                                 tick={{
                                                     fill: "#64748b",
                                                     fontSize: 9,
@@ -1865,21 +1562,13 @@ function AdminForecasting() {
                                             />
 
                                             <YAxis
-                                                axisLine={
-                                                    false
-                                                }
-                                                tickLine={
-                                                    false
-                                                }
+                                                axisLine={false}
+                                                tickLine={false}
                                                 tick={{
                                                     fill: "#64748b",
                                                     fontSize: 10,
                                                 }}
-                                                tickFormatter={(
-                                                    v,
-                                                ) =>
-                                                    `${v}%`
-                                                }
+                                                tickFormatter={(v) => `${v}%`}
                                             />
 
                                             <Tooltip
@@ -1891,28 +1580,22 @@ function AdminForecasting() {
                                                     if (
                                                         !active ||
                                                         !payload ||
-                                                        payload.length ===
-                                                            0
+                                                        payload.length === 0
                                                     ) {
                                                         return null;
                                                     }
 
-                                                    const value =
-                                                        Number(
-                                                            payload[0]
-                                                                ?.value ??
-                                                                0,
-                                                        );
+                                                    const value = Number(
+                                                        payload[0]?.value ?? 0,
+                                                    );
 
                                                     return (
-                                                        <div className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 shadow-2xl">
-                                                            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                                                {
-                                                                    label
-                                                                }
+                                                        <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 shadow-2xl">
+                                                            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-slate-400">
+                                                                {label}
                                                             </p>
 
-                                                            <p className="text-xs font-bold text-yellow-400">
+                                                            <p className="text-xs font-bold text-yellow-600 dark:text-yellow-400">
                                                                 {value.toFixed(
                                                                     2,
                                                                 )}
@@ -1927,9 +1610,7 @@ function AdminForecasting() {
                                                 type="monotone"
                                                 dataKey="change"
                                                 stroke="#facc15"
-                                                strokeWidth={
-                                                    2
-                                                }
+                                                strokeWidth={2}
                                                 dot={{
                                                     r: 3,
                                                     fill: "#facc15",
@@ -1940,11 +1621,8 @@ function AdminForecasting() {
                                 )}
                             </div>
 
-                            <div className="mt-auto border-t border-slate-800 pt-3 text-center text-[10px] text-slate-600">
-                                {
-                                    monthOverMonthData.length
-                                }{" "}
-                                forecast periods
+                            <div className="mt-auto border-t border-gray-200 dark:border-slate-800 pt-3 text-center text-[10px] text-gray-600 dark:text-slate-600">
+                                {monthOverMonthData.length} forecast periods
                             </div>
                         </div>
 
@@ -1952,117 +1630,94 @@ function AdminForecasting() {
                             STATIC NOTES — REPLACED RISK ASSESSMENT
                         ====================================================== */}
 
-                        <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-                            <h3 className="mb-4 flex items-center gap-2 text-xs font-black text-white">
+                        <div className="flex flex-col rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xl">
+                            <h3 className="mb-4 flex items-center gap-2 text-xs font-black text-gray-900 dark:text-white">
                                 <BarChart3
                                     size={14}
-                                    className="text-yellow-400"
+                                    className="text-yellow-600 dark:text-yellow-400"
                                 />
                                 Notes
                             </h3>
 
                             <div className="flex-1 space-y-3">
-                                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                                    <p className="text-[11px] font-semibold text-white">
+                                <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3">
+                                    <p className="text-[11px] font-semibold text-gray-900 dark:text-white">
                                         Forecast data
                                     </p>
 
-                                    <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
-                                        Forecasts are
-                                        generated from
-                                        historical
-                                        ALIBATON
-                                        financial,
-                                        payment,
-                                        invoice, and
-                                        contract
-                                        records.
+                                    <p className="mt-1 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                        Forecasts are generated from historical
+                                        ALIBATON financial, payment, invoice,
+                                        and contract records.
                                     </p>
                                 </div>
 
-                                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                                    <p className="text-[11px] font-semibold text-white">
-                                        Prediction
-                                        guidance
+                                <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3">
+                                    <p className="text-[11px] font-semibold text-gray-900 dark:text-white">
+                                        Prediction guidance
                                     </p>
 
-                                    <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
-                                        Forecast values
-                                        are estimates
-                                        and may change
-                                        as new records
-                                        are added to the
+                                    <p className="mt-1 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                        Forecast values are estimates and may
+                                        change as new records are added to the
                                         system.
                                     </p>
                                 </div>
 
-                                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                                    <p className="text-[11px] font-semibold text-white">
+                                <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3">
+                                    <p className="text-[11px] font-semibold text-gray-900 dark:text-white">
                                         Data coverage
                                     </p>
 
-                                    <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
-                                        More complete
-                                        historical
-                                        records can
-                                        improve the
-                                        reliability of
-                                        future forecasts.
+                                    <p className="mt-1 text-[10px] leading-relaxed text-gray-500 dark:text-slate-500">
+                                        More complete historical records can
+                                        improve the reliability of future
+                                        forecasts.
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="mt-4 border-t border-slate-800 pt-3 text-center text-[10px] text-slate-600">
-                                Updated automatically
-                                every 30 seconds
+                            <div className="mt-4 border-t border-gray-200 dark:border-slate-800 pt-3 text-center text-[10px] text-gray-600 dark:text-slate-600">
+                                Updated automatically every 30 seconds
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900 p-3 shadow-xl">
+                    <div className="mt-5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xl">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-2">
                                 <div
                                     className={`flex h-6 w-6 items-center justify-center rounded-full ${
                                         dataQuality.has_sufficient_history
-                                            ? "bg-emerald-400/10 text-emerald-400"
-                                            : "bg-amber-400/10 text-amber-400"
+                                            ? "bg-emerald-400/10 text-emerald-600 dark:text-emerald-400"
+                                            : "bg-amber-400/10 text-amber-600 dark:text-amber-400"
                                     }`}
                                 >
-                                    <CheckCircle2
-                                        size={13}
-                                    />
+                                    <CheckCircle2 size={13} />
                                 </div>
 
                                 <div>
-                                    <p className="text-[11px] font-semibold text-white">
+                                    <p className="text-[11px] font-semibold text-gray-900 dark:text-white">
                                         {loading
                                             ? "Updating system data..."
                                             : "Connected to ALIBATON live database"}
                                     </p>
 
-                                    <p className="text-[10px] text-slate-500">
-                                        {
-                                            dataQuality.message
-                                        }
+                                    <p className="text-[10px] text-gray-500 dark:text-slate-500">
+                                        {dataQuality.message}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3 text-[9px] text-slate-600">
-                                <span>
-                                    Source: Live DB
-                                    (Company-Wide)
-                                </span>
+                            <div className="flex items-center gap-3 text-[9px] text-gray-600 dark:text-slate-600">
+                                <span>Source: Live DB (Company-Wide)</span>
 
                                 <span>
                                     Last generated:{" "}
                                     {forecastData.generated_at
                                         ? new Date(
                                               forecastData.generated_at,
-                                          ).toLocaleString(
-                                              "en-PH",
-                                          )
+                                          ).toLocaleString("en-PH")
                                         : "—"}
                                 </span>
                             </div>

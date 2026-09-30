@@ -11,8 +11,13 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('theme');
-            if (saved) return saved === 'dark';
+            // Keep this key in sync with the inline script in
+            // resources/views/app.blade.php ("alibaton-theme").
+            const saved =
+                localStorage.getItem('alibaton-theme') ??
+                localStorage.getItem('theme');
+            if (saved === 'dark') return true;
+            if (saved === 'light') return false;
             return window.matchMedia('(prefers-color-scheme: dark)').matches;
         }
         return true;
@@ -25,7 +30,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             document.documentElement.classList.remove('dark');
         }
         if (typeof window !== 'undefined') {
-            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+            localStorage.setItem('alibaton-theme', isDarkMode ? 'dark' : 'light');
+            // Remove the legacy key so it can't fight the new one.
+            localStorage.removeItem('theme');
         }
     }, [isDarkMode]);
 
