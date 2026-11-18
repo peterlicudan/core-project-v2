@@ -1,0 +1,49 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('activity_logs', function (Blueprint $table) {
+            $table->id();
+
+            // Who did the action
+            $table->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('actor_name')->nullable();
+            $table->string('actor_email')->nullable();
+            $table->string('actor_role')->nullable();
+
+            // Who/what was targeted
+            $table->foreignId('target_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('target_name')->nullable();
+            $table->string('target_email')->nullable();
+
+            // What happened
+            $table->string('action', 100);
+            $table->string('action_label')->nullable();
+            $table->text('description')->nullable();
+            $table->json('metadata')->nullable();
+
+            // Context
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+
+            $table->timestamps();
+
+            // Indexes for fast queries
+            $table->index(['actor_id', 'created_at']);
+            $table->index(['target_user_id', 'created_at']);
+            $table->index(['action', 'created_at']);
+            $table->index('created_at');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('activity_logs');
+    }
+};

@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/*
+|--------------------------------------------------------------------------
+| DARK MODE VARIANT
+|--------------------------------------------------------------------------
+|
+| By default Tailwind v4's `dark:` variant follows the OS setting
+| (`prefers-color-scheme`). We need it to follow OUR OWN theme toggle
+| instead, which adds/removes the `.dark` class on <html>.
+|
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+
+@keyframes galleryMove {
+
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
+    }
+
+}
+
+
+.gallery-scroll {
+
+    display: flex;
+    width: max-content;
+    animation: galleryMove 35s linear infinite;
+    will-change: transform;
+
+}
+
+
+.gallery-scroll:hover {
+
+    animation-play-state: paused;
+
+}
+
+
+/* Custom scrollbar used by Super Admin document tables/lists */
+.sa-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 transparent;
+}
+
+.sa-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.sa-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sa-scrollbar::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+.dark .sa-scrollbar {
+    scrollbar-color: #475569 transparent;
+}
+
+.dark .sa-scrollbar::-webkit-scrollbar-thumb {
+    background: #475569;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
